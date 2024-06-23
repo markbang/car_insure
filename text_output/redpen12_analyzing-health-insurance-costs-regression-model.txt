@@ -1,0 +1,721 @@
+# Supervised Machine Learning: Regression
+
+**If you found this notebook useful, please consider upvoting it!**
+
+# 1\. About the Data¶
+
+**Context:**
+
+> The dataset provided is derived from the book "Machine Learning with R"
+> authored by Brett Lantz, which serves as an introductory guide to machine
+> learning using the R programming language. While the publisher, Packt
+> Publishing, typically does not make their datasets available online unless
+> you purchase the book and create a user account, this dataset has been made
+> publicly accessible with some necessary cleaning and recoding to align with
+> the book's format. This accessibility is particularly valuable for
+> individuals who might not have access to the book, such as library users or
+> those borrowing the book from friends.
+
+**Content:**
+
+The dataset consists of several columns, each representing different
+attributes or features related to health insurance:
+
+  * **age:** This column represents the age of the primary beneficiary, likely referring to the age of the insured individual.
+
+  * **sex:** Here, the dataset includes information about the gender of the insurance contractor, with possible values being "female" or "male."
+
+  * **bmi:** The BMI, or Body Mass Index, is provided as an indicator of body weight. It offers insights into whether an individual's weight is relatively high or low compared to their height. The BMI is computed as weight in kilograms divided by the square of height in meters. Ideally, a BMI falls within the range of 18.5 to 24.9 to indicate a healthy weight.
+
+  * **children:** This column reflects the number of children covered by health insurance or, more broadly, the number of dependents for the primary beneficiary.
+
+  * **smoker:** The dataset includes information about whether the individual is a smoker or a non-smoker, which is a significant factor in health insurance considerations.
+
+  * **region:** It specifies the beneficiary's residential area in the United States and includes regions like northeast, southeast, southwest, and northwest.
+
+  * **charges:** This column contains data regarding individual medical costs billed by health insurance, which is a fundamental aspect of health insurance analysis and evaluation.
+
+This dataset provides valuable information for exploring various aspects of
+health insurance, including age demographics, gender distribution, BMI, the
+number of dependents, smoking habits, regional differences, and individual
+medical charges. It serves as a practical and illustrative dataset for machine
+learning and data analysis projects, particularly in the context of health
+insurance-related applications.
+
+## Import the required libraries¶
+
+In [1]:
+
+    
+    
+    import pandas as pd
+    import numpy as np
+    np.set_printoptions(suppress=True)
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    from sklearn.linear_model import (
+        LinearRegression,
+        Ridge,
+        Lasso,
+        ElasticNet,
+    
+    )
+    from sklearn.model_selection import KFold, train_test_split, GridSearchCV
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import (
+        PolynomialFeatures,
+        StandardScaler,
+        LabelEncoder
+    )
+    from sklearn.compose import (
+        ColumnTransformer,
+        make_column_selector,
+    )
+    from sklearn.metrics import mean_squared_error, r2_score
+    from zipfile import ZipFile
+    import warnings
+    warnings.filterwarnings('ignore')
+    
+
+## Importing the Dataset¶
+
+In [2]:
+
+    
+    
+    data = pd.read_csv("/kaggle/input/insurance/insurance.csv")
+    data.head()
+    
+
+Out[2]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+  
+# 2\. Objectives¶
+
+**Model Performance Assessment:** Evaluate and compare the performance of
+different regression models by assessing metrics such as RMSE, R-squared (R2)
+scores, and other relevant indicators to determine which model offers the most
+accurate predictions.
+
+**Model Selection and Optimization:** Choose the best regression model from
+the available options, optimizing it through techniques like hyperparameter
+tuning and cross-validation to ensure it provides reliable predictions.
+
+**Interpretability and Insights:** Analyze regression models for
+interpretability, examining variable coefficients and their impact. Provide
+actionable insights into the relationships between variables, ensuring the
+project delivers both predictive power and a clear understanding of the
+underlying dataset.
+
+# 3\. EDA¶
+
+In [3]:
+
+    
+    
+    n, m = data.shape
+    print(f"Number of columns: {m} columns\nNumber of rows: {n} rows")
+    
+    
+    
+    Number of columns: 7 columns
+    Number of rows: 1338 rows
+    
+
+In [4]:
+
+    
+    
+    data.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 1338 entries, 0 to 1337
+    Data columns (total 7 columns):
+     #   Column    Non-Null Count  Dtype  
+    ---  ------    --------------  -----  
+     0   age       1338 non-null   int64  
+     1   sex       1338 non-null   object 
+     2   bmi       1338 non-null   float64
+     3   children  1338 non-null   int64  
+     4   smoker    1338 non-null   object 
+     5   region    1338 non-null   object 
+     6   charges   1338 non-null   float64
+    dtypes: float64(2), int64(2), object(3)
+    memory usage: 73.3+ KB
+    
+
+In [5]:
+
+    
+    
+    data.isnull().sum()
+    
+
+Out[5]:
+
+    
+    
+    age         0
+    sex         0
+    bmi         0
+    children    0
+    smoker      0
+    region      0
+    charges     0
+    dtype: int64
+
+In [6]:
+
+    
+    
+    styled_data = (
+        data.describe()
+        .drop("count", axis=0)
+        .style.background_gradient(axis=0, cmap="magma")
+        .set_properties(**{"text-align": "center"})
+        .set_table_styles([{"selector": "th", "props": [("background-color", "k")]}])
+        .set_caption("Summary Statistics")
+    )
+    
+    styled_data
+    
+
+Out[6]:
+
+Summary Statistics   | age | bmi | children | charges  
+---|---|---|---|---  
+mean | 39.207025 | 30.663397 | 1.094918 | 13270.422265  
+std | 14.049960 | 6.098187 | 1.205493 | 12110.011237  
+min | 18.000000 | 15.960000 | 0.000000 | 1121.873900  
+25% | 27.000000 | 26.296250 | 0.000000 | 4740.287150  
+50% | 39.000000 | 30.400000 | 1.000000 | 9382.033000  
+75% | 51.000000 | 34.693750 | 2.000000 | 16639.912515  
+max | 64.000000 | 53.130000 | 5.000000 | 63770.428010  
+  
+In [7]:
+
+    
+    
+    number_columns = data.select_dtypes("number").drop("charges", axis=1)
+    
+    skewness_before_log = data[number_columns.columns].skew()
+    fig, axes = plt.subplots(
+        nrows=3,
+        ncols=3,
+        figsize=(9, 11),
+        gridspec_kw={"hspace": 0.35, "wspace": 0.3, "width_ratios": [0.5, 0.3, 0.3]},
+    )
+    axes = axes.flatten()
+    i = 0
+    for column in number_columns.columns:
+        ax = axes[i]
+        sns.regplot(
+            data=data,
+            x=column,
+            y="charges",
+            ax=ax,
+            scatter_kws={"alpha": 0.5},
+            marker="o",
+            line_kws={"color": "orange"},
+            order=3,
+        )
+        ax.set_title(f"{column} vs charges", size=9)
+        ax = axes[i + 1]
+        sns.kdeplot(data=data, x=column, ax=ax, fill=False, alpha=0.9, legend=True)
+        skewness = skewness_before_log[column]
+        ax.text(
+            ax.get_xlim()[0],
+            ax.get_ylim()[-1],
+            f"skew: {skewness:.2f}",
+            size=9,
+            weight="bold",
+        )
+    
+        ax = axes[i + 2]
+        sns.boxplot(
+            data=data,
+            y=column,
+            ax=ax,
+            width=0.6,
+            saturation=0.9,
+            linewidth=0.9,
+        )
+        i += 3
+    
+
+![](__results___files/__results___15_0.png)
+
+In [8]:
+
+    
+    
+    fig = plt.figure()
+    plt.subplot(121)
+    sns.histplot(data['charges'], kde=True, color='blue')
+    plt.title('Charges Distribution', size=10)
+    plt.xlabel('Charges')
+    
+    plt.subplot(122)
+    sns.histplot(np.log(data['charges']), kde=True, color='red')
+    plt.title('Log-transformed Charges Distribution', size=10)
+    plt.xlabel('Log(Charges)')
+    plt.tight_layout()
+    plt.show()
+    
+
+![](__results___files/__results___16_0.png)
+
+In [9]:
+
+    
+    
+    corr = data.corr(numeric_only=True)
+    mask = np.triu(np.ones_like(corr, dtype=bool))
+    
+    sns.heatmap(corr, mask=mask, annot=True, fmt=".2%")
+    
+
+Out[9]:
+
+    
+    
+    <Axes: >
+
+![](__results___files/__results___17_1.png)
+
+In [10]:
+
+    
+    
+    data["age group"] = pd.cut(data.age, bins=[0, 40, 60, 100], labels=["young adult", "middle-aged", "old adults"])
+    
+
+In [11]:
+
+    
+    
+    data.groupby("age group")["charges"].agg(["mean", "count"])
+    
+
+Out[11]:
+
+| mean | count  
+---|---|---  
+age group |  |   
+young adult | 10219.422874 | 701  
+middle-aged | 15888.757668 | 546  
+old adults | 21063.163398 | 91  
+  
+In [12]:
+
+    
+    
+    data.groupby("smoker")["charges"].agg(["mean", "count"])
+    
+
+Out[12]:
+
+| mean | count  
+---|---|---  
+smoker |  |   
+no | 8434.268298 | 1064  
+yes | 32050.231832 | 274  
+  
+In [13]:
+
+    
+    
+    from itertools import product
+    from collections import Counter
+    
+    a = data["smoker"].unique().tolist()
+    b = data["age group"].unique().tolist()
+    
+    labels = dict(zip(product(a, b, repeat=1), [4, 5, 6, 1, 2, 3]))
+    
+    
+    data["smoker_aged"] = data[["smoker", "age group"]].apply(lambda x: labels[tuple(x)], axis=1)
+    
+
+In [14]:
+
+    
+    
+    sns.barplot(data=data, x="smoker_aged", y="charges")
+    correlation = data[["smoker_aged"]].corrwith(data.charges)[0]
+    plt.text(0.2, 30000, f"Correlation: {correlation:.2%}")
+    plt.title("Smoking and Aged vs Charges")
+    plt.show()
+    
+
+![](__results___files/__results___22_0.png)
+
+# 3\. Linear Regression Models¶
+
+In [15]:
+
+    
+    
+    X = data.drop(['charges','region'], axis=1)
+    y = data.charges
+    
+    X["sex"] = X["sex"].map({"female": 0, "male": 1})
+    X["smoker"] = X["smoker"].map({"no": 0, "yes": 1})
+    X["age group"] = X["age group"].map({"young adult": 0, "middle-aged": 1, "old adults": 2})
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15, random_state=23)
+    
+
+In [16]:
+
+    
+    
+    def model_pipeline(model, degree=2):
+        num_pipeline = Pipeline(
+            steps=[
+                ("poly", PolynomialFeatures(degree=degree)),
+                ("scaler", StandardScaler()),
+            ]
+        )
+        
+        
+        transformer = ColumnTransformer([
+            ("num_transformers", num_pipeline, make_column_selector(dtype_include="number"))
+            ], remainder="passthrough")
+    
+        model_pipeline = Pipeline(steps=[("transformer", transformer), ("model", model)])
+        return model_pipeline
+    
+
+In [17]:
+
+    
+    
+    kf = KFold(shuffle=True, random_state=42, n_splits=3)
+    
+
+In [18]:
+
+    
+    
+    # Gride Search for Linear Regression
+    lr = model_pipeline(LinearRegression())
+    lr_grid = {"transformer__num_transformers__poly__degree": range(0, 6)}
+    
+    grid_search = GridSearchCV(
+        estimator=lr,
+        param_grid=lr_grid,
+        cv=kf,
+        scoring=("r2", "neg_mean_squared_error"),
+        refit="r2",
+    )
+    grid_search.fit(X_train, y_train)
+    grid_search.best_score_, grid_search.best_params_
+    
+
+Out[18]:
+
+    
+    
+    (0.8347903905631365, {'transformer__num_transformers__poly__degree': 2})
+
+In [19]:
+
+    
+    
+    best_lr = model_pipeline(
+        LinearRegression(),
+        degree=grid_search.best_params_["transformer__num_transformers__poly__degree"],
+    )
+    
+    best_lr.fit(X_train, y_train)
+    print("Training score", best_lr.score(X_train, y_train))
+    print("Testing score", best_lr.score(X_test, y_test))
+    
+    
+    
+    Training score 0.8446550596341762
+    Testing score 0.8431179481438463
+    
+
+# Lasso Regression¶
+
+In [20]:
+
+    
+    
+    # Lasso regression
+    lasso = model_pipeline(Lasso())
+    lasso_grid = {
+        "transformer__num_transformers__poly__degree": range(1, 4),
+        "model__alpha": np.geomspace(0.01, 10, 20),
+    }
+    
+    grid_search = GridSearchCV(estimator=lasso, param_grid=lasso_grid, cv=kf, refit="r2")
+    grid_search.fit(X_train, y_train)
+    grid_search.best_score_, grid_search.best_params_
+    
+
+Out[20]:
+
+    
+    
+    (0.8362952459910292,
+     {'model__alpha': 4.832930238571752,
+      'transformer__num_transformers__poly__degree': 2})
+
+In [21]:
+
+    
+    
+    best_l1 = model_pipeline(
+        Lasso(alpha=grid_search.best_params_["model__alpha"]),
+        degree=grid_search.best_params_["transformer__num_transformers__poly__degree"],
+    )
+    
+    best_l1.fit(X_train, y_train)
+    print("Training score", best_l1.score(X_train, y_train))
+    print("Testing score", best_l1.score(X_test, y_test))
+    
+    
+    
+    Training score 0.844034684591997
+    Testing score 0.8437698574521892
+    
+
+# Ridge Regression¶
+
+In [22]:
+
+    
+    
+    # Ridge Regression
+    ridge = model_pipeline(Ridge())
+    ridge_grid = {
+        "transformer__num_transformers__poly__degree": range(1, 4),
+        "model__alpha": np.geomspace(0.01, 10, 20),
+    }
+    
+    grid_search = GridSearchCV(estimator=ridge, param_grid=ridge_grid, cv=kf, refit="r2")
+    grid_search.fit(X_train, y_train)
+    grid_search.best_score_, grid_search.best_params_
+    
+
+Out[22]:
+
+    
+    
+    (0.8357422412902559,
+     {'model__alpha': 0.5455594781168517,
+      'transformer__num_transformers__poly__degree': 2})
+
+In [23]:
+
+    
+    
+    best_l2 = model_pipeline(
+        Ridge(alpha=grid_search.best_params_["model__alpha"]),
+        degree=grid_search.best_params_["transformer__num_transformers__poly__degree"],
+    )
+    
+    best_l2.fit(X_train, y_train)
+    print("Training score", best_l2.score(X_train, y_train))
+    print("Testing score", best_l2.score(X_test, y_test))
+    
+    
+    
+    Training score 0.8441942314384716
+    Testing score 0.842624127159288
+    
+
+# ElasticNet Regression¶
+
+In [24]:
+
+    
+    
+    # Elastic Net
+    elastic_net = model_pipeline(ElasticNet())
+    elastic_net_grid = {
+        "transformer__num_transformers__poly__degree": range(1, 4),
+        "model__alpha": np.geomspace(0.01, 10, 20),
+        "model__l1_ratio": np.linspace(0.01, 1, 10),
+    }
+    
+    
+    grid_search = GridSearchCV(estimator= elastic_net, param_grid=elastic_net_grid, cv=kf, refit="r2")
+    grid_search.fit(X_train, y_train)
+    grid_search.best_score_, grid_search.best_params_
+    
+
+Out[24]:
+
+    
+    
+    (0.8362952459910292,
+     {'model__alpha': 4.832930238571752,
+      'model__l1_ratio': 1.0,
+      'transformer__num_transformers__poly__degree': 2})
+
+In [25]:
+
+    
+    
+    best_elastic_net = model_pipeline(ElasticNet(alpha=grid_search.best_params_["model__alpha"], l1_ratio=grid_search.best_params_["model__l1_ratio"]), degree=grid_search.best_params_["transformer__num_transformers__poly__degree"])
+    best_elastic_net.fit(X_train, y_train)
+    print("Training score", best_elastic_net.score(X_train, y_train))
+    print("Testing score", best_elastic_net.score(X_test, y_test))
+    
+    
+    
+    Training score 0.844034684591997
+    Testing score 0.8437698574521892
+    
+
+# Models Evaluation¶
+
+In [26]:
+
+    
+    
+    def rmse(ytrue, ypred):
+        return np.sqrt(mean_squared_error(ytrue, ypred))
+    
+
+In [27]:
+
+    
+    
+    def compare_models(models, X, y):
+        evaluate = dict()
+    
+        for label, model in models.items():
+            ypred = model.predict(X)
+            score = (r2_score(y, ypred) * 100).round(2)
+            loss = (rmse(y, ypred)).round(2)
+            evaluate[label] = [loss, score]
+        return evaluate
+    
+
+In [28]:
+
+    
+    
+    models = dict(lr = best_lr, lasso=best_l1, ridge=best_l2, elastic_net = best_elastic_net)
+    
+    train_score_df = pd.DataFrame(compare_models(models, X_train, y_train), index=["rmse", "r2_score"]).T
+    test_score_df = pd.DataFrame(compare_models(models, X_test, y_test), index=["rmse", "r2_score"]).T
+    
+
+In [29]:
+
+    
+    
+    def plot_actual_vs_pred(model, X, y, ax):
+        ypred = model[-1].predict(X)
+        sns.scatterplot(x=ypred, y=y, legend=False, ax=ax, size=3.5)
+        ax.set_title(f"{model[0]}", size=10)
+    
+    
+    fig, axes = plt.subplots(1, 4, sharey=True, figsize=(12, 4), gridspec_kw={"wspace": 0.1}, frameon=True)
+    plot_actual_vs_pred(("Linear regression", best_lr), X_train, y_train, ax=axes[0])
+    plot_actual_vs_pred(("Lasso regression", best_l1), X_train, y_train, ax=axes[1])
+    plot_actual_vs_pred(("Ridge regression", best_l2), X_train, y_train, ax=axes[2])
+    plot_actual_vs_pred(("Elasticnet regression", best_elastic_net), X_train, y_train, ax=axes[3])
+    fig.suptitle("Actual charges vs Predict charges")
+    plt.show()
+    
+
+![](__results___files/__results___42_0.png)
+
+In [30]:
+
+    
+    
+    from scipy.stats import probplot
+    
+    def quantile_plot(model, X, y, ax):
+        ypred = model[-1].predict(X)
+        loss = y - ypred
+        probplot(loss, dist="norm", plot=ax)
+        ax.set_title(f"{model[0]}", size=10)
+        ax.set_ylabel(ax.get_ylabel(), visible=False)
+    
+    
+    fig, axes = plt.subplots(1, 4, sharey=True, figsize=(12, 4), gridspec_kw={"wspace": 0.1}, frameon=True)
+    quantile_plot(("Linear regression", best_lr), X_train, y_train, ax=axes[0])
+    quantile_plot(("Lasso regression", best_l1), X_train, y_train, ax=axes[1])
+    quantile_plot(("Ridge regression", best_l2), X_train, y_train, ax=axes[2])
+    quantile_plot(("Elasticnet regression", best_elastic_net), X_train, y_train, ax=axes[3])
+    fig.suptitle("Normal Q-Q plot")
+    plt.show()
+    
+
+![](__results___files/__results___43_0.png)
+
+# 4\. Insights and key findings¶
+
+### Summary Statistic¶
+
+  * Mean (average) values:
+
+    * Age: 39.21 years
+    * BMI: 30.66
+    * Number of children: 1.09
+    * Charges: $13,270.42
+  * Standard deviations indicate the degree of variability in the data:
+
+    * Age: 14.05
+    * BMI: 6.10
+    * Number of children: 1.21
+    * Charges: $12,110.01
+  * Minimum values:
+
+    * Age: 18 years
+    * BMI: 15.96
+    * Number of children: 0
+    * Charges: $1,121.87
+  * Quartiles:
+
+    * Median (50th percentile):
+      * Age: 39 years
+      * BMI: 30.4
+      * Number of children: 1
+      * Charges: $9,382.03
+    * 25th and 75th percentiles:
+      * Age: 27 years and 51 years
+      * BMI: 26.30 and 34.69
+      * Number of children: 0 and 2
+      * Charges: $4,740.29 and $16,639.91
+
+These statistics offer insights into central tendencies, variability, and data
+distribution, which is valuable for data analysis, modeling, and decision-
+making in various fields. (LR), Lasso, Ridge, and Elastic Net. Two key
+metrics, Root Mean Squared Error (RMSE) and R-squared (R2) score are used to
+evaluate the models.
+
+  * RMSE (Root Mean Squared Error) measures the average error between predicted values and actual values:
+
+    * LR: 4,777.22
+    * Lasso: 5,336.15
+    * Ridge: 4,786.75
+    * Elastic Net: 5,025.63
+  * R2 (R-squared) score, indicating the proportion of the variance in the dependent variable predictable fro7 the independe4t40ariables:
+
+    * L25 84.43%
+    * Lasso: 40407%
+    * Ridge: 84.36%
+    * Elastic Net: 82.76%
+
+These findings emphasize the importance of choosing the right model based on
+the specific requirements of the analysis or modeling task.
+

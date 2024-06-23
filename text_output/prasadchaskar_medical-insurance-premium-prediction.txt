@@ -1,0 +1,387 @@
+In [1]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/medical-insurance-premium-prediction/Medicalpremium.csv
+    
+
+In [2]:
+
+    
+    
+    # Pandas
+    import pandas as pd 
+    
+    # Matplotlib
+    import matplotlib.pyplot as plt 
+    plt.style.use('fivethirtyeight')
+    
+    # Sklearn
+    from sklearn.model_selection import train_test_split
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.linear_model import LinearRegression,Lasso,Ridge
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.metrics import classification_report
+    
+    # XGBOOST
+    from xgboost import XGBRFRegressor
+    
+    # Seaborn
+    import seaborn as sns
+    
+    # Warnings
+    import warnings
+    warnings.filterwarnings('ignore')
+    
+
+# Data collection¶
+
+## Read data.¶
+
+In [3]:
+
+    
+    
+    data  = pd.read_csv('../input/medical-insurance-premium-prediction/Medicalpremium.csv')
+    data.head()
+    
+
+Out[3]:
+
+| Age | Diabetes | BloodPressureProblems | AnyTransplants | AnyChronicDiseases | Height | Weight | KnownAllergies | HistoryOfCancerInFamily | NumberOfMajorSurgeries | PremiumPrice  
+---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 45 | 0 | 0 | 0 | 0 | 155 | 57 | 0 | 0 | 0 | 25000  
+1 | 60 | 1 | 0 | 0 | 0 | 180 | 73 | 0 | 0 | 0 | 29000  
+2 | 36 | 1 | 1 | 0 | 0 | 158 | 59 | 0 | 0 | 1 | 23000  
+3 | 52 | 1 | 1 | 0 | 1 | 183 | 93 | 0 | 0 | 2 | 28000  
+4 | 38 | 0 | 0 | 0 | 1 | 166 | 88 | 0 | 0 | 1 | 23000  
+  
+# Exploratory Data Analysis (or EDA)¶
+
+In [4]:
+
+    
+    
+    data.columns
+    
+
+Out[4]:
+
+    
+    
+    Index(['Age', 'Diabetes', 'BloodPressureProblems', 'AnyTransplants',
+           'AnyChronicDiseases', 'Height', 'Weight', 'KnownAllergies',
+           'HistoryOfCancerInFamily', 'NumberOfMajorSurgeries', 'PremiumPrice'],
+          dtype='object')
+
+## Check null values¶
+
+In [5]:
+
+    
+    
+    data.isnull().sum()
+    
+
+Out[5]:
+
+    
+    
+    Age                        0
+    Diabetes                   0
+    BloodPressureProblems      0
+    AnyTransplants             0
+    AnyChronicDiseases         0
+    Height                     0
+    Weight                     0
+    KnownAllergies             0
+    HistoryOfCancerInFamily    0
+    NumberOfMajorSurgeries     0
+    PremiumPrice               0
+    dtype: int64
+
+## Inference¶
+
+### There are no null record present in our dataset.¶
+
+## Heatmap¶
+
+In [6]:
+
+    
+    
+    plt.figure(figsize=(14,8))
+    sns.heatmap(data.corr(), annot = True, cmap='coolwarm',linewidths=.1)
+    plt.title("Heatmap for correlation between columns")
+    plt.show()
+    
+
+![](__results___files/__results___11_0.png)
+
+## Check datatypes of columns¶
+
+In [7]:
+
+    
+    
+    data.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 986 entries, 0 to 985
+    Data columns (total 11 columns):
+     #   Column                   Non-Null Count  Dtype
+    ---  ------                   --------------  -----
+     0   Age                      986 non-null    int64
+     1   Diabetes                 986 non-null    int64
+     2   BloodPressureProblems    986 non-null    int64
+     3   AnyTransplants           986 non-null    int64
+     4   AnyChronicDiseases       986 non-null    int64
+     5   Height                   986 non-null    int64
+     6   Weight                   986 non-null    int64
+     7   KnownAllergies           986 non-null    int64
+     8   HistoryOfCancerInFamily  986 non-null    int64
+     9   NumberOfMajorSurgeries   986 non-null    int64
+     10  PremiumPrice             986 non-null    int64
+    dtypes: int64(11)
+    memory usage: 84.9 KB
+    
+
+In [8]:
+
+    
+    
+    data.Age.describe()
+    
+
+Out[8]:
+
+    
+    
+    count    986.000000
+    mean      41.745436
+    std       13.963371
+    min       18.000000
+    25%       30.000000
+    50%       42.000000
+    75%       53.000000
+    max       66.000000
+    Name: Age, dtype: float64
+
+# Data visualizations¶
+
+In [9]:
+
+    
+    
+    plt.figure(figsize=(10,5))
+    plt.hist(data.Age,edgecolor='k')
+    plt.xlabel("Age")
+    plt.ylabel("Count");
+    plt.title("Distribution of Age");
+    
+
+![](__results___files/__results___16_0.png)
+
+In [10]:
+
+    
+    
+    sns.displot(data.Height)
+    plt.title("Distribution of height");
+    
+
+![](__results___files/__results___17_0.png)
+
+## Inference:¶
+
+## The distribution of patient heights right skewed with centre of 168 with no
+outlier.¶
+
+In [11]:
+
+    
+    
+    sns.displot(data.Weight)
+    plt.title("Distribution of height");
+    
+
+![](__results___files/__results___19_0.png)
+
+## Inference:¶
+
+## The distribution of patient weights left skewed with centre of 75.¶
+
+In [12]:
+
+    
+    
+    data.columns
+    
+
+Out[12]:
+
+    
+    
+    Index(['Age', 'Diabetes', 'BloodPressureProblems', 'AnyTransplants',
+           'AnyChronicDiseases', 'Height', 'Weight', 'KnownAllergies',
+           'HistoryOfCancerInFamily', 'NumberOfMajorSurgeries', 'PremiumPrice'],
+          dtype='object')
+
+## Pairplots¶
+
+In [13]:
+
+    
+    
+    sns.pairplot(data,hue = 'PremiumPrice',diag_kind = "kde",kind = "scatter",palette = "husl")
+    plt.show()
+    
+
+![](__results___files/__results___23_0.png)
+
+## Dependent and Independent Features¶
+
+In [14]:
+
+    
+    
+    X = data.drop('PremiumPrice',axis=1)
+    y = data.PremiumPrice
+    
+
+# Normalization¶
+
+## Normalization scales each input variable separately to the range 0-1, which
+is the range for floating-point values where we have the most precision.¶
+
+In [15]:
+
+    
+    
+    scalar =  StandardScaler()
+    X.Age = scalar.fit_transform(X[['Age']])
+    X.Height = scalar.fit_transform(X[['Height']])
+    X.Weight = scalar.fit_transform(X[['Weight']])
+    
+
+## To get a good prediction, divide the data into training and testing data,
+it is because as the name suggests you will train few data points and test few
+data points, and keep on doing that unless you get good results.¶
+
+In [16]:
+
+    
+    
+    X_train,X_test,y_train,y_test = train_test_split(X,y,test_size=0.2,random_state=43)
+    
+
+# Model¶
+
+## The model phase is where we implement a variety of Machine Learning
+algorithms to predict a certain outcome.¶
+
+In [17]:
+
+    
+    
+    models = {
+        LinearRegression():'Linear Regression',
+        Lasso():'Lasso',
+        Ridge():'Ridge',
+        XGBRFRegressor():'XGBRFRegressor',
+        RandomForestRegressor():'RandomForest'
+    }
+    for m in models.keys():
+        m.fit(X_train,y_train)
+    
+
+# iNterpret¶
+
+## To determine how well a model is performing, we often validate its
+performance on new unseen instances that were not available to the model
+during training¶
+
+In [18]:
+
+    
+    
+    for model,name in models.items():
+         print(f"Accuracy Score for {name} is : ",model.score(X_test,y_test)*100,"%")
+    
+    
+    
+    Accuracy Score for Linear Regression is :  68.94071160558988 %
+    Accuracy Score for Lasso is :  68.92612230263563 %
+    Accuracy Score for Ridge is :  68.86685393102887 %
+    Accuracy Score for XGBRFRegressor is :  80.62880110922326 %
+    Accuracy Score for RandomForest is :  79.04198652624686 %
+    
+
+# Finding Important Features in Scikit-learn¶
+
+## 1) Random Forest¶
+
+In [19]:
+
+    
+    
+    random_forest = RandomForestRegressor()
+    random_forest.fit(X_train,y_train)
+    feature_imp1 = random_forest.feature_importances_
+    sns.barplot(x=feature_imp1, y=X.columns)
+    # Add labels to your graph
+    plt.xlabel('Feature Importance Score')
+    plt.ylabel('Features')
+    plt.title("Visualizing Important Features")
+    plt.show();
+    
+
+![](__results___files/__results___39_0.png)
+
+## 2) XGBoostRegressor¶
+
+In [20]:
+
+    
+    
+    xgboost =XGBRFRegressor()
+    xgboost.fit(X_train,y_train)
+    feature_imp2 = xgboost.feature_importances_
+    sns.barplot(x=feature_imp2, y=X.columns)
+    # Add labels to your graph
+    plt.xlabel('Feature Importance Score')
+    plt.ylabel('Features')
+    plt.title("Visualizing Important Features")
+    plt.show();
+    
+
+![](__results___files/__results___41_0.png)
+
+In [ ]:
+
+    
+    
+     
+    
+

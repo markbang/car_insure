@@ -1,0 +1,1186 @@
+In [1]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/health-insurance-cross-sell-prediction/sample_submission.csv
+    /kaggle/input/health-insurance-cross-sell-prediction/train.csv
+    /kaggle/input/health-insurance-cross-sell-prediction/test.csv
+    
+
+# VEHICLE INSURANCE PREDICTION¶
+
+In [2]:
+
+    
+    
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    %matplotlib inline
+    import seaborn as sns
+    import numpy as np
+    
+
+In [3]:
+
+    
+    
+    train=pd.read_csv("/kaggle/input/health-insurance-cross-sell-prediction/train.csv")
+    test=pd.read_csv("/kaggle/input/health-insurance-cross-sell-prediction/test.csv")
+    
+
+In [4]:
+
+    
+    
+    train.head()
+    
+
+Out[4]:
+
+| id | Gender | Age | Driving_License | Region_Code | Previously_Insured | Vehicle_Age | Vehicle_Damage | Annual_Premium | Policy_Sales_Channel | Vintage | Response  
+---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | Male | 44 | 1 | 28.0 | 0 | > 2 Years | Yes | 40454.0 | 26.0 | 217 | 1  
+1 | 2 | Male | 76 | 1 | 3.0 | 0 | 1-2 Year | No | 33536.0 | 26.0 | 183 | 0  
+2 | 3 | Male | 47 | 1 | 28.0 | 0 | > 2 Years | Yes | 38294.0 | 26.0 | 27 | 1  
+3 | 4 | Male | 21 | 1 | 11.0 | 1 | < 1 Year | No | 28619.0 | 152.0 | 203 | 0  
+4 | 5 | Female | 29 | 1 | 41.0 | 1 | < 1 Year | No | 27496.0 | 152.0 | 39 | 0  
+  
+In [5]:
+
+    
+    
+    df=train.drop('id',axis=1)
+    df.head()
+    
+
+Out[5]:
+
+| Gender | Age | Driving_License | Region_Code | Previously_Insured | Vehicle_Age | Vehicle_Damage | Annual_Premium | Policy_Sales_Channel | Vintage | Response  
+---|---|---|---|---|---|---|---|---|---|---|---  
+0 | Male | 44 | 1 | 28.0 | 0 | > 2 Years | Yes | 40454.0 | 26.0 | 217 | 1  
+1 | Male | 76 | 1 | 3.0 | 0 | 1-2 Year | No | 33536.0 | 26.0 | 183 | 0  
+2 | Male | 47 | 1 | 28.0 | 0 | > 2 Years | Yes | 38294.0 | 26.0 | 27 | 1  
+3 | Male | 21 | 1 | 11.0 | 1 | < 1 Year | No | 28619.0 | 152.0 | 203 | 0  
+4 | Female | 29 | 1 | 41.0 | 1 | < 1 Year | No | 27496.0 | 152.0 | 39 | 0  
+  
+In [6]:
+
+    
+    
+    print(df.columns)
+    
+    
+    
+    Index(['Gender', 'Age', 'Driving_License', 'Region_Code', 'Previously_Insured',
+           'Vehicle_Age', 'Vehicle_Damage', 'Annual_Premium',
+           'Policy_Sales_Channel', 'Vintage', 'Response'],
+          dtype='object')
+    
+
+In [7]:
+
+    
+    
+    df.describe()
+    
+
+Out[7]:
+
+| Age | Driving_License | Region_Code | Previously_Insured | Annual_Premium | Policy_Sales_Channel | Vintage | Response  
+---|---|---|---|---|---|---|---|---  
+count | 381109.000000 | 381109.000000 | 381109.000000 | 381109.000000 | 381109.000000 | 381109.000000 | 381109.000000 | 381109.000000  
+mean | 38.822584 | 0.997869 | 26.388807 | 0.458210 | 30564.389581 | 112.034295 | 154.347397 | 0.122563  
+std | 15.511611 | 0.046110 | 13.229888 | 0.498251 | 17213.155057 | 54.203995 | 83.671304 | 0.327936  
+min | 20.000000 | 0.000000 | 0.000000 | 0.000000 | 2630.000000 | 1.000000 | 10.000000 | 0.000000  
+25% | 25.000000 | 1.000000 | 15.000000 | 0.000000 | 24405.000000 | 29.000000 | 82.000000 | 0.000000  
+50% | 36.000000 | 1.000000 | 28.000000 | 0.000000 | 31669.000000 | 133.000000 | 154.000000 | 0.000000  
+75% | 49.000000 | 1.000000 | 35.000000 | 1.000000 | 39400.000000 | 152.000000 | 227.000000 | 0.000000  
+max | 85.000000 | 1.000000 | 52.000000 | 1.000000 | 540165.000000 | 163.000000 | 299.000000 | 1.000000  
+  
+**Checking for null values in training data**
+
+  * **There is no null value in any column of the data**
+
+In [8]:
+
+    
+    
+    train.isnull().sum()
+    
+
+Out[8]:
+
+    
+    
+    id                      0
+    Gender                  0
+    Age                     0
+    Driving_License         0
+    Region_Code             0
+    Previously_Insured      0
+    Vehicle_Age             0
+    Vehicle_Damage          0
+    Annual_Premium          0
+    Policy_Sales_Channel    0
+    Vintage                 0
+    Response                0
+    dtype: int64
+
+**Looking for correlation between any two features**
+
+  * **As we can there is no significant relation between any two features so we will go ahead with all features we have**
+
+In [9]:
+
+    
+    
+    plt.figure(figsize=(20,8))
+    sns.heatmap(data=df.corr(),annot=True,cmap="Greens")
+    
+
+Out[9]:
+
+    
+    
+    <AxesSubplot:>
+
+![](__results___files/__results___11_1.png)
+
+# **VISUALIZATION AND ANALYSIS**¶
+
+**TARGET VARIABLE**
+
+**Checking if data is imbalanced or not**
+
+  * **Target value is highly imbalanced i.e. 87.7% are -ve responses and 12.3% are +ve responses**
+
+In [10]:
+
+    
+    
+    def with_hue(data,feature,ax):
+        
+        #Numnber of categories
+        num_of_cat=len([x for x in data[feature].unique() if x==x])
+        
+        bars=ax.patches
+        
+        for ind in range(num_of_cat):
+            ##     Get every hue bar
+            ##     ex. 8 X categories, 4 hues =>
+            ##    [0, 8, 16, 24] are hue bars for 1st X category
+            hueBars=bars[ind:][::num_of_cat] 
+            # Get the total height (for percentages)
+            total=sum([x.get_height() for x in hueBars])
+            #Printing percentages on bar
+            for bar in hueBars:
+                percentage='{:.1f}%'.format(100 * bar.get_height()/total)
+                ax.text(bar.get_x()+bar.get_width()/2.0,
+                       bar.get_height(),
+                       percentage,
+                        ha="center",va="bottom",fontweight='bold')
+        
+    
+        
+    def without_hue(data,feature,ax):
+        
+        total=float(len(data))
+        bars_plot=ax.patches
+        
+        for bars in bars_plot:
+            percentage = '{:.1f}%'.format(100 * bars.get_height()/total)
+            x = bars.get_x() + bars.get_width()/2.0
+            y = bars.get_height()
+            ax.text(x, y,(percentage,bars.get_height()),ha='center',fontweight='bold')
+    
+
+In [11]:
+
+    
+    
+    plt.figure(figsize=(15,7))
+    plt.text(0.7,220000,"Data is highly Imbalanced",fontweight='bold',fontsize=15)
+    sns.set_theme(context='notebook',style='darkgrid')
+    a=sns.countplot(x=train["Response"],palette="gnuplot")
+    without_hue(df,'Response',a)
+    
+
+![](__results___files/__results___16_0.png)
+
+In [12]:
+
+    
+    
+    df.head()
+    
+
+Out[12]:
+
+| Gender | Age | Driving_License | Region_Code | Previously_Insured | Vehicle_Age | Vehicle_Damage | Annual_Premium | Policy_Sales_Channel | Vintage | Response  
+---|---|---|---|---|---|---|---|---|---|---|---  
+0 | Male | 44 | 1 | 28.0 | 0 | > 2 Years | Yes | 40454.0 | 26.0 | 217 | 1  
+1 | Male | 76 | 1 | 3.0 | 0 | 1-2 Year | No | 33536.0 | 26.0 | 183 | 0  
+2 | Male | 47 | 1 | 28.0 | 0 | > 2 Years | Yes | 38294.0 | 26.0 | 27 | 1  
+3 | Male | 21 | 1 | 11.0 | 1 | < 1 Year | No | 28619.0 | 152.0 | 203 | 0  
+4 | Female | 29 | 1 | 41.0 | 1 | < 1 Year | No | 27496.0 | 152.0 | 39 | 0  
+  
+**UNIVARIATE ANALYSIS**
+
+**CATEGORICAL VALUES**
+
+  * **Gender,Driving_License,Previously_Insured,Vehicle_Age,Vehicle_Damage**
+
+In [13]:
+
+    
+    
+    f,ax=plt.subplots(nrows=5,ncols=2,figsize=(20,50), 
+                      gridspec_kw={'width_ratios': [10,10],
+                                   'height_ratios': [10,10,10,10,10],'wspace': 0.2,
+                           'hspace': 0.4})
+    
+    
+    a1=sns.countplot(data=df,x="Gender",ax=ax[0][0],palette="Set1")
+    without_hue(df,'Gender',a1)
+    a2=sns.countplot(data=df,x='Gender',hue='Response',palette="gnuplot",ax=ax[0][1])
+    with_hue(df,'Gender',a2)
+    
+    b1=sns.countplot(data=df,x="Driving_License",palette="gnuplot",ax=ax[1][0])
+    without_hue(df,"Driving_License",b1)
+    b2=sns.countplot(data=df,x="Driving_License",hue='Response',palette="gnuplot",ax=ax[1][1])
+    with_hue(df,"Driving_License",b2)
+    
+    c1=sns.countplot(data=df,x="Previously_Insured",palette="gnuplot",ax=ax[2][0])
+    without_hue(df,"Previously_Insured",c1)
+    c2=sns.countplot(data=df,x="Previously_Insured",hue='Response',palette="gnuplot",ax=ax[2][1])
+    with_hue(df,"Previously_Insured",c2)
+    
+    d1=sns.countplot(data=df,x="Vehicle_Age",palette="gnuplot",ax=ax[3][0])
+    without_hue(df,"Vehicle_Age",d1)
+    d2=sns.countplot(data=df,x="Vehicle_Age",hue='Response',palette="gnuplot",ax=ax[3][1])
+    with_hue(df,"Vehicle_Age",d2)
+    
+    e1=sns.countplot(data=df,x="Vehicle_Damage",ax=ax[4][0],palette="Set1")
+    without_hue(df,"Vehicle_Damage",e1)
+    e2=sns.countplot(data=df,x="Vehicle_Damage",hue='Response',palette="gnuplot",ax=ax[4][1])
+    with_hue(df,"Vehicle_Damage",e2)
+    
+
+![](__results___files/__results___20_0.png)
+
+**CONCLUSIONS FROM CATEGOICAL FEATURES**
+
+  * **13.8% males and 10.4% females responded +ve**
+  * **People who don't have license are not responding but with driving license only 12.3% are responding**
+  * **Person who is not previously insured are responding i.e. 22.5% , but who is already insured are not responding**
+  * **People whose vehicle age is greater than 1 year are reasponding more frequently**
+  * **23.8% of people whose Vehicle is Damaged are responding +ve**
+
+In [14]:
+
+    
+    
+    df.head()
+    
+
+Out[14]:
+
+| Gender | Age | Driving_License | Region_Code | Previously_Insured | Vehicle_Age | Vehicle_Damage | Annual_Premium | Policy_Sales_Channel | Vintage | Response  
+---|---|---|---|---|---|---|---|---|---|---|---  
+0 | Male | 44 | 1 | 28.0 | 0 | > 2 Years | Yes | 40454.0 | 26.0 | 217 | 1  
+1 | Male | 76 | 1 | 3.0 | 0 | 1-2 Year | No | 33536.0 | 26.0 | 183 | 0  
+2 | Male | 47 | 1 | 28.0 | 0 | > 2 Years | Yes | 38294.0 | 26.0 | 27 | 1  
+3 | Male | 21 | 1 | 11.0 | 1 | < 1 Year | No | 28619.0 | 152.0 | 203 | 0  
+4 | Female | 29 | 1 | 41.0 | 1 | < 1 Year | No | 27496.0 | 152.0 | 39 | 0  
+  
+**CONTINUOUS VALUES**
+
+  * **Age,Region_Code,Annual_Premium,Policy_Sales_Channel,Vintage**
+
+**AGE COLUMN**
+
+In [15]:
+
+    
+    
+    f,ax=plt.subplots(nrows=1,ncols=2,figsize=(20,10))
+    ax[0].text(50,17000,"Age data is right Skewed",fontweight='bold',fontsize=15)
+    sns.histplot(data=df,x="Age",palette='gnuplot',kde=True,ax=ax[0],binwidth=1)
+    ax[1].text(50,17000,"Age data is little right Skewed\nwith hueness",fontweight='bold',fontsize=15)
+    sns.histplot(data=df,x="Age",palette='gnuplot',kde=True,ax=ax[1],hue="Response",binwidth=1)
+    
+
+Out[15]:
+
+    
+    
+    <AxesSubplot:xlabel='Age', ylabel='Count'>
+
+![](__results___files/__results___25_1.png)
+
+**Let's See if how many outliers are present in age?**
+
+In [16]:
+
+    
+    
+    df_age=sorted(df['Age'])
+    Q1,Q3=np.percentile(df_age,[25,75])
+    IQR= Q3-Q1
+    lower_range= Q1-(1.5*IQR)
+    upper_range=Q3+(1.5*IQR)
+    
+    print("Lower Range : ",lower_range)      
+    print("Upper Range : ",upper_range)
+    df_lower_outliers=df[df.Age<lower_range]
+    df_upper_outliers=df[df.Age>upper_range]
+    
+    
+    
+    Lower Range :  -11.0
+    Upper Range :  85.0
+    
+
+In [17]:
+
+    
+    
+    #NO LOWER OUTLIERS
+    df_lower_outliers
+    
+
+Out[17]:
+
+| Gender | Age | Driving_License | Region_Code | Previously_Insured | Vehicle_Age | Vehicle_Damage | Annual_Premium | Policy_Sales_Channel | Vintage | Response  
+---|---|---|---|---|---|---|---|---|---|---|---  
+  
+In [18]:
+
+    
+    
+    #NO UPPER OUTLIERS
+    df_upper_outliers
+    
+
+Out[18]:
+
+| Gender | Age | Driving_License | Region_Code | Previously_Insured | Vehicle_Age | Vehicle_Damage | Annual_Premium | Policy_Sales_Channel | Vintage | Response  
+---|---|---|---|---|---|---|---|---|---|---|---  
+  
+In [19]:
+
+    
+    
+    plt.figure(figsize=(20,10))
+    plt.text(55,-0.2,"There is not outlier in age feature",fontsize='20',fontweight='bold')
+    sns.boxplot(data=df,x="Age",palette='gnuplot')
+    
+
+Out[19]:
+
+    
+    
+    <AxesSubplot:xlabel='Age'>
+
+![](__results___files/__results___30_1.png)
+
+**Let's plot log distribution of age column to see if we can reduce the
+skewness**
+
+  * **Log Distribution doesn't make any specific change in the distribution so we will go ahead without doing any changes in Age column**
+
+In [20]:
+
+    
+    
+    f,ax=plt.subplots(nrows=1,ncols=2,figsize=(20,10))
+    sns.histplot(data=df,x=np.log(df["Age"]),palette='gnuplot',kde=True,ax=ax[0],binwidth=0.04)
+    sns.histplot(data=df,x=np.log(df["Age"]),palette='gnuplot',kde=True,ax=ax[1],hue="Response",binwidth=0.04)
+    
+
+Out[20]:
+
+    
+    
+    <AxesSubplot:xlabel='Age', ylabel='Count'>
+
+![](__results___files/__results___32_1.png)
+
+**REGION CODE**
+
+  * **This Column is randomly distributed , there is not any significant observation we can get from this feature**
+  * **In my opinion we should not work on this feature further**
+
+In [21]:
+
+    
+    
+    f,ax=plt.subplots(nrows=1,ncols=2,figsize=(15,10))
+    ax[0].text(35,70000,"Region_Code is\nrandomly distributed",fontweight='bold',fontsize=12)
+    sns.histplot(data=df,x="Region_Code",palette='gnuplot',kde=True,ax=ax[0],binwidth=1)
+    ax[1].text(35,70000,"Region_Code is\nrandomly distributed\nwith hueness",fontweight='bold',fontsize=12)
+    sns.histplot(data=df,x="Region_Code",palette='gnuplot',kde=True,ax=ax[1],hue="Response",binwidth=1)
+    
+
+Out[21]:
+
+    
+    
+    <AxesSubplot:xlabel='Region_Code', ylabel='Count'>
+
+![](__results___files/__results___34_1.png)
+
+**ANNUAL PREMIUM**
+
+In [22]:
+
+    
+    
+    f,ax=plt.subplots(nrows=1,ncols=2,figsize=(20,5))
+    ax[0].text(300000,30000,"Normally distributed with\nlittle right skewed",fontweight='bold',fontsize=12)
+    sns.histplot(data=df,x="Annual_Premium",palette='gnuplot',kde=True,ax=ax[0])
+    ax[1].text(300000,30000,"Normally distributed with\nlittle right skewed\nwith hueness",fontweight='bold',fontsize=12)
+    sns.histplot(data=df,x="Annual_Premium",palette='gnuplot',kde=True,ax=ax[1],hue="Response")
+    
+
+Out[22]:
+
+    
+    
+    <AxesSubplot:xlabel='Annual_Premium', ylabel='Count'>
+
+![](__results___files/__results___36_1.png)
+
+In [23]:
+
+    
+    
+    plt.figure(figsize=(20,10))
+    plt.text(250000,-0.2,"2.7% data points are upper outliers in Annual_Premium feature",fontsize=15,fontweight='bold')
+    sns.boxplot(data=df,x="Annual_Premium",palette='gnuplot')
+    
+
+Out[23]:
+
+    
+    
+    <AxesSubplot:xlabel='Annual_Premium'>
+
+![](__results___files/__results___37_1.png)
+
+In [24]:
+
+    
+    
+    #IQR (Inter quartile range)
+    df_prem=sorted(df['Annual_Premium'])
+    Q1,Q3=np.percentile(df_prem,[25,75])
+    IQR= Q3-Q1
+    lower_range= Q1-(1.5*IQR)
+    upper_range=Q3+(1.5*IQR)
+    
+    print("Lower Range : ",lower_range)      
+    print("Upper Range : ",upper_range)
+    df_lower_outliers=df[df.Annual_Premium<lower_range]
+    df_upper_outliers=df[df.Annual_Premium>upper_range]
+    
+    
+    
+    Lower Range :  1912.5
+    Upper Range :  61892.5
+    
+
+In [25]:
+
+    
+    
+    #There is not lower outliers
+    df_lower_outliers
+    
+
+Out[25]:
+
+| Gender | Age | Driving_License | Region_Code | Previously_Insured | Vehicle_Age | Vehicle_Damage | Annual_Premium | Policy_Sales_Channel | Vintage | Response  
+---|---|---|---|---|---|---|---|---|---|---|---  
+  
+In [26]:
+
+    
+    
+    #There are 10320 people in data whose annual_premium is greater than 61892.5 i.e. 2.7%
+    df_upper_outliers
+    
+
+Out[26]:
+
+| Gender | Age | Driving_License | Region_Code | Previously_Insured | Vehicle_Age | Vehicle_Damage | Annual_Premium | Policy_Sales_Channel | Vintage | Response  
+---|---|---|---|---|---|---|---|---|---|---|---  
+25 | Female | 21 | 1 | 28.0 | 1 | < 1 Year | No | 61964.0 | 152.0 | 72 | 0  
+37 | Female | 25 | 1 | 28.0 | 1 | < 1 Year | No | 76251.0 | 152.0 | 107 | 0  
+67 | Male | 60 | 1 | 28.0 | 0 | 1-2 Year | Yes | 66338.0 | 124.0 | 73 | 0  
+139 | Male | 21 | 1 | 29.0 | 1 | < 1 Year | No | 62164.0 | 152.0 | 116 | 0  
+149 | Female | 22 | 1 | 11.0 | 1 | < 1 Year | No | 76651.0 | 152.0 | 258 | 0  
+... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ...  
+380959 | Male | 25 | 1 | 8.0 | 1 | < 1 Year | No | 61909.0 | 152.0 | 161 | 0  
+380998 | Female | 33 | 1 | 8.0 | 0 | 1-2 Year | Yes | 101664.0 | 124.0 | 21 | 0  
+381035 | Female | 22 | 1 | 11.0 | 1 | < 1 Year | No | 62889.0 | 152.0 | 295 | 0  
+381047 | Female | 52 | 1 | 8.0 | 1 | 1-2 Year | No | 71915.0 | 7.0 | 233 | 0  
+381079 | Male | 33 | 1 | 28.0 | 0 | < 1 Year | Yes | 69845.0 | 26.0 | 115 | 0  
+  
+10320 rows Ã 11 columns
+
+  * **Question here is should we remove these ouliers in Annual_Premium data , but I think if a person is paying money more than Rs61892 annually , may he/she is a rich person who is capable of paying that much more money than others**
+  * **10392 people are outliers if we remove them we can loss data from the table**
+  * **So the conclusion is we won't change anything is annual_premium data**
+
+**VINTAGE**
+
+**This Column is uniformly distributed we can't do nothing much to this
+column**
+
+In [27]:
+
+    
+    
+    f,ax=plt.subplots(nrows=1,ncols=2,figsize=(20,10))
+    sns.histplot(data=df,x="Vintage",palette='gnuplot',kde=True,ax=ax[0])
+    sns.histplot(data=df,x="Vintage",palette='gnuplot',kde=True,ax=ax[1],hue="Response")
+    
+
+Out[27]:
+
+    
+    
+    <AxesSubplot:xlabel='Vintage', ylabel='Count'>
+
+![](__results___files/__results___44_1.png)
+
+**POLICY SALES CHANNEL**
+
+In [28]:
+
+    
+    
+    f,ax=plt.subplots(nrows=1,ncols=2,figsize=(20,10))
+    ax[0].text(40,100000,"Randomly Distributed",fontweight='bold',fontsize=15)
+    sns.histplot(data=df,x="Policy_Sales_Channel",palette='gnuplot',kde=True,ax=ax[0])
+    ax[1].text(40,100000,"Randomly Distributed\nwith hueness",fontweight='bold',fontsize=15)
+    sns.histplot(data=df,x="Policy_Sales_Channel",palette='gnuplot',kde=True,ax=ax[1],hue="Response")
+    
+
+Out[28]:
+
+    
+    
+    <AxesSubplot:xlabel='Policy_Sales_Channel', ylabel='Count'>
+
+![](__results___files/__results___46_1.png)
+
+**BIVARIATE ANALYSIS**
+
+In [29]:
+
+    
+    
+    df["Gender"]=df["Gender"].map({"Female":"0","Male":"1"}).astype('int')
+    
+
+In [30]:
+
+    
+    
+    df1=df.copy()
+    
+
+In [31]:
+
+    
+    
+    df1=pd.get_dummies(df1,drop_first=True)
+    df1
+    
+
+Out[31]:
+
+| Gender | Age | Driving_License | Region_Code | Previously_Insured | Annual_Premium | Policy_Sales_Channel | Vintage | Response | Vehicle_Age_< 1 Year | Vehicle_Age_> 2 Years | Vehicle_Damage_Yes  
+---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 44 | 1 | 28.0 | 0 | 40454.0 | 26.0 | 217 | 1 | 0 | 1 | 1  
+1 | 1 | 76 | 1 | 3.0 | 0 | 33536.0 | 26.0 | 183 | 0 | 0 | 0 | 0  
+2 | 1 | 47 | 1 | 28.0 | 0 | 38294.0 | 26.0 | 27 | 1 | 0 | 1 | 1  
+3 | 1 | 21 | 1 | 11.0 | 1 | 28619.0 | 152.0 | 203 | 0 | 1 | 0 | 0  
+4 | 0 | 29 | 1 | 41.0 | 1 | 27496.0 | 152.0 | 39 | 0 | 1 | 0 | 0  
+... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ...  
+381104 | 1 | 74 | 1 | 26.0 | 1 | 30170.0 | 26.0 | 88 | 0 | 0 | 0 | 0  
+381105 | 1 | 30 | 1 | 37.0 | 1 | 40016.0 | 152.0 | 131 | 0 | 1 | 0 | 0  
+381106 | 1 | 21 | 1 | 30.0 | 1 | 35118.0 | 160.0 | 161 | 0 | 1 | 0 | 0  
+381107 | 0 | 68 | 1 | 14.0 | 0 | 44617.0 | 124.0 | 74 | 0 | 0 | 1 | 1  
+381108 | 1 | 46 | 1 | 29.0 | 0 | 41777.0 | 26.0 | 237 | 0 | 0 | 0 | 0  
+  
+381109 rows Ã 12 columns
+
+In [32]:
+
+    
+    
+    df1=df1.rename(columns={"Vehicle_Age_< 1 Year": "Vehicle_Age_1_Year", 
+                                "Vehicle_Age_> 2 Years": "Vehicle_Age_2_Year"})
+    df1
+    
+
+Out[32]:
+
+| Gender | Age | Driving_License | Region_Code | Previously_Insured | Annual_Premium | Policy_Sales_Channel | Vintage | Response | Vehicle_Age_1_Year | Vehicle_Age_2_Year | Vehicle_Damage_Yes  
+---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 44 | 1 | 28.0 | 0 | 40454.0 | 26.0 | 217 | 1 | 0 | 1 | 1  
+1 | 1 | 76 | 1 | 3.0 | 0 | 33536.0 | 26.0 | 183 | 0 | 0 | 0 | 0  
+2 | 1 | 47 | 1 | 28.0 | 0 | 38294.0 | 26.0 | 27 | 1 | 0 | 1 | 1  
+3 | 1 | 21 | 1 | 11.0 | 1 | 28619.0 | 152.0 | 203 | 0 | 1 | 0 | 0  
+4 | 0 | 29 | 1 | 41.0 | 1 | 27496.0 | 152.0 | 39 | 0 | 1 | 0 | 0  
+... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ...  
+381104 | 1 | 74 | 1 | 26.0 | 1 | 30170.0 | 26.0 | 88 | 0 | 0 | 0 | 0  
+381105 | 1 | 30 | 1 | 37.0 | 1 | 40016.0 | 152.0 | 131 | 0 | 1 | 0 | 0  
+381106 | 1 | 21 | 1 | 30.0 | 1 | 35118.0 | 160.0 | 161 | 0 | 1 | 0 | 0  
+381107 | 0 | 68 | 1 | 14.0 | 0 | 44617.0 | 124.0 | 74 | 0 | 0 | 1 | 1  
+381108 | 1 | 46 | 1 | 29.0 | 0 | 41777.0 | 26.0 | 237 | 0 | 0 | 0 | 0  
+  
+381109 rows Ã 12 columns
+
+In [33]:
+
+    
+    
+    df1['Vehicle_Age_1_Year']=df1['Vehicle_Age_1_Year'].astype('int')
+    df1['Vehicle_Age_2_Year']=df1['Vehicle_Age_2_Year'].astype('int')
+    df1['Vehicle_Damage_Yes']=df1['Vehicle_Damage_Yes'].astype('int')
+    
+
+In [34]:
+
+    
+    
+    plt.figure(figsize=(20,10))
+    sns.heatmap(df1.corr(),annot=True,cmap="Greens")
+    
+
+Out[34]:
+
+    
+    
+    <AxesSubplot:>
+
+![](__results___files/__results___53_1.png)
+
+**Pairplot**
+
+In [36]:
+
+    
+    
+    sns.pairplot(data=df1,palette='gnuplot')
+    
+
+Out[36]:
+
+    
+    
+    <seaborn.axisgrid.PairGrid at 0x7fe2f5a99650>
+
+![](__results___files/__results___55_1.png)
+
+# **MODEL AND PREDICTION(WITHOUT OVERSAMPLING)**¶
+
+**IMPORTING LIBRARIES**
+
+In [35]:
+
+    
+    
+    from sklearn.model_selection import train_test_split , cross_val_score , RandomizedSearchCV,GridSearchCV
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.metrics import f1_score, roc_auc_score,accuracy_score,confusion_matrix, precision_recall_curve, auc, roc_curve, recall_score, classification_report 
+    from imblearn.over_sampling import SMOTE
+    import xgboost as xgb
+    import optuna
+    
+
+In [ ]:
+
+    
+    
+    #SCALING CONTINUOUS FEATURES
+    '''from sklearn.preprocessing import MinMaxScaler , StandardScaler
+    ss=StandardScaler()
+    train[['Age']]=ss.fit_transform(train[['Age']])
+    train[['Vintage']]=ss.fit_transform(train[['Vintage']])
+    train[['Annual_Premium']] = ss.fit_transform(train[['Annual_Premium']])'''
+    
+
+In [36]:
+
+    
+    
+    Y=df1["Response"]
+    X=df1.drop(["Response"],axis=1)
+    
+
+# USING OVERSAMPLING TECHNIQUE(SMOTE)¶
+
+In [37]:
+
+    
+    
+    df2=df1.copy()
+    df2
+    
+
+Out[37]:
+
+| Gender | Age | Driving_License | Region_Code | Previously_Insured | Annual_Premium | Policy_Sales_Channel | Vintage | Response | Vehicle_Age_1_Year | Vehicle_Age_2_Year | Vehicle_Damage_Yes  
+---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 44 | 1 | 28.0 | 0 | 40454.0 | 26.0 | 217 | 1 | 0 | 1 | 1  
+1 | 1 | 76 | 1 | 3.0 | 0 | 33536.0 | 26.0 | 183 | 0 | 0 | 0 | 0  
+2 | 1 | 47 | 1 | 28.0 | 0 | 38294.0 | 26.0 | 27 | 1 | 0 | 1 | 1  
+3 | 1 | 21 | 1 | 11.0 | 1 | 28619.0 | 152.0 | 203 | 0 | 1 | 0 | 0  
+4 | 0 | 29 | 1 | 41.0 | 1 | 27496.0 | 152.0 | 39 | 0 | 1 | 0 | 0  
+... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ...  
+381104 | 1 | 74 | 1 | 26.0 | 1 | 30170.0 | 26.0 | 88 | 0 | 0 | 0 | 0  
+381105 | 1 | 30 | 1 | 37.0 | 1 | 40016.0 | 152.0 | 131 | 0 | 1 | 0 | 0  
+381106 | 1 | 21 | 1 | 30.0 | 1 | 35118.0 | 160.0 | 161 | 0 | 1 | 0 | 0  
+381107 | 0 | 68 | 1 | 14.0 | 0 | 44617.0 | 124.0 | 74 | 0 | 0 | 1 | 1  
+381108 | 1 | 46 | 1 | 29.0 | 0 | 41777.0 | 26.0 | 237 | 0 | 0 | 0 | 0  
+  
+381109 rows Ã 12 columns
+
+In [38]:
+
+    
+    
+    from imblearn.over_sampling import SMOTE
+    
+
+In [39]:
+
+    
+    
+    #SPLITTING BEFORE SAMPLING
+    x_train_sam,x_test_sam,y_train_sam,y_test_sam=train_test_split(X,Y,test_size=0.2,random_state=42)
+    
+
+In [40]:
+
+    
+    
+    y_train_sam.value_counts()
+    
+
+Out[40]:
+
+    
+    
+    0    267700
+    1     37187
+    Name: Response, dtype: int64
+
+In [41]:
+
+    
+    
+    y_test_sam.value_counts()
+    
+
+Out[41]:
+
+    
+    
+    0    66699
+    1     9523
+    Name: Response, dtype: int64
+
+In [42]:
+
+    
+    
+    #SAMPLING OF ONLY TRAIN DATA TO AVOID DATA LEAKAGE
+    sm=SMOTE()
+    x_train_sampling,y_train_sampling=sm.fit_resample(x_train_sam,y_train_sam)
+    
+
+In [43]:
+
+    
+    
+    y_train_sampling.value_counts()
+    
+
+Out[43]:
+
+    
+    
+    0    267700
+    1    267700
+    Name: Response, dtype: int64
+
+**RANDOM FOREST CLASSIFIER**
+
+In [44]:
+
+    
+    
+    def objective(trial):
+        
+        n_estimators = trial.suggest_int('n_estimators', 2, 200)
+        max_depth = int(trial.suggest_loguniform('max_depth', 1, 40))
+        clf = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth)
+        return cross_val_score(clf, x_train_sampling, y_train_sampling, 
+               n_jobs=-1, cv=5,scoring='f1').mean()
+    
+
+In [45]:
+
+    
+    
+    study = optuna.create_study(direction='maximize')
+    study.optimize(objective, n_trials=25)
+    
+    
+    
+    [I 2021-05-09 15:47:59,124] A new study created in memory with name: no-name-044ce953-ec92-4725-8a7a-a0e4a4f1184f
+    [I 2021-05-09 15:49:40,757] Trial 0 finished with value: 0.837837873991764 and parameters: {'n_estimators': 86, 'max_depth': 8.901775058409324}. Best is trial 0 with value: 0.837837873991764.
+    [I 2021-05-09 15:49:55,713] Trial 1 finished with value: 0.8188563006204349 and parameters: {'n_estimators': 58, 'max_depth': 1.4500591297321366}. Best is trial 0 with value: 0.837837873991764.
+    [I 2021-05-09 15:54:40,865] Trial 2 finished with value: 0.8707819899975202 and parameters: {'n_estimators': 127, 'max_depth': 27.842519067650432}. Best is trial 2 with value: 0.8707819899975202.
+    [I 2021-05-09 15:54:57,294] Trial 3 finished with value: 0.8588651186380071 and parameters: {'n_estimators': 8, 'max_depth': 21.31896083695312}. Best is trial 2 with value: 0.8707819899975202.
+    [I 2021-05-09 16:00:35,913] Trial 4 finished with value: 0.8702427146836491 and parameters: {'n_estimators': 154, 'max_depth': 26.588010211892648}. Best is trial 2 with value: 0.8707819899975202.
+    [I 2021-05-09 16:00:51,333] Trial 5 finished with value: 0.8194416209143783 and parameters: {'n_estimators': 60, 'max_depth': 1.8460549174816892}. Best is trial 2 with value: 0.8707819899975202.
+    [I 2021-05-09 16:05:16,793] Trial 6 finished with value: 0.8476860731715581 and parameters: {'n_estimators': 179, 'max_depth': 13.15670163356654}. Best is trial 2 with value: 0.8707819899975202.
+    [I 2021-05-09 16:09:03,269] Trial 7 finished with value: 0.8587639089746709 and parameters: {'n_estimators': 133, 'max_depth': 18.038675286176503}. Best is trial 2 with value: 0.8707819899975202.
+    [I 2021-05-09 16:09:39,659] Trial 8 finished with value: 0.8677754773887939 and parameters: {'n_estimators': 17, 'max_depth': 29.455630563449773}. Best is trial 2 with value: 0.8707819899975202.
+    [I 2021-05-09 16:09:55,018] Trial 9 finished with value: 0.8162755422160192 and parameters: {'n_estimators': 61, 'max_depth': 1.8323972200090481}. Best is trial 2 with value: 0.8707819899975202.
+    [I 2021-05-09 16:10:52,780] Trial 10 finished with value: 0.8278292115257058 and parameters: {'n_estimators': 118, 'max_depth': 3.711569446306145}. Best is trial 2 with value: 0.8707819899975202.
+    /opt/conda/lib/python3.7/site-packages/joblib/externals/loky/process_executor.py:691: UserWarning: A worker stopped while some jobs were given to the executor. This can be caused by a too short worker timeout or by a memory leak.
+      "timeout or by a memory leak.", UserWarning
+    [I 2021-05-09 16:17:39,460] Trial 11 finished with value: 0.8728579902104006 and parameters: {'n_estimators': 176, 'max_depth': 39.98694828880141}. Best is trial 11 with value: 0.8728579902104006.
+    [I 2021-05-09 16:24:16,630] Trial 12 finished with value: 0.8722626070786319 and parameters: {'n_estimators': 172, 'max_depth': 36.966621858978236}. Best is trial 11 with value: 0.8728579902104006.
+    /opt/conda/lib/python3.7/site-packages/joblib/externals/loky/process_executor.py:691: UserWarning: A worker stopped while some jobs were given to the executor. This can be caused by a too short worker timeout or by a memory leak.
+      "timeout or by a memory leak.", UserWarning
+    [I 2021-05-09 16:31:52,156] Trial 13 finished with value: 0.8730119587858347 and parameters: {'n_estimators': 197, 'max_depth': 38.80876403690591}. Best is trial 13 with value: 0.8730119587858347.
+    [I 2021-05-09 16:39:41,753] Trial 14 finished with value: 0.873158915765287 and parameters: {'n_estimators': 199, 'max_depth': 39.92662510746937}. Best is trial 14 with value: 0.873158915765287.
+    [I 2021-05-09 16:41:40,724] Trial 15 finished with value: 0.8292797125488243 and parameters: {'n_estimators': 193, 'max_depth': 4.679175356035404}. Best is trial 14 with value: 0.873158915765287.
+    [I 2021-05-09 16:46:18,818] Trial 16 finished with value: 0.8462345780789742 and parameters: {'n_estimators': 200, 'max_depth': 12.025197360468656}. Best is trial 14 with value: 0.873158915765287.
+    [I 2021-05-09 16:48:27,305] Trial 17 finished with value: 0.8340752081670738 and parameters: {'n_estimators': 151, 'max_depth': 6.977548647285637}. Best is trial 14 with value: 0.873158915765287.
+    [I 2021-05-09 16:53:52,275] Trial 18 finished with value: 0.8541811470143845 and parameters: {'n_estimators': 196, 'max_depth': 16.28898459694941}. Best is trial 14 with value: 0.873158915765287.
+    [I 2021-05-09 16:59:52,849] Trial 19 finished with value: 0.8726036610626549 and parameters: {'n_estimators': 153, 'max_depth': 38.923161009511965}. Best is trial 14 with value: 0.873158915765287.
+    [I 2021-05-09 17:00:53,072] Trial 20 finished with value: 0.8267422392446739 and parameters: {'n_estimators': 101, 'max_depth': 3.3273429627392916}. Best is trial 14 with value: 0.873158915765287.
+    [I 2021-05-09 17:07:47,525] Trial 21 finished with value: 0.8728464262657898 and parameters: {'n_estimators': 175, 'max_depth': 36.54773703143307}. Best is trial 14 with value: 0.873158915765287.
+    [I 2021-05-09 17:15:27,783] Trial 22 finished with value: 0.8726725355979255 and parameters: {'n_estimators': 197, 'max_depth': 38.39444322897897}. Best is trial 14 with value: 0.873158915765287.
+    [I 2021-05-09 17:21:33,288] Trial 23 finished with value: 0.8668809585693837 and parameters: {'n_estimators': 178, 'max_depth': 23.53960865218307}. Best is trial 14 with value: 0.873158915765287.
+    [I 2021-05-09 17:28:12,525] Trial 24 finished with value: 0.8724745052451255 and parameters: {'n_estimators': 162, 'max_depth': 36.39236268777757}. Best is trial 14 with value: 0.873158915765287.
+    
+
+In [46]:
+
+    
+    
+    trial=study.best_trial
+    print(trial.values)
+    print(trial.params)
+    
+    
+    
+    [0.873158915765287]
+    {'n_estimators': 199, 'max_depth': 39.92662510746937}
+    
+
+In [47]:
+
+    
+    
+    clf=RandomForestClassifier(n_estimators=199,max_depth=40,class_weight='balanced')
+    clf.fit(x_train_sampling,y_train_sampling)
+    
+
+Out[47]:
+
+    
+    
+    RandomForestClassifier(class_weight='balanced', max_depth=40, n_estimators=199)
+
+In [48]:
+
+    
+    
+    pred=clf.predict(x_test_sam)
+    print(accuracy_score(y_test_sam,pred))
+    
+    
+    
+    0.8141481462045079
+    
+
+In [49]:
+
+    
+    
+    print(classification_report(y_test_sam,pred))
+    
+    
+    
+                  precision    recall  f1-score   support
+    
+               0       0.92      0.86      0.89     66699
+               1       0.33      0.47      0.39      9523
+    
+        accuracy                           0.81     76222
+       macro avg       0.62      0.67      0.64     76222
+    weighted avg       0.85      0.81      0.83     76222
+    
+    
+
+In [66]:
+
+    
+    
+    print("F1 Score with oversampling : ", f1_score(y_test_sam,pred,average='micro'))
+    
+    
+    
+    F1 Score with oversampling :  0.814148146204508
+    
+
+In [51]:
+
+    
+    
+    plt.figure(figsize=(20,10))
+    y_score=clf.predict_proba(x_test_sam)[:,1]
+    
+    fpr,tpr,_=roc_curve(y_test_sam,y_score)
+    
+    plt.title('Random Forest ROC curve: CC Fraud')
+    plt.xlabel('FPR (Precision)')
+    plt.ylabel('TPR (Recall)')
+    
+    plt.plot(fpr,tpr)
+    plt.plot((0,1), ls='dashed',color='black')
+    plt.show()
+    print ('Area under curve (AUC): ', auc(fpr,tpr))
+    
+
+![](__results___files/__results___77_0.png)
+
+    
+    
+    Area under curve (AUC):  0.8324196530302881
+    
+
+**LGBM CLASSIFIER**
+
+In [54]:
+
+    
+    
+    import lightgbm as lgb
+    
+
+In [55]:
+
+    
+    
+    def objective_lgbm(trial):
+        
+        n_estimators = trial.suggest_int('n_estimators', 2, 300)
+        max_depth = int(trial.suggest_loguniform('max_depth', 2, 50))
+        learning_rate=trial.suggest_loguniform('learning_rate',0.001,1)
+        colsample_bytree=trial.suggest_loguniform("colsample_bytree",0.1, 1)
+        num_leaves=trial.suggest_int('num_leaves',10,300)
+        reg_alpha= trial.suggest_loguniform('reg_alpha',0.1,1)
+        reg_lambda= trial.suggest_loguniform('reg_lambda',0.1,1)
+        min_split_gain=trial.suggest_loguniform('min_split_gain',0.1,1)
+        subsample=trial.suggest_loguniform('subsample',0.1,1)    
+        clf = lgb.LGBMClassifier(n_estimators=n_estimators, max_depth=max_depth,
+                                learning_rate=learning_rate,colsample_bytree=colsample_bytree,
+                                num_leaves=num_leaves,reg_alpha=reg_alpha,reg_lambda=reg_lambda,
+                                min_split_gain=min_split_gain,subsample=subsample)
+        
+        return cross_val_score(clf, x_train_sampling, y_train_sampling, 
+               n_jobs=-1, cv=5,scoring='f1').mean()
+    
+
+In [56]:
+
+    
+    
+    study_lgbm= optuna.create_study(direction='maximize')
+    study_lgbm.optimize(objective_lgbm, n_trials=25)
+    
+    
+    
+    [I 2021-05-09 17:37:07,477] A new study created in memory with name: no-name-c679617e-df9b-4e13-8ef9-657a6c12ec77
+    [I 2021-05-09 17:37:32,803] Trial 0 finished with value: 0.8381231309322779 and parameters: {'n_estimators': 151, 'max_depth': 10.840257161594057, 'learning_rate': 0.002354580659159654, 'colsample_bytree': 0.17358680795684303, 'num_leaves': 175, 'reg_alpha': 0.1164106856595257, 'reg_lambda': 0.13539650968875572, 'min_split_gain': 0.5524600755361536, 'subsample': 0.10994445066476663}. Best is trial 0 with value: 0.8381231309322779.
+    [I 2021-05-09 17:37:43,202] Trial 1 finished with value: 0.8268323924817833 and parameters: {'n_estimators': 95, 'max_depth': 2.5846513459761646, 'learning_rate': 0.004793164021605496, 'colsample_bytree': 0.18930529609186827, 'num_leaves': 280, 'reg_alpha': 0.1231641161738522, 'reg_lambda': 0.23596691933222563, 'min_split_gain': 0.5815211317315117, 'subsample': 0.12066805282770775}. Best is trial 0 with value: 0.8381231309322779.
+    [I 2021-05-09 17:38:06,285] Trial 2 finished with value: 0.8523177382703773 and parameters: {'n_estimators': 282, 'max_depth': 2.5610112412046244, 'learning_rate': 0.2576127955190999, 'colsample_bytree': 0.9800462590105997, 'num_leaves': 104, 'reg_alpha': 0.38202578778289764, 'reg_lambda': 0.11180308853907653, 'min_split_gain': 0.13728489932295895, 'subsample': 0.10461899726029261}. Best is trial 2 with value: 0.8523177382703773.
+    [I 2021-05-09 17:38:12,504] Trial 3 finished with value: 0.8345117952434766 and parameters: {'n_estimators': 32, 'max_depth': 9.139045755301618, 'learning_rate': 0.004589517236618269, 'colsample_bytree': 0.14375047355820397, 'num_leaves': 119, 'reg_alpha': 0.7004537732527438, 'reg_lambda': 0.3798448825969945, 'min_split_gain': 0.10268092410541137, 'subsample': 0.5320890378122876}. Best is trial 2 with value: 0.8523177382703773.
+    [I 2021-05-09 17:38:23,660] Trial 4 finished with value: 0.8348708225205336 and parameters: {'n_estimators': 90, 'max_depth': 4.8142451827130115, 'learning_rate': 0.012037380295975224, 'colsample_bytree': 0.1612656632253903, 'num_leaves': 204, 'reg_alpha': 0.1746535264072612, 'reg_lambda': 0.4506937333146839, 'min_split_gain': 0.2742333048683297, 'subsample': 0.32414126417571415}. Best is trial 2 with value: 0.8523177382703773.
+    [I 2021-05-09 17:38:49,338] Trial 5 finished with value: 0.8312886472621086 and parameters: {'n_estimators': 300, 'max_depth': 2.2754106185538605, 'learning_rate': 0.018404239416689193, 'colsample_bytree': 0.9907837953391094, 'num_leaves': 103, 'reg_alpha': 0.10141798576377026, 'reg_lambda': 0.15284312202474806, 'min_split_gain': 0.24003868708287274, 'subsample': 0.16518068202017436}. Best is trial 2 with value: 0.8523177382703773.
+    [I 2021-05-09 17:38:56,350] Trial 6 finished with value: 0.8491640623165029 and parameters: {'n_estimators': 47, 'max_depth': 34.89535662397981, 'learning_rate': 0.006365215507190477, 'colsample_bytree': 0.10587332687521671, 'num_leaves': 69, 'reg_alpha': 0.224810274430143, 'reg_lambda': 0.12339703600563225, 'min_split_gain': 0.11213557577337126, 'subsample': 0.13054551587101304}. Best is trial 2 with value: 0.8523177382703773.
+    [I 2021-05-09 17:39:19,716] Trial 7 finished with value: 0.8257796176941113 and parameters: {'n_estimators': 226, 'max_depth': 2.30490124967715, 'learning_rate': 0.005127356510114252, 'colsample_bytree': 0.3270959929925667, 'num_leaves': 220, 'reg_alpha': 0.11593483602601357, 'reg_lambda': 0.7894483211677599, 'min_split_gain': 0.18903452677106322, 'subsample': 0.15330434527744086}. Best is trial 2 with value: 0.8523177382703773.
+    [I 2021-05-09 17:39:57,173] Trial 8 finished with value: 0.8580085726228859 and parameters: {'n_estimators': 251, 'max_depth': 18.92535709867096, 'learning_rate': 0.06053894142022973, 'colsample_bytree': 0.1627863017547368, 'num_leaves': 246, 'reg_alpha': 0.2713577427861103, 'reg_lambda': 0.19759744911001784, 'min_split_gain': 0.6262949830847567, 'subsample': 0.30040211679617124}. Best is trial 8 with value: 0.8580085726228859.
+    [I 2021-05-09 17:40:10,305] Trial 9 finished with value: 0.8325902359045949 and parameters: {'n_estimators': 126, 'max_depth': 2.2796009348196398, 'learning_rate': 0.07041284615785724, 'colsample_bytree': 0.2509319682812193, 'num_leaves': 137, 'reg_alpha': 0.16225561090783922, 'reg_lambda': 0.6596342238445715, 'min_split_gain': 0.3801706922651231, 'subsample': 0.14456322445275857}. Best is trial 8 with value: 0.8580085726228859.
+    [I 2021-05-09 17:40:29,956] Trial 10 finished with value: 0.8597988466704388 and parameters: {'n_estimators': 213, 'max_depth': 40.51312003957736, 'learning_rate': 0.960341743414073, 'colsample_bytree': 0.42529899897929563, 'num_leaves': 270, 'reg_alpha': 0.4547614488030508, 'reg_lambda': 0.21524990956543036, 'min_split_gain': 0.985162081686779, 'subsample': 0.9443259168120745}. Best is trial 10 with value: 0.8597988466704388.
+    [I 2021-05-09 17:40:50,623] Trial 11 finished with value: 0.8594047752522312 and parameters: {'n_estimators': 220, 'max_depth': 45.60950134733337, 'learning_rate': 0.9926816156134736, 'colsample_bytree': 0.462449601476212, 'num_leaves': 277, 'reg_alpha': 0.4337561084008482, 'reg_lambda': 0.21745959247704533, 'min_split_gain': 0.9542679719204908, 'subsample': 0.9328424564173571}. Best is trial 10 with value: 0.8597988466704388.
+    [I 2021-05-09 17:41:04,709] Trial 12 finished with value: 0.8611195806576358 and parameters: {'n_estimators': 186, 'max_depth': 48.17243456743291, 'learning_rate': 0.8406915489645652, 'colsample_bytree': 0.5009738261365504, 'num_leaves': 297, 'reg_alpha': 0.4942530120147569, 'reg_lambda': 0.25300864204868156, 'min_split_gain': 0.9827675684870587, 'subsample': 0.9515054857232244}. Best is trial 12 with value: 0.8611195806576358.
+    [I 2021-05-09 17:41:18,092] Trial 13 finished with value: 0.8599654171709554 and parameters: {'n_estimators': 175, 'max_depth': 28.43009286226925, 'learning_rate': 0.9547835826698752, 'colsample_bytree': 0.5909673086350568, 'num_leaves': 295, 'reg_alpha': 0.6926157533920996, 'reg_lambda': 0.3062357550127124, 'min_split_gain': 0.9865677273661274, 'subsample': 0.9989072297496047}. Best is trial 12 with value: 0.8611195806576358.
+    [I 2021-05-09 17:41:33,246] Trial 14 finished with value: 0.863973323232709 and parameters: {'n_estimators': 169, 'max_depth': 24.681798114378804, 'learning_rate': 0.293430053517273, 'colsample_bytree': 0.6351797917280241, 'num_leaves': 297, 'reg_alpha': 0.8540032469937174, 'reg_lambda': 0.3147166600891706, 'min_split_gain': 0.8044277832700836, 'subsample': 0.616816983171155}. Best is trial 14 with value: 0.863973323232709.
+    [I 2021-05-09 17:41:52,945] Trial 15 finished with value: 0.8589779988110081 and parameters: {'n_estimators': 181, 'max_depth': 21.56546839576109, 'learning_rate': 0.2786069262888723, 'colsample_bytree': 0.6389471601317614, 'num_leaves': 26, 'reg_alpha': 0.9946002611332095, 'reg_lambda': 0.5601644812659253, 'min_split_gain': 0.756178585728049, 'subsample': 0.638816087899147}. Best is trial 14 with value: 0.863973323232709.
+    [I 2021-05-09 17:42:08,027] Trial 16 finished with value: 0.86501122330564 and parameters: {'n_estimators': 124, 'max_depth': 14.201782799798677, 'learning_rate': 0.3108660990509291, 'colsample_bytree': 0.7599669874872153, 'num_leaves': 234, 'reg_alpha': 0.9992633895840847, 'reg_lambda': 0.30252702760549516, 'min_split_gain': 0.41486581521184074, 'subsample': 0.6436239490668326}. Best is trial 16 with value: 0.86501122330564.
+    [I 2021-05-09 17:42:24,761] Trial 17 finished with value: 0.8649096058355757 and parameters: {'n_estimators': 116, 'max_depth': 12.131045332677749, 'learning_rate': 0.27334777148625605, 'colsample_bytree': 0.75842451057526, 'num_leaves': 221, 'reg_alpha': 0.9026104492665376, 'reg_lambda': 0.3305344878768581, 'min_split_gain': 0.42919405608477784, 'subsample': 0.6274654737633567}. Best is trial 16 with value: 0.86501122330564.
+    [I 2021-05-09 17:42:44,554] Trial 18 finished with value: 0.8629888962221696 and parameters: {'n_estimators': 103, 'max_depth': 12.553988558087042, 'learning_rate': 0.11453285424703373, 'colsample_bytree': 0.8071129802627681, 'num_leaves': 178, 'reg_alpha': 0.9626866952224316, 'reg_lambda': 0.4708977251661663, 'min_split_gain': 0.3856944938367548, 'subsample': 0.4283600584848902}. Best is trial 16 with value: 0.86501122330564.
+    [I 2021-05-09 17:42:53,428] Trial 19 finished with value: 0.8588190444554356 and parameters: {'n_estimators': 54, 'max_depth': 6.06552931028903, 'learning_rate': 0.4389263751305414, 'colsample_bytree': 0.8180215003088077, 'num_leaves': 226, 'reg_alpha': 0.673636074716871, 'reg_lambda': 0.3855734086356349, 'min_split_gain': 0.39375077842786577, 'subsample': 0.7050393730524567}. Best is trial 16 with value: 0.86501122330564.
+    [I 2021-05-09 17:43:17,318] Trial 20 finished with value: 0.8596929722213741 and parameters: {'n_estimators': 128, 'max_depth': 15.16863075728376, 'learning_rate': 0.13511257250965114, 'colsample_bytree': 0.3538501697952077, 'num_leaves': 243, 'reg_alpha': 0.5707937213709791, 'reg_lambda': 0.16778426074214572, 'min_split_gain': 0.4724811759248088, 'subsample': 0.4486383151954709}. Best is trial 16 with value: 0.86501122330564.
+    [I 2021-05-09 17:43:32,278] Trial 21 finished with value: 0.8613099877991608 and parameters: {'n_estimators': 145, 'max_depth': 8.005119865743914, 'learning_rate': 0.4175035616389096, 'colsample_bytree': 0.7360071733585241, 'num_leaves': 198, 'reg_alpha': 0.9762452948507102, 'reg_lambda': 0.3130726574850227, 'min_split_gain': 0.7015889552162374, 'subsample': 0.7215774808109015}. Best is trial 16 with value: 0.86501122330564.
+    [I 2021-05-09 17:43:49,170] Trial 22 finished with value: 0.8653959638706871 and parameters: {'n_estimators': 83, 'max_depth': 25.189253756735123, 'learning_rate': 0.17179233498193255, 'colsample_bytree': 0.6038190843157162, 'num_leaves': 254, 'reg_alpha': 0.838971567767778, 'reg_lambda': 0.2832341981958901, 'min_split_gain': 0.3099589058884009, 'subsample': 0.5504932545076727}. Best is trial 22 with value: 0.8653959638706871.
+    [I 2021-05-09 17:44:04,290] Trial 23 finished with value: 0.8649167696454276 and parameters: {'n_estimators': 65, 'max_depth': 15.571357792236947, 'learning_rate': 0.1522623090564574, 'colsample_bytree': 0.9255121624756031, 'num_leaves': 253, 'reg_alpha': 0.8186373287577872, 'reg_lambda': 0.26668920169391913, 'min_split_gain': 0.3147819378783185, 'subsample': 0.2973604172270439}. Best is trial 22 with value: 0.8653959638706871.
+    [I 2021-05-09 17:44:21,792] Trial 24 finished with value: 0.8437716237114179 and parameters: {'n_estimators': 68, 'max_depth': 17.15053066098069, 'learning_rate': 0.030636407508597394, 'colsample_bytree': 0.9975790648482403, 'num_leaves': 253, 'reg_alpha': 0.7608793700145221, 'reg_lambda': 0.2681559435580584, 'min_split_gain': 0.29692652739273573, 'subsample': 0.22865209759983426}. Best is trial 22 with value: 0.8653959638706871.
+    
+
+In [57]:
+
+    
+    
+    trial_lgbm= study_lgbm.best_trial
+    print(trial_lgbm.value)
+    print(trial_lgbm.params)
+    
+    
+    
+    0.8653959638706871
+    {'n_estimators': 83, 'max_depth': 25.189253756735123, 'learning_rate': 0.17179233498193255, 'colsample_bytree': 0.6038190843157162, 'num_leaves': 254, 'reg_alpha': 0.838971567767778, 'reg_lambda': 0.2832341981958901, 'min_split_gain': 0.3099589058884009, 'subsample': 0.5504932545076727}
+    
+
+In [58]:
+
+    
+    
+    model_lgbm=lgb.LGBMClassifier(n_estimators=83, max_depth=25, learning_rate=0.17179233498193255, 
+                                  colsample_bytree=0.6038190843157162, num_leaves=254, reg_alpha=0.838971567767778, 
+                                  reg_lambda=0.2832341981958901, 
+                                  min_split_gain=0.3099589058884009,subsample=0.5504932545076727,class_weight='balanced')
+    
+
+In [59]:
+
+    
+    
+    model_lgbm.fit(x_train_sampling,y_train_sampling)
+    
+
+Out[59]:
+
+    
+    
+    LGBMClassifier(class_weight='balanced', colsample_bytree=0.6038190843157162,
+                   learning_rate=0.17179233498193255, max_depth=25,
+                   min_split_gain=0.3099589058884009, n_estimators=83,
+                   num_leaves=254, reg_alpha=0.838971567767778,
+                   reg_lambda=0.2832341981958901, subsample=0.5504932545076727)
+
+In [60]:
+
+    
+    
+    pred_lgbm=model_lgbm.predict(x_test_sam)
+    print(accuracy_score(y_test_sam,pred_lgbm))
+    
+    
+    
+    0.8332240035685236
+    
+
+In [61]:
+
+    
+    
+    print(classification_report(y_test_sam,pred_lgbm))
+    
+    
+    
+                  precision    recall  f1-score   support
+    
+               0       0.91      0.90      0.90     66699
+               1       0.35      0.38      0.36      9523
+    
+        accuracy                           0.83     76222
+       macro avg       0.63      0.64      0.63     76222
+    weighted avg       0.84      0.83      0.84     76222
+    
+    
+
+In [65]:
+
+    
+    
+    print("F1 Score : ", f1_score(y_test_sam,pred_lgbm,average='micro'))
+    
+    
+    
+    F1 Score :  0.8332240035685236
+    
+
+In [63]:
+
+    
+    
+    plt.figure(figsize=(20,10))
+    y_score2=model_lgbm.predict_proba(x_test_sam)[:,1]
+    
+    fpr2,tpr2,_=roc_curve(y_test_sam,y_score2)
+    
+    plt.title('Random Forest ROC curve: CC Fraud')
+    plt.xlabel('FPR (Precision)')
+    plt.ylabel('TPR (Recall)')
+    
+    plt.plot(fpr2,tpr2)
+    plt.plot((0,1), ls='dashed',color='black')
+    plt.show()
+    print ('Area under curve (AUC): ', auc(fpr2,tpr2))
+    
+
+![](__results___files/__results___88_0.png)
+
+    
+    
+    Area under curve (AUC):  0.8436923538896614
+    
+
+In [64]:
+
+    
+    
+    roc_auc_score(y_test_sam,y_score2)
+    
+
+Out[64]:
+
+    
+    
+    0.8436923538896614
+

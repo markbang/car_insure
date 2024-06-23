@@ -1,0 +1,353 @@
+# Insurance Prediction (Regression)¶
+
+ì¤ë ì í¬ë ìë£ë³´í ë°ì´í°ë¥¼ íì©í´ í ì¬ëì´
+ë³´íë£ë¥¼ ì¼ë§ë ë¼ì§ë¥¼ ìì¸¡íë íê· ë¬¸ì ë¥¼ ë¤ë¤ë³´ê²
+ìµëë¤. ìì inputì ì¶ê°ë ë°ì´í°ìì ë°ë¡ ì´ì©í ì ìê³
+, ë°ì´í°ë¥¼ ì´ë£¨ê³ ìë columnë¤ì ëí ì¤ëª ì ë¤ìê³¼
+ê°ìµëë¤.
+
+  * Age: í¼ë³´íìì ëì´
+  * Sex: í¼ë³´íìì ì±ë³
+  * BMI: í¼ë³´íìì ì²´ì§ë ì§ì - $\frac{Weight\:(kg)}{\left(Height\:(m)\right)^{2}}$
+  * Children: í¼ë³´íìì ìë ì ì
+  * Smoker: í¡ì° ì¬ë¶ (yes / no)
+  * Region: í¼ë³´íìê° ê±°ì£¼íë ì§ì­ (Southeast / Southwest / Northeast / Northwest)
+  * Charges: ë³´íë£
+
+In [1]:
+
+    
+    
+    # ìííê²½ ì¸í (ì½ë ë³ê²½ X, ìííê²½ê³¼ ì ì¬íê² íì¼ì½ê¸° êµ¬í)
+    library(readr)
+    data = read_csv('../input/insurance/insurance.csv')
+    
+    set.seed(2021)
+    idx=sample(1:nrow(data),nrow(data)*0.8)
+    cha_which=which(colnames(data)=='charges')
+    X_train=data[idx,-cha_which]; Y_train=data[idx,cha_which]
+    X_test=data[-idx,-cha_which]; Y_test=data[-idx,cha_which]
+    
+    dim(X_train); dim(Y_train); dim(X_test); dim(Y_test)
+    
+    
+    
+    Rows: 1338 Columns: 7
+    
+    ââ Column specification ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    Delimiter: ","
+    chr (3): sex, smoker, region
+    dbl (4): age, bmi, children, charges
+    
+    
+    â¹ Use `spec()` to retrieve the full column specification for this data.
+    â¹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+    
+    
+
+  1. 1070
+  2. 6
+
+  1. 1070
+  2. 1
+
+  1. 268
+  2. 6
+
+  1. 268
+  2. 1
+
+## Start¶
+
+In [2]:
+
+    
+    
+    apply(is.na(X_train),2,sum); apply(is.na(X_test),2,sum)
+    # ê²°ì¸¡ì¹ ìì. ì ì²ë¦¬ ê³¼ì  x
+    
+
+age
+
+    0
+sex
+
+    0
+bmi
+
+    0
+children
+
+    0
+smoker
+
+    0
+region
+
+    0
+
+age
+
+    0
+sex
+
+    0
+bmi
+
+    0
+children
+
+    0
+smoker
+
+    0
+region
+
+    0
+
+In [3]:
+
+    
+    
+    library(dplyr)
+    X_train=X_train %>% mutate_if(is.character,.funs='as.factor')
+    X_test=X_test %>% mutate_if(is.character,.funs='as.factor')
+    str(X_train); str(X_test)
+    # train, test setì factor labelê° ëì¼í¨. ì ì²ë¦¬ ê³¼ì  x
+    
+    
+    
+    Attaching package: âdplyrâ
+    
+    
+    The following objects are masked from âpackage:statsâ:
+    
+        filter, lag
+    
+    
+    The following objects are masked from âpackage:baseâ:
+    
+        intersect, setdiff, setequal, union
+    
+    
+    
+    
+    
+    tibble [1,070 Ã 6] (S3: tbl_df/tbl/data.frame)
+     $ age     : num [1:1070] 26 47 33 53 44 43 22 36 45 37 ...
+     $ sex     : Factor w/ 2 levels "female","male": 2 2 1 2 1 2 1 1 1 2 ...
+     $ bmi     : num [1:1070] 27.3 28.2 33.5 34.1 32.3 ...
+     $ children: num [1:1070] 3 4 0 0 1 2 0 0 0 4 ...
+     $ smoker  : Factor w/ 2 levels "no","yes": 1 1 2 2 1 2 2 1 1 2 ...
+     $ region  : Factor w/ 4 levels "northeast","northwest",..: 1 1 4 1 3 3 2 4 4 4 ...
+    tibble [268 Ã 6] (S3: tbl_df/tbl/data.frame)
+     $ age     : num [1:268] 31 37 56 56 60 37 31 18 28 62 ...
+     $ sex     : Factor w/ 2 levels "female","male": 1 2 1 2 1 2 2 1 2 1 ...
+     $ bmi     : num [1:268] 25.7 29.8 39.8 40.3 36 ...
+     $ children: num [1:268] 0 2 0 0 0 2 2 0 1 3 ...
+     $ smoker  : Factor w/ 2 levels "no","yes": 1 1 1 1 1 1 2 1 2 1 ...
+     $ region  : Factor w/ 4 levels "northeast","northwest",..: 3 1 3 4 1 2 4 1 4 2 ...
+    
+
+In [4]:
+
+    
+    
+    # ì¤ì¼ì¼ë§
+    library(caret)
+    ran=preProcess(X_train,'range')
+    X_train_normal=predict(ran,X_train)
+    X_test_normal=predict(ran,X_test)
+    
+    
+    
+    Loading required package: lattice
+    
+    Loading required package: ggplot2
+    
+    
+    Attaching package: âcaretâ
+    
+    
+    The following object is masked from âpackage:httrâ:
+    
+        progress
+    
+    
+    
+
+In [5]:
+
+    
+    
+    # validation set ëëê¸°
+    set.seed(1)
+    idx=sample(1:nrow(X_train_normal),nrow(X_train_normal)*0.7)
+    x_train=X_train_normal[idx,]; y_train=Y_train[idx,]
+    x_valid=X_train_normal[-idx,]; y_valid=Y_train[-idx,]
+    
+
+In [6]:
+
+    
+    
+    # Random Forest
+    library(randomForest)
+    set.seed(1)
+    model1=randomForest(y_train$charges~.,data=x_train)
+    pred1=predict(model1,x_valid)
+    head(pred1)
+    
+    
+    
+    randomForest 4.6-14
+    
+    Type rfNews() to see new features/changes/bug fixes.
+    
+    
+    Attaching package: ârandomForestâ
+    
+    
+    The following object is masked from âpackage:ggplot2â:
+    
+        margin
+    
+    
+    The following object is masked from âpackage:dplyrâ:
+    
+        combine
+    
+    
+    
+
+1
+
+    10588.8050554795
+2
+
+    37674.2818106063
+3
+
+    34629.2286995195
+4
+
+    38489.7399559001
+5
+
+    13293.5443699342
+6
+
+    9488.76355787996
+
+In [7]:
+
+    
+    
+    set.seed(1)
+    model2=randomForest(y_train$charges~.,data=x_train,mtry=5)
+    pred2=predict(model2,x_valid)
+    head(pred2)
+    
+
+1
+
+    10896.837410495
+2
+
+    44999.586014573
+3
+
+    39685.431916719
+4
+
+    45186.100389361
+5
+
+    13504.8259613627
+6
+
+    10060.4691998493
+
+In [8]:
+
+    
+    
+    library(ModelMetrics)
+    R2(pred1,y_valid$charges) # R2 : 0.85002
+    rmse(pred1,y_valid$charges) # RMSE : 5231.7498
+    
+    R2(pred2,y_valid$charges) # R2 : 0.85311
+    rmse(pred2,y_valid$charges) # RMSE : 4926.088
+    
+    
+    
+    Attaching package: âModelMetricsâ
+    
+    
+    The following objects are masked from âpackage:caretâ:
+    
+        confusionMatrix, precision, recall, sensitivity, specificity
+    
+    
+    The following object is masked from âpackage:baseâ:
+    
+        kappa
+    
+    
+    
+
+0.850022266924747
+
+5231.74988907895
+
+0.853119483202801
+
+4926.08820882816
+
+In [9]:
+
+    
+    
+    # model2 ì í
+    pred=predict(model2,X_test_normal)
+    head(pred)
+    
+
+1
+
+    4193.118370584
+2
+
+    7885.97287577867
+3
+
+    12865.130712167
+4
+
+    12600.343164303
+5
+
+    14888.7473124494
+6
+
+    6638.438596116
+
+In [10]:
+
+    
+    
+    # ê²°ê³¼ ì±ì  (ìíììë ì ì ìì)
+    R2(pred,Y_test$charges) # 0.84493
+    rmse(pred,Y_test$charges) # 4912.4007
+    
+
+0.84493892355474
+
+4912.40077899888
+
+In [ ]:
+
+    
+    
+    
+

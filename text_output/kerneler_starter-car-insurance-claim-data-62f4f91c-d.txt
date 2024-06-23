@@ -1,0 +1,194 @@
+## Introduction¶
+
+Greetings from the Kaggle bot! This is an automatically-generated kernel with
+starter code demonstrating how to read in the data and begin exploring. If
+you're inspired to dig deeper, click the blue "Fork Notebook" button at the
+top of this kernel to begin editing.
+
+## Exploratory Analysis¶
+
+To begin this exploratory analysis, first import libraries and define
+functions for plotting the data using `matplotlib`. Depending on the data, not
+all plots will be made. (Hey, I'm just a simple kerneling bot, not a Kaggle
+Competitions Grandmaster!)
+
+In [1]:
+
+    
+    
+    from mpl_toolkits.mplot3d import Axes3D
+    from sklearn.preprocessing import StandardScaler
+    import matplotlib.pyplot as plt # plotting
+    import numpy as np # linear algebra
+    import os # accessing directory structure
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+
+There is 1 csv file in the current version of the dataset:
+
+In [2]:
+
+    
+    
+    print(os.listdir('../input'))
+    
+    
+    
+    ['car_insurance_claim.csv']
+    
+
+The next hidden code cells define functions for plotting data. Click on the
+"Code" button in the published kernel to reveal the hidden code.
+
+In [3]:
+
+    
+    
+    # Distribution graphs (histogram/bar graph) of column data
+    def plotPerColumnDistribution(df, nGraphShown, nGraphPerRow):
+        nunique = df.nunique()
+        df = df[[col for col in df if nunique[col] > 1 and nunique[col] < 50]] # For displaying purposes, pick columns that have between 1 and 50 unique values
+        nRow, nCol = df.shape
+        columnNames = list(df)
+        nGraphRow = (nCol + nGraphPerRow - 1) / nGraphPerRow
+        plt.figure(num = None, figsize = (6 * nGraphPerRow, 8 * nGraphRow), dpi = 80, facecolor = 'w', edgecolor = 'k')
+        for i in range(min(nCol, nGraphShown)):
+            plt.subplot(nGraphRow, nGraphPerRow, i + 1)
+            columnDf = df.iloc[:, i]
+            if (not np.issubdtype(type(columnDf.iloc[0]), np.number)):
+                valueCounts = columnDf.value_counts()
+                valueCounts.plot.bar()
+            else:
+                columnDf.hist()
+            plt.ylabel('counts')
+            plt.xticks(rotation = 90)
+            plt.title(f'{columnNames[i]} (column {i})')
+        plt.tight_layout(pad = 1.0, w_pad = 1.0, h_pad = 1.0)
+        plt.show()
+    
+
+In [4]:
+
+    
+    
+    # Correlation matrix
+    def plotCorrelationMatrix(df, graphWidth):
+        filename = df.dataframeName
+        df = df.dropna('columns') # drop columns with NaN
+        df = df[[col for col in df if df[col].nunique() > 1]] # keep columns where there are more than 1 unique values
+        if df.shape[1] < 2:
+            print(f'No correlation plots shown: The number of non-NaN or constant columns ({df.shape[1]}) is less than 2')
+            return
+        corr = df.corr()
+        plt.figure(num=None, figsize=(graphWidth, graphWidth), dpi=80, facecolor='w', edgecolor='k')
+        corrMat = plt.matshow(corr, fignum = 1)
+        plt.xticks(range(len(corr.columns)), corr.columns, rotation=90)
+        plt.yticks(range(len(corr.columns)), corr.columns)
+        plt.gca().xaxis.tick_bottom()
+        plt.colorbar(corrMat)
+        plt.title(f'Correlation Matrix for {filename}', fontsize=15)
+        plt.show()
+    
+
+In [5]:
+
+    
+    
+    # Scatter and density plots
+    def plotScatterMatrix(df, plotSize, textSize):
+        df = df.select_dtypes(include =[np.number]) # keep only numerical columns
+        # Remove rows and columns that would lead to df being singular
+        df = df.dropna('columns')
+        df = df[[col for col in df if df[col].nunique() > 1]] # keep columns where there are more than 1 unique values
+        columnNames = list(df)
+        if len(columnNames) > 10: # reduce the number of columns for matrix inversion of kernel density plots
+            columnNames = columnNames[:10]
+        df = df[columnNames]
+        ax = pd.plotting.scatter_matrix(df, alpha=0.75, figsize=[plotSize, plotSize], diagonal='kde')
+        corrs = df.corr().values
+        for i, j in zip(*plt.np.triu_indices_from(ax, k = 1)):
+            ax[i, j].annotate('Corr. coef = %.3f' % corrs[i, j], (0.8, 0.2), xycoords='axes fraction', ha='center', va='center', size=textSize)
+        plt.suptitle('Scatter and Density Plot')
+        plt.show()
+    
+
+Now you're ready to read in the data and use the plotting functions to
+visualize the data.
+
+### Let's check 1st file: ../input/car_insurance_claim.csv¶
+
+In [6]:
+
+    
+    
+    nRowsRead = 1000 # specify 'None' if want to read whole file
+    # car_insurance_claim.csv has 10302 rows in reality, but we are only loading/previewing the first 1000 rows
+    df1 = pd.read_csv('../input/car_insurance_claim.csv', delimiter=',', nrows = nRowsRead)
+    df1.dataframeName = 'car_insurance_claim.csv'
+    nRow, nCol = df1.shape
+    print(f'There are {nRow} rows and {nCol} columns')
+    
+    
+    
+    There are 1000 rows and 27 columns
+    
+
+Let's take a quick look at what the data looks like:
+
+In [7]:
+
+    
+    
+    df1.head(5)
+    
+
+Out[7]:
+
+| ID | KIDSDRIV | BIRTH | AGE | HOMEKIDS | YOJ | INCOME | PARENT1 | HOME_VAL | MSTATUS | GENDER | EDUCATION | OCCUPATION | TRAVTIME | CAR_USE | BLUEBOOK | TIF | CAR_TYPE | RED_CAR | OLDCLAIM | CLM_FREQ | REVOKED | MVR_PTS | CLM_AMT | CAR_AGE | CLAIM_FLAG | URBANICITY  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 63581743 | 0 | 16MAR39 | 60.0 | 0 | 11.0 | $67,349 | No | $0 | z_No | M | PhD | Professional | 14 | Private | $14,230 | 11 | Minivan | yes | $4,461 | 2 | No | 3 | $0 | 18.0 | 0 | Highly Urban/ Urban  
+1 | 132761049 | 0 | 21JAN56 | 43.0 | 0 | 11.0 | $91,449 | No | $257,252 | z_No | M | z_High School | z_Blue Collar | 22 | Commercial | $14,940 | 1 | Minivan | yes | $0 | 0 | No | 0 | $0 | 1.0 | 0 | Highly Urban/ Urban  
+2 | 921317019 | 0 | 18NOV51 | 48.0 | 0 | 11.0 | $52,881 | No | $0 | z_No | M | Bachelors | Manager | 26 | Private | $21,970 | 1 | Van | yes | $0 | 0 | No | 2 | $0 | 10.0 | 0 | Highly Urban/ Urban  
+3 | 727598473 | 0 | 05MAR64 | 35.0 | 1 | 10.0 | $16,039 | No | $124,191 | Yes | z_F | z_High School | Clerical | 5 | Private | $4,010 | 4 | z_SUV | no | $38,690 | 2 | No | 3 | $0 | 10.0 | 0 | Highly Urban/ Urban  
+4 | 450221861 | 0 | 05JUN48 | 51.0 | 0 | 14.0 | NaN | No | $306,251 | Yes | M | <High School | z_Blue Collar | 32 | Private | $15,440 | 7 | Minivan | yes | $0 | 0 | No | 0 | $0 | 6.0 | 0 | Highly Urban/ Urban  
+  
+Distribution graphs (histogram/bar graph) of sampled columns:
+
+In [8]:
+
+    
+    
+    plotPerColumnDistribution(df1, 10, 5)
+    
+
+![](__results___files/__results___15_0.png)
+
+Correlation matrix:
+
+In [9]:
+
+    
+    
+    plotCorrelationMatrix(df1, 8)
+    
+
+![](__results___files/__results___17_0.png)
+
+Scatter and density plots:
+
+In [10]:
+
+    
+    
+    plotScatterMatrix(df1, 20, 10)
+    
+
+![](__results___files/__results___19_0.png)
+
+## Conclusion¶
+
+This concludes your starter analysis! To go forward from here, click the blue
+"Fork Notebook" button at the top of this kernel. This will create a copy of
+the code and environment for you to edit. Delete, modify, and add code as you
+please. Happy Kaggling!
+

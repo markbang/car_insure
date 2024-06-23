@@ -1,0 +1,1479 @@
+* * *
+
+#  â AI / ML Project - Insurance Claim Anticipation â
+
+####  **_Domain: Healthcare_**
+
+* * *
+
+![](https://raw.githubusercontent.com/Masterx-
+AI/Project_Insurance_Claim_Anticipation_/main/ica.jpg)
+
+* * *
+
+### Description:¶
+
+A simple yet challenging project, to anticipate whether the insurance will be
+claimed or not. The complexity arises due to the fact that the dataset has
+fewer samples, & is slightly imbalanced. Can you overcome these obstacles &
+build a good predictive model to classify them?
+
+**This data frame contains the following columns:**
+
+  * age : age of policyholder
+  * sex: gender of policy holder (female=0, male=1)
+  * bmi: Body mass index, providing an understanding of body, weights that are relatively high or low relative to height, objective index of body weight (kg / m ^ 2) using the ratio of height to weight, ideally 18.5 to 25
+  * steps: average walking steps per day of policyholder
+  * children: number of children / dependents of policyholder
+  * smoker: smoking state of policyholder (non-smoke=0;smoker=1)
+  * region: the residential area of policyholder in the US (northeast=0, northwest=1, southeast=2, southwest=3)
+  * charges: individual medical costs billed by health insurance
+  * insuranceclaim: yes=1, no=0
+
+This is "Sample Insurance Claim Prediction Dataset" which based on "[Medical
+Cost Personal Datasets][1]" to update sample value on top.
+
+### Acknowledgements:¶
+
+This dataset has been referred from Kaggle.
+
+### Objective:¶
+
+  * Understand the Dataset & cleanup (if required).
+  * Build classification model to predict weather the insurance will be claimed or not.
+  * Also fine-tune the hyperparameters & compare the evaluation metrics of vaious classification algorithms.
+
+* * *
+
+#  Stractegic Plan of Action:
+
+**We aim to solve the problem statement by creating a plan of action, Here are
+some of the necessary steps:**
+
+  1. Data Exploration
+  2. Exploratory Data Analysis (EDA)
+  3. Data Pre-processing
+  4. Data Manipulation
+  5. Feature Selection/Extraction
+  6. Predictive Modelling
+  7. Project Outcomes & Conclusion
+
+* * *
+
+# 1\. Data Exploration
+
+In [1]:
+
+    
+    
+    #Importing the basic librarires
+    
+    import os
+    import math
+    import scipy
+    import numpy as np
+    import pandas as pd
+    import seaborn as sns
+    from tqdm import tqdm
+    from sklearn import tree
+    from scipy.stats import randint
+    from scipy.stats import loguniform
+    from IPython.display import display
+    
+    from sklearn.decomposition import PCA
+    from imblearn.over_sampling import SMOTE
+    from sklearn.feature_selection import RFE
+    from sklearn.preprocessing import OneHotEncoder
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.model_selection import train_test_split
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
+    
+    from sklearn.model_selection import RandomizedSearchCV
+    from sklearn.model_selection import RepeatedStratifiedKFold
+    
+    from sklearn.svm import SVC
+    from xgboost import XGBClassifier
+    from sklearn.naive_bayes import BernoulliNB
+    from sklearn.tree import DecisionTreeClassifier
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.neighbors import KNeighborsClassifier
+    from sklearn.ensemble import GradientBoostingClassifier
+    
+    from sklearn.linear_model import LinearRegression
+    from sklearn.preprocessing import PolynomialFeatures
+    
+    from scikitplot.metrics import plot_roc_curve as auc_roc
+    from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, \
+    f1_score, roc_auc_score, roc_curve, precision_score, recall_score
+    
+    import matplotlib.pyplot as plt
+    plt.rcParams['figure.figsize'] = [10,6]
+    
+    import warnings 
+    warnings.filterwarnings('ignore')
+    
+    pd.set_option('display.max_columns', 50)
+    
+
+In [2]:
+
+    
+    
+    #Importing the dataset
+    
+    
+    df = pd.read_csv('../input/insurance-claim-dataset/Insurance.csv')
+    
+    target = 'insuranceclaim'
+    labels = ['Claimed','Not Claimed']
+    features = [i for i in df.columns.values if i not in [target]]
+    
+    original_df = df.copy(deep=True)
+    display(df.head())
+    
+    print('\n\033[1mInference:\033[0m The Datset consists of {} features & {} samples.'.format(df.shape[1], df.shape[0]))
+    
+
+| age | sex | bmi | children | smoker | region | charges | insuranceclaim  
+---|---|---|---|---|---|---|---|---  
+0 | 19 | 0 | 27.900 | 0 | 1 | 3 | 16884.92400 | 1  
+1 | 18 | 1 | 33.770 | 1 | 0 | 2 | 1725.55230 | 1  
+2 | 28 | 1 | 33.000 | 3 | 0 | 2 | 4449.46200 | 0  
+3 | 33 | 1 | 22.705 | 0 | 0 | 1 | 21984.47061 | 0  
+4 | 32 | 1 | 28.880 | 0 | 0 | 1 | 3866.85520 | 1  
+      
+    
+    Inference: The Datset consists of 8 features & 1338 samples.
+    
+
+In [3]:
+
+    
+    
+    #Checking the dtypes of all the columns
+    
+    df.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 1338 entries, 0 to 1337
+    Data columns (total 8 columns):
+     #   Column          Non-Null Count  Dtype  
+    ---  ------          --------------  -----  
+     0   age             1338 non-null   int64  
+     1   sex             1338 non-null   int64  
+     2   bmi             1338 non-null   float64
+     3   children        1338 non-null   int64  
+     4   smoker          1338 non-null   int64  
+     5   region          1338 non-null   int64  
+     6   charges         1338 non-null   float64
+     7   insuranceclaim  1338 non-null   int64  
+    dtypes: float64(2), int64(6)
+    memory usage: 83.8 KB
+    
+
+In [4]:
+
+    
+    
+    #Checking number of unique rows in each feature
+    
+    df.nunique().sort_values()
+    
+
+Out[4]:
+
+    
+    
+    sex                  2
+    smoker               2
+    insuranceclaim       2
+    region               4
+    children             6
+    age                 47
+    bmi                548
+    charges           1337
+    dtype: int64
+
+In [5]:
+
+    
+    
+    #Checking number of unique rows in each feature
+    
+    nu = df[features].nunique().sort_values()
+    nf = []; cf = []; nnf = 0; ncf = 0; #numerical & categorical features
+    
+    for i in range(df[features].shape[1]):
+        if nu.values[i]<=7:cf.append(nu.index[i])
+        else: nf.append(nu.index[i])
+    
+    print('\n\033[1mInference:\033[0m The Datset has {} numerical & {} categorical features.'.format(len(nf),len(cf)))
+    
+    
+    
+    Inference: The Datset has 3 numerical & 4 categorical features.
+    
+
+In [6]:
+
+    
+    
+    #Checking the stats of all the columns
+    
+    display(df.describe())
+    
+
+| age | sex | bmi | children | smoker | region | charges | insuranceclaim  
+---|---|---|---|---|---|---|---|---  
+count | 1338.000000 | 1338.000000 | 1338.000000 | 1338.000000 | 1338.000000 | 1338.000000 | 1338.000000 | 1338.000000  
+mean | 39.207025 | 0.505232 | 30.663397 | 1.094918 | 0.204783 | 1.515695 | 13270.422265 | 0.585202  
+std | 14.049960 | 0.500160 | 6.098187 | 1.205493 | 0.403694 | 1.104885 | 12110.011237 | 0.492871  
+min | 18.000000 | 0.000000 | 15.960000 | 0.000000 | 0.000000 | 0.000000 | 1121.873900 | 0.000000  
+25% | 27.000000 | 0.000000 | 26.296250 | 0.000000 | 0.000000 | 1.000000 | 4740.287150 | 0.000000  
+50% | 39.000000 | 1.000000 | 30.400000 | 1.000000 | 0.000000 | 2.000000 | 9382.033000 | 1.000000  
+75% | 51.000000 | 1.000000 | 34.693750 | 2.000000 | 0.000000 | 2.000000 | 16639.912515 | 1.000000  
+max | 64.000000 | 1.000000 | 53.130000 | 5.000000 | 1.000000 | 3.000000 | 63770.428010 | 1.000000  
+  
+**Inference:** The stats seem to be fine, let us gain more undestanding by
+visualising the dataset.
+
+* * *
+
+#  2\. Exploratory Data Analysis (EDA)
+
+In [7]:
+
+    
+    
+    #Let us first analyze the distribution of the target variable
+    
+    MAP={}
+    for e, i in enumerate(sorted(df[target].unique())):
+        MAP[i]=labels[e]
+    #MAP={0:'Not-Survived',1:'Survived'}
+    df1 = df.copy()
+    df1[target]=df1[target].map(MAP)
+    explode=np.zeros(len(labels))
+    explode[-1]=0.1
+    print('\033[1mTarget Variable Distribution'.center(55))
+    plt.pie(df1[target].value_counts(), labels=df1[target].value_counts().index, counterclock=False, shadow=True, 
+            explode=explode, autopct='%1.1f%%', radius=1, startangle=0)
+    plt.show()
+    
+    
+    
+                Target Variable Distribution           
+    
+
+![](__results___files/__results___20_1.png)
+
+**Inference:** The Target Variable seems to be slightly imbalanced! Hence we
+shall try to perform data augmentation.
+
+In [8]:
+
+    
+    
+    #Visualising the categorical features 
+    
+    print('\033[1mVisualising Categorical Features:'.center(100))
+    
+    n=3
+    plt.figure(figsize=[15,3*math.ceil(len(cf)/n)])
+    
+    for i in range(len(cf)):
+        if df[cf[i]].nunique()<=6:
+            plt.subplot(math.ceil(len(cf)/n),n,i+1)
+            sns.countplot(df[cf[i]])
+        else:
+            plt.subplot(3,1,i-1)
+            sns.countplot(df[cf[i]])
+    plt.tight_layout()
+    plt.show()
+    
+    
+    
+                                   Visualising Categorical Features:                                
+    
+
+![](__results___files/__results___22_1.png)
+
+**Inference:** Visualizing the categorical features reveal lot of information
+about the dataset.
+
+In [9]:
+
+    
+    
+    #Understanding the feature set
+    
+    print('\033[1mFeatures Distribution'.center(100))
+    
+    nf = [i for i in features if i not in cf]
+    
+    plt.figure(figsize=[15,3*math.ceil(len(features)/3)])
+    for c in range(len(nf)):
+        plt.subplot(math.ceil(len(features)/3),3,c+1)
+        sns.distplot(df[nf[c]])
+    plt.tight_layout()
+    plt.show()
+    
+    plt.figure(figsize=[15,3*math.ceil(len(features)/3)])
+    for c in range(len(nf)):
+        plt.subplot(math.ceil(len(features)/3),3,c+1)
+        df.boxplot(nf[c])
+    plt.tight_layout()
+    plt.show()
+    
+    
+    
+                                         Features Distribution                                      
+    
+
+![](__results___files/__results___24_1.png)
+
+![](__results___files/__results___24_2.png)
+
+**Inference:** The data is somewhat normally distributed. And there are many
+outliers present in the dataset. We shall fix these outliers..
+
+In [10]:
+
+    
+    
+    #Understanding the relationship between all the features
+    
+    g=sns.pairplot(df1, hue=target, size=4)
+    g.map_upper(sns.kdeplot, levels=1, color=".2")
+    plt.show()
+    
+
+![](__results___files/__results___26_0.png)
+
+**Inference:** The data samples of most of the features do show some patterns.
+Also they seem to have lot of overlap for the outcome classes, making it
+difficult to be distingusihable. Let is proceed to perform cleanup on the data
+to remove the irregularities...
+
+* * *
+
+#  3\. Data Preprocessing
+
+In [11]:
+
+    
+    
+    #Removal of any Duplicate rows (if any)
+    
+    counter = 0
+    r,c = original_df.shape
+    
+    df1 = df.copy()
+    df1.drop_duplicates(inplace=True)
+    df1.reset_index(drop=True,inplace=True)
+    
+    if df1.shape==(r,c):
+        print('\n\033[1mInference:\033[0m The dataset doesn\'t have any duplicates')
+    else:
+        print(f'\n\033[1mInference:\033[0m Number of duplicates dropped ---> {r-df1.shape[0]}')
+    
+    
+    
+    Inference: Number of duplicates dropped ---> 1
+    
+
+In [12]:
+
+    
+    
+    #Check for empty elements
+    
+    nvc = pd.DataFrame(df1.isnull().sum().sort_values(), columns=['Total Null Values'])
+    nvc['Percentage'] = round(nvc['Total Null Values']/df1.shape[0],3)*100
+    print(nvc)
+    
+    
+    
+                    Total Null Values  Percentage
+    age                             0         0.0
+    sex                             0         0.0
+    bmi                             0         0.0
+    children                        0         0.0
+    smoker                          0         0.0
+    region                          0         0.0
+    charges                         0         0.0
+    insuranceclaim                  0         0.0
+    
+
+**Inference:** There are many outliers in the dataset. Let us try to impute
+the missing values
+
+In [13]:
+
+    
+    
+    #Converting categorical Columns to Numeric
+    
+    #df1 = df.copy()
+    ecc = nvc[nvc['Percentage']!=0].index.values
+    dcc = [i for i in df.columns if i not in ecc]
+    
+    df3 = df1[dcc]
+    fcc = [i for i in cf if i not in ecc]
+    
+    #One-Hot Binay Encoding
+    oh=True
+    dm=True
+    for i in fcc:
+        #print(i)
+        if df3[i].nunique()==2:
+            if oh==True: print("\033[1m\nOne-Hot Encoding on features:\033[0m")
+            print(i);oh=False
+            df3[i]=pd.get_dummies(df3[i], drop_first=True, prefix=str(i))
+        if (df3[i].nunique()>2 and df3[i].nunique()<17):
+            if dm==True: print("\n\033[1mDummy Encoding on features:\033[0m")
+            print(i);dm=False
+            df3 = pd.concat([df3.drop([i], axis=1), pd.DataFrame(pd.get_dummies(df3[i], drop_first=True, prefix=str(i)))],axis=1)
+            
+    df3.shape
+    
+    
+    
+    One-Hot Encoding on features:
+    sex
+    smoker
+    
+    Dummy Encoding on features:
+    region
+    children
+    
+
+Out[13]:
+
+    
+    
+    (1337, 14)
+
+In [14]:
+
+    
+    
+    #Removal of outlier:
+    
+    df4 = df3.copy()
+    
+    for i in [i for i in df4.columns]:
+        if df4[i].nunique()>=12:
+            Q1 = df4[i].quantile(0.25)
+            Q3 = df4[i].quantile(0.75)
+            IQR = Q3 - Q1
+            df4 = df4[df4[i] <= (Q3+(1.5*IQR))]
+            df4 = df4[df4[i] >= (Q1-(1.5*IQR))]
+    df4 = df4.reset_index(drop=True)
+    display(df4.head())
+    print('\n\033[1mInference:\033[0m Before removal of outliers, The dataset had {} samples.'.format(df1.shape[0]))
+    print('\033[1mInference:\033[0m After removal of outliers, The dataset now has {} samples.'.format(df4.shape[0]))
+    
+
+| age | sex | bmi | smoker | charges | insuranceclaim | region_1 | region_2 | region_3 | children_1 | children_2 | children_3 | children_4 | children_5  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 19 | 0 | 27.900 | 1 | 16884.92400 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0  
+1 | 18 | 1 | 33.770 | 0 | 1725.55230 | 1 | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0  
+2 | 28 | 1 | 33.000 | 0 | 4449.46200 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0  
+3 | 33 | 1 | 22.705 | 0 | 21984.47061 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0  
+4 | 32 | 1 | 28.880 | 0 | 3866.85520 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0  
+      
+    
+    Inference: Before removal of outliers, The dataset had 1337 samples.
+    Inference: After removal of outliers, The dataset now has 1190 samples.
+    
+
+In [15]:
+
+    
+    
+    #Fixing the imbalance using SMOTE Technique
+    
+    df5 = df4.copy()
+    
+    print('Original class distribution:')
+    print(df5[target].value_counts())
+    
+    xf = df5.columns
+    X = df5.drop([target],axis=1)
+    Y = df5[target]
+    
+    smote = SMOTE()
+    X, Y = smote.fit_resample(X, Y)
+    
+    df5 = pd.DataFrame(X, columns=xf)
+    df5[target] = Y
+    
+    print('\nClass distribution after applying SMOTE Technique:',)
+    print(Y.value_counts())
+    
+    
+    
+    Original class distribution:
+    1    638
+    0    552
+    Name: insuranceclaim, dtype: int64
+    
+    Class distribution after applying SMOTE Technique:
+    1    638
+    0    638
+    Name: insuranceclaim, dtype: int64
+    
+
+In [16]:
+
+    
+    
+    #Final Dataset size after performing Preprocessing
+    
+    df = df5.copy()
+    plt.title('Final Dataset Samples')
+    plt.pie([df.shape[0], original_df.shape[0]-df4.shape[0], df5.shape[0]-df4.shape[0]], radius = 1, shadow=True,
+            labels=['Retained','Dropped','Augmented'], counterclock=False, autopct='%1.1f%%', pctdistance=0.9, explode=[0,0,0])
+    plt.pie([df.shape[0]], labels=['100%'], labeldistance=-0, radius=0.78, shadow=True, colors=['powderblue'])
+    plt.show()
+    
+    print('\n\033[1mInference:\033[0mThe final dataset after cleanup has {} samples & {} columns.'.format(df.shape[0], df.shape[1]))
+    
+
+![](__results___files/__results___36_0.png)
+
+    
+    
+    Inference:The final dataset after cleanup has 1276 samples & 14 columns.
+    
+
+* * *
+
+#  4\. Data Manipulation
+
+In [17]:
+
+    
+    
+    #Splitting the data intro training & testing sets
+    
+    df = df5.copy()
+    
+    X = df.drop([target],axis=1)
+    Y = df[target]
+    Train_X, Test_X, Train_Y, Test_Y = train_test_split(X, Y, train_size=0.8, test_size=0.2, random_state=0)
+    
+    print('Original set  ---> ',X.shape,Y.shape,'\nTraining set  ---> ',Train_X.shape,Train_Y.shape,'\nTesting set   ---> ', Test_X.shape,'', Test_Y.shape)
+    
+    
+    
+    Original set  --->  (1276, 13) (1276,) 
+    Training set  --->  (1020, 13) (1020,) 
+    Testing set   --->  (256, 13)  (256,)
+    
+
+In [18]:
+
+    
+    
+    #Feature Scaling (Standardization)
+    
+    std = StandardScaler()
+    
+    print('\033[1mStandardardization on Training set'.center(100))
+    Train_X_std = std.fit_transform(Train_X)
+    Train_X_std = pd.DataFrame(Train_X_std, columns=X.columns)
+    display(Train_X_std.describe())
+    
+    print('\n','\033[1mStandardardization on Testing set'.center(100))
+    Test_X_std = std.transform(Test_X)
+    Test_X_std = pd.DataFrame(Test_X_std, columns=X.columns)
+    display(Test_X_std.describe())
+    
+    
+    
+                                   Standardardization on Training set                               
+    
+
+| age | sex | bmi | smoker | charges | region_1 | region_2 | region_3 | children_1 | children_2 | children_3 | children_4 | children_5  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+count | 1.020000e+03 | 1.020000e+03 | 1.020000e+03 | 1.020000e+03 | 1.020000e+03 | 1.020000e+03 | 1.020000e+03 | 1.020000e+03 | 1.020000e+03 | 1.020000e+03 | 1.020000e+03 | 1.020000e+03 | 1.020000e+03  
+mean | 2.224800e-16 | 4.593276e-17 | 3.513529e-16 | -2.151873e-16 | -6.019150e-17 | 1.323560e-16 | -1.001378e-16 | -3.548360e-16 | -1.114577e-16 | -4.745659e-17 | -1.143965e-16 | 2.264528e-16 | -4.349190e-16  
+std | 1.000491e+00 | 1.000491e+00 | 1.000491e+00 | 1.000491e+00 | 1.000491e+00 | 1.000491e+00 | 1.000491e+00 | 1.000491e+00 | 1.000491e+00 | 1.000491e+00 | 1.000491e+00 | 1.000491e+00 | 1.000491e+00  
+min | -1.496559e+00 | -9.539981e-01 | -2.379798e+00 | -3.459028e-01 | -1.214473e+00 | -5.803691e-01 | -5.471408e-01 | -5.365434e-01 | -5.471408e-01 | -4.519406e-01 | -3.529682e-01 | -1.449863e-01 | -1.221694e-01  
+25% | -9.209591e-01 | -9.539981e-01 | -7.298936e-01 | -3.459028e-01 | -7.559472e-01 | -5.803691e-01 | -5.471408e-01 | -5.365434e-01 | -5.471408e-01 | -4.519406e-01 | -3.529682e-01 | -1.449863e-01 | -1.221694e-01  
+50% | 1.438999e-02 | -9.539981e-01 | -3.605696e-02 | -3.459028e-01 | -2.241228e-01 | -5.803691e-01 | -5.471408e-01 | -5.365434e-01 | -5.471408e-01 | -4.519406e-01 | -3.529682e-01 | -1.449863e-01 | -1.221694e-01  
+75% | 8.777892e-01 | 1.048220e+00 | 6.368883e-01 | -3.459028e-01 | 4.016879e-01 | 1.723041e+00 | -5.471408e-01 | -5.365434e-01 | -5.471408e-01 | -4.519406e-01 | -3.529682e-01 | -1.449863e-01 | -1.221694e-01  
+max | 1.813138e+00 | 1.048220e+00 | 2.914683e+00 | 2.890986e+00 | 3.376862e+00 | 1.723041e+00 | 1.827683e+00 | 1.863782e+00 | 1.827683e+00 | 2.212680e+00 | 2.833116e+00 | 6.897204e+00 | 8.185353e+00  
+      
+    
+                                    Standardardization on Testing set                                
+    
+
+| age | sex | bmi | smoker | charges | region_1 | region_2 | region_3 | children_1 | children_2 | children_3 | children_4 | children_5  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+count | 256.000000 | 256.000000 | 256.000000 | 256.000000 | 256.000000 | 256.000000 | 256.000000 | 256.000000 | 256.000000 | 256.000000 | 256.000000 | 256.000000 | 256.000000  
+mean | 0.052894 | -0.070206 | 0.084411 | 0.008132 | -0.031633 | -0.076498 | 0.092948 | 0.072914 | 0.009459 | -0.035594 | 0.070184 | -0.062461 | -0.024816  
+std | 1.004672 | 0.996159 | 1.022403 | 1.012241 | 0.921629 | 0.954092 | 1.055812 | 1.046775 | 1.007964 | 0.969398 | 1.083386 | 0.759344 | 0.895782  
+min | -1.496559 | -0.953998 | -1.857056 | -0.345903 | -1.211765 | -0.580369 | -0.547141 | -0.536543 | -0.547141 | -0.451941 | -0.352968 | -0.144986 | -0.122169  
+25% | -0.795047 | -0.953998 | -0.687765 | -0.345903 | -0.722617 | -0.580369 | -0.547141 | -0.536543 | -0.547141 | -0.451941 | -0.352968 | -0.144986 | -0.122169  
+50% | 0.086340 | -0.953998 | 0.005212 | -0.345903 | -0.182677 | -0.580369 | -0.547141 | -0.536543 | -0.547141 | -0.451941 | -0.352968 | -0.144986 | -0.122169  
+75% | 0.949739 | 1.048220 | 0.757083 | -0.345903 | 0.422453 | -0.580369 | 1.827683 | 1.863782 | -0.547141 | -0.451941 | -0.352968 | -0.144986 | -0.122169  
+max | 1.813138 | 1.048220 | 2.876853 | 2.890986 | 3.261848 | 1.723041 | 1.827683 | 1.863782 | 1.827683 | 2.212680 | 2.833116 | 6.897204 | 8.185353  
+  
+* * *
+
+#  5\. Feature Selection/Extraction
+
+In [19]:
+
+    
+    
+    #Checking the correlation
+    
+    features = df.columns
+    plt.figure(figsize=[12,10])
+    plt.title('Features Correlation-Plot')
+    sns.heatmap(df[features].corr(), vmin=-1, vmax=1, center=0, annot=True) #, 
+    plt.show()
+    
+
+![](__results___files/__results___43_0.png)
+
+**Inference:** \ Correlation plt between the variables convey lot of
+information about the realationship betweem them. There seems to be strong
+multicollinearity in the dataset.
+
+Let us check with different techniques if we can improve the model's
+performance by performing Feature Selection/Extraction steps to take care of
+these multi-collinearity...
+
+**Strategy:** \ We can fix these multicollinearity with two techniques:
+
+  1. Manual Method - Variance Inflation Factor (VIF)
+  2. Automatic Method - Recursive Feature Elimination (RFE)
+  3. Decomposition Method - Principle Component Analysis (PCA)
+
+## 5a. Manual Method - VIF¶
+
+In [20]:
+
+    
+    
+    # Calculate the VIFs to remove multicollinearity
+    
+    DROP=[]; scores1=[]; scores2=[]; scores3=[]
+    #scores.append(f1_score(Test_Y,LogisticRegression().fit(Train_X_std, Train_Y).predict(Test_X_std)))
+    scores1.append(f1_score(Test_Y,LogisticRegression().fit(Train_X_std.drop(DROP,axis=1), Train_Y).predict(Test_X_std.drop(DROP,axis=1)),average='weighted')*100)
+    scores2.append(f1_score(Test_Y,RandomForestClassifier().fit(Train_X_std.drop(DROP,axis=1), Train_Y).predict(Test_X_std.drop(DROP,axis=1)),average='weighted')*100)
+    scores3.append(f1_score(Test_Y,XGBClassifier().fit(Train_X_std.drop(DROP,axis=1), Train_Y, eval_metric='logloss').predict(Test_X_std.drop(DROP,axis=1)),average='weighted')*100)
+            
+    for i in tqdm(range(len(X.columns.values)-1)):
+        vif = pd.DataFrame()
+        Xs = X.drop(DROP,axis=1)
+        #print(DROP)
+        vif['Features'] = Xs.columns
+        vif['VIF'] = [variance_inflation_factor(Xs.values, i) for i in range(Xs.shape[1])]
+        vif['VIF'] = round(vif['VIF'], 2)
+        vif = vif.sort_values(by = "VIF", ascending = False)
+        vif.reset_index(drop=True, inplace=True)
+        DROP.append(vif.Features[0])
+        if vif.VIF[0]>1:
+            scores1.append(f1_score(Test_Y,LogisticRegression().fit(Train_X_std.drop(DROP,axis=1), Train_Y).predict(Test_X_std.drop(DROP,axis=1)),average='weighted')*100)
+            scores2.append(f1_score(Test_Y,RandomForestClassifier().fit(Train_X_std.drop(DROP,axis=1), Train_Y).predict(Test_X_std.drop(DROP,axis=1)),average='weighted')*100)
+            scores3.append(f1_score(Test_Y,XGBClassifier().fit(Train_X_std.drop(DROP,axis=1), Train_Y, eval_metric='logloss').predict(Test_X_std.drop(DROP,axis=1)),average='weighted')*100)
+        #print(scores)
+        
+    plt.plot(scores1, label='LR')
+    plt.plot(scores2, label='RF')
+    plt.plot(scores3, label='XG')
+    #plt.ylim([0.7,0.85])
+    plt.legend()
+    plt.grid()
+    plt.show()
+    
+    
+    
+    100%|ââââââââââ| 12/12 [00:05<00:00,  2.38it/s]
+    
+
+![](__results___files/__results___47_1.png)
+
+## 5b. Automatic Method - RFE¶
+
+In [21]:
+
+    
+    
+    # Applying Recurrsive Feature Elimination
+    
+    # Running RFE with the output number of the variable equal to 10
+    LR = LogisticRegression()#.fit(Train_X_std, Train_Y)
+    scores1=[]; scores2=[]; scores3=[]
+    scores1.append(f1_score(Test_Y,LogisticRegression().fit(Train_X_std, Train_Y).predict(Test_X_std),average='weighted')*100)
+    scores2.append(f1_score(Test_Y,RandomForestClassifier().fit(Train_X_std, Train_Y).predict(Test_X_std),average='weighted')*100)
+    scores3.append(f1_score(Test_Y,XGBClassifier().fit(Train_X_std, Train_Y, eval_metric='logloss').predict(Test_X_std),average='weighted')*100)
+    
+    for i in tqdm(range(len(X.columns.values))):
+        rfe = RFE(LR,n_features_to_select=len(Train_X_std.columns)-i)   
+        rfe = rfe.fit(Train_X_std, Train_Y)
+        scores1.append(f1_score(Test_Y,LogisticRegression().fit(Train_X_std[Train_X_std.columns[rfe.support_]], Train_Y).predict(Test_X_std[Train_X_std.columns[rfe.support_]]),average='weighted')*100)
+        scores2.append(f1_score(Test_Y,RandomForestClassifier().fit(Train_X_std[Train_X_std.columns[rfe.support_]], Train_Y).predict(Test_X_std[Train_X_std.columns[rfe.support_]]),average='weighted')*100)
+        scores3.append(f1_score(Test_Y,XGBClassifier().fit(Train_X_std[Train_X_std.columns[rfe.support_]], Train_Y, eval_metric='logloss').predict(Test_X_std[Train_X_std.columns[rfe.support_]]),average='weighted')*100)
+        
+    plt.plot(scores1, label='LR')
+    plt.plot(scores2, label='RF')
+    plt.plot(scores3, label='XG')
+    #plt.ylim([0.80,0.84])
+    plt.legend()
+    plt.grid()
+    plt.show()
+    
+    
+    
+    100%|ââââââââââ| 13/13 [00:09<00:00,  1.40it/s]
+    
+
+![](__results___files/__results___49_1.png)
+
+In [22]:
+
+    
+    
+    from sklearn.decomposition import PCA
+    
+    pca = PCA().fit(Train_X_std)
+    
+    fig, ax = plt.subplots(figsize=(14,6))
+    x_values = range(1, pca.n_components_+1)
+    ax.bar(x_values, pca.explained_variance_ratio_, lw=2, label='Explained Variance')
+    ax.plot(x_values, np.cumsum(pca.explained_variance_ratio_), lw=2, label='Cumulative Explained Variance', color='red')
+    plt.plot([0,pca.n_components_+1],[0.90,0.90],'g--')
+    plt.plot([6,6],[0,1], 'g--')
+    ax.set_title('Explained variance of components')
+    ax.set_xlabel('Principal Component')
+    ax.set_ylabel('Explained Variance')
+    plt.grid()
+    plt.legend()
+    plt.show()
+    
+
+![](__results___files/__results___50_0.png)
+
+**Inference:** We shall avoid performing dimensionality reduction for the
+current problem.
+
+In [23]:
+
+    
+    
+    #Applying PCA Transformations
+    
+    # scores1.append(f1_score(Test_Y,LogisticRegression().fit(Train_X_std, Train_Y).predict(Test_X_std),average='weighted')*100)
+    # scores2.append(f1_score(Test_Y,RandomForestClassifier().fit(Train_X_std, Train_Y).predict(Test_X_std),average='weighted')*100)
+    # scores3.append(f1_score(Test_Y,XGBClassifier().fit(Train_X_std, Train_Y, eval_metric='logloss').predict(Test_X_std),average='weighted')*100)
+    
+    scores1=[]; scores2=[]; scores3=[]
+    for i in tqdm(range(len(X.columns.values))):
+        pca = PCA(n_components=Train_X_std.shape[1]-i)
+        Train_X_std_pca = pca.fit_transform(Train_X_std)
+        #print('The shape of final transformed training feature set:')
+        #print(Train_X_std_pca.shape)
+        Train_X_std_pca = pd.DataFrame(Train_X_std_pca)
+    
+        Test_X_std_pca = pca.transform(Test_X_std)
+        #print('\nThe shape of final transformed testing feature set:')
+        #print(Test_X_std_pca.shape)
+        Test_X_std_pca = pd.DataFrame(Test_X_std_pca)
+        
+        scores1.append(f1_score(Test_Y,LogisticRegression().fit(Train_X_std_pca, Train_Y).predict(Test_X_std_pca),average='weighted')*100)
+        scores2.append(f1_score(Test_Y,RandomForestClassifier().fit(Train_X_std_pca, Train_Y).predict(Test_X_std_pca),average='weighted')*100)
+        scores3.append(f1_score(Test_Y,XGBClassifier().fit(Train_X_std_pca, Train_Y, eval_metric='logloss').predict(Test_X_std_pca),average='weighted')*100)
+    
+        
+    plt.plot(scores1, label='LR')
+    plt.plot(scores2, label='RF')
+    plt.plot(scores3, label='XG')
+    #plt.ylim([0.80,0.84])
+    plt.legend()
+    plt.grid()
+    plt.show()
+    
+    
+    
+    100%|ââââââââââ| 13/13 [00:10<00:00,  1.27it/s]
+    
+
+![](__results___files/__results___52_1.png)
+
+**Inference:** In VIF, RFE & PCA Techniques, we did notice any better scores
+upon dropping some multicollinear features. But in order to avoid the curse of
+dimensionality, we can capture top 90% of the data Variance explained by top n
+PCA components.
+
+In [24]:
+
+    
+    
+    #### Finalising the shortlisted features
+    
+    rfe = RFE(LR,n_features_to_select=len(Train_X_std.columns))   
+    rfe = rfe.fit(Train_X_std, Train_Y)
+    
+    print(f1_score(Test_Y,LogisticRegression().fit(Train_X_std[Train_X_std.columns[rfe.support_]], Train_Y).predict(Test_X_std[Train_X_std.columns[rfe.support_]]),average='weighted')*100)
+    print(f1_score(Test_Y,RandomForestClassifier().fit(Train_X_std[Train_X_std.columns[rfe.support_]], Train_Y).predict(Test_X_std[Train_X_std.columns[rfe.support_]]),average='weighted')*100)
+    print(f1_score(Test_Y,XGBClassifier().fit(Train_X_std[Train_X_std.columns[rfe.support_]], Train_Y, eval_metric='logloss').predict(Test_X_std[Train_X_std.columns[rfe.support_]]),average='weighted')*100)
+        
+    # Train_X_std = Train_X_std[Train_X_std.columns[rfe.support_]]
+    # Test_X_std = Test_X_std[Test_X_std.columns[rfe.support_]]
+    
+    print(Train_X_std.shape)
+    print(Test_X_std.shape)
+    
+    
+    
+    81.2534351145038
+    90.62728937728937
+    93.74808973653647
+    (1020, 13)
+    (256, 13)
+    
+
+* * *
+
+#  6\. Predictive Modeling
+
+In [25]:
+
+    
+    
+    #Let us create first create a table to store the results of various models 
+    
+    Evaluation_Results = pd.DataFrame(np.zeros((8,5)), columns=['Accuracy', 'Precision','Recall','F1-score','AUC-ROC score'])
+    Evaluation_Results.index=['Logistic Regression (LR)','Decision Tree Classifier (DT)','Random Forest Classifier (RF)','NaÃ¯ve Bayes Classifier (NB)',
+                             'Support Vector Machine (SVM)','K Nearest Neighbours (KNN)', 'Gradient Boosting (GB)','Extreme Gradient Boosting (XGB)']
+    Evaluation_Results
+    
+
+Out[25]:
+
+| Accuracy | Precision | Recall | F1-score | AUC-ROC score  
+---|---|---|---|---|---  
+Logistic Regression (LR) | 0.0 | 0.0 | 0.0 | 0.0 | 0.0  
+Decision Tree Classifier (DT) | 0.0 | 0.0 | 0.0 | 0.0 | 0.0  
+Random Forest Classifier (RF) | 0.0 | 0.0 | 0.0 | 0.0 | 0.0  
+NaÃ¯ve Bayes Classifier (NB) | 0.0 | 0.0 | 0.0 | 0.0 | 0.0  
+Support Vector Machine (SVM) | 0.0 | 0.0 | 0.0 | 0.0 | 0.0  
+K Nearest Neighbours (KNN) | 0.0 | 0.0 | 0.0 | 0.0 | 0.0  
+Gradient Boosting (GB) | 0.0 | 0.0 | 0.0 | 0.0 | 0.0  
+Extreme Gradient Boosting (XGB) | 0.0 | 0.0 | 0.0 | 0.0 | 0.0  
+  
+In [26]:
+
+    
+    
+    #Let us define functions to summarise the Prediction's scores .
+    
+    #Classification Summary Function
+    def Classification_Summary(pred,pred_prob,i):
+        Evaluation_Results.iloc[i]['Accuracy']=round(accuracy_score(Test_Y, pred),3)*100   
+        Evaluation_Results.iloc[i]['Precision']=round(precision_score(Test_Y, pred, average='weighted'),3)*100 #
+        Evaluation_Results.iloc[i]['Recall']=round(recall_score(Test_Y, pred, average='weighted'),3)*100 #
+        Evaluation_Results.iloc[i]['F1-score']=round(f1_score(Test_Y, pred, average='weighted'),3)*100 #
+        Evaluation_Results.iloc[i]['AUC-ROC score']=round(roc_auc_score(Test_Y, pred_prob[:,1], multi_class='ovr'),3)*100 #[:, 1]
+        print('{}{}\033[1m Evaluating {} \033[0m{}{}\n'.format('<'*3,'-'*35,Evaluation_Results.index[i], '-'*35,'>'*3))
+        print('Accuracy = {}%'.format(round(accuracy_score(Test_Y, pred),3)*100))
+        print('F1 Score = {}%'.format(round(f1_score(Test_Y, pred, average='weighted'),3)*100)) #
+        print('\n \033[1mConfusiton Matrix:\033[0m\n',confusion_matrix(Test_Y, pred))
+        print('\n\033[1mClassification Report:\033[0m\n',classification_report(Test_Y, pred))
+        
+        auc_roc(Test_Y, pred_prob, curves=['each_class'])
+        plt.show()
+    
+    #Visualising Function
+    def AUC_ROC_plot(Test_Y, pred):    
+        ref = [0 for _ in range(len(Test_Y))]
+        ref_auc = roc_auc_score(Test_Y, ref)
+        lr_auc = roc_auc_score(Test_Y, pred)
+    
+        ns_fpr, ns_tpr, _ = roc_curve(Test_Y, ref)
+        lr_fpr, lr_tpr, _ = roc_curve(Test_Y, pred)
+    
+        plt.plot(ns_fpr, ns_tpr, linestyle='--')
+        plt.plot(lr_fpr, lr_tpr, marker='.', label='AUC = {}'.format(round(roc_auc_score(Test_Y, pred)*100,2))) 
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.legend()
+        plt.show()
+    
+
+* * *
+
+## 1\. Logistic Regression:¶
+
+In [27]:
+
+    
+    
+    # Building Logistic Regression Classifier
+    
+    LR_model = LogisticRegression()
+    
+    space = dict()
+    space['solver'] = ['newton-cg', 'lbfgs', 'liblinear']
+    space['penalty'] = ['l2'] #'none', 'l1', 'l2', 'elasticnet'
+    space['C'] = loguniform(1e-5, 100)
+    
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
+    
+    RCV = RandomizedSearchCV(LR_model, space, n_iter=50, scoring='roc_auc', n_jobs=-1, cv=5, random_state=1)
+    
+    LR = RCV.fit(Train_X_std, Train_Y).best_estimator_
+    pred = LR.predict(Test_X_std)
+    pred_prob = LR.predict_proba(Test_X_std)
+    Classification_Summary(pred,pred_prob,0)
+    
+    print('\n\033[1mInterpreting the Output of Logistic Regression:\n\033[0m')
+    
+    print('intercept ', LR.intercept_[0])
+    print('classes', LR.classes_)
+    display(pd.DataFrame({'coeff': LR.coef_[0]}, index=Train_X_std.columns))
+    
+    
+    
+    <<<----------------------------------- Evaluating Logistic Regression (LR) ----------------------------------->>>
+    
+    Accuracy = 81.2%
+    F1 Score = 81.3%
+    
+     Confusiton Matrix:
+     [[101  23]
+     [ 25 107]]
+    
+    Classification Report:
+                   precision    recall  f1-score   support
+    
+               0       0.80      0.81      0.81       124
+               1       0.82      0.81      0.82       132
+    
+        accuracy                           0.81       256
+       macro avg       0.81      0.81      0.81       256
+    weighted avg       0.81      0.81      0.81       256
+    
+    
+
+![](__results___files/__results___61_1.png)
+
+    
+    
+    Interpreting the Output of Logistic Regression:
+    
+    intercept  -0.0242051567890947
+    classes [0 1]
+    
+
+| coeff  
+---|---  
+age | 0.416493  
+sex | 0.015441  
+bmi | 1.345272  
+smoker | 1.199179  
+charges | -0.118376  
+region_1 | 0.083144  
+region_2 | 0.195229  
+region_3 | 0.150394  
+children_1 | -0.612906  
+children_2 | -1.042804  
+children_3 | -1.165913  
+children_4 | -0.526190  
+children_5 | -0.476664  
+  
+* * *
+
+## 2\. Decisoin Tree Classfier:¶
+
+In [28]:
+
+    
+    
+    #Building Decision Tree Classifier
+    
+    DT_model = DecisionTreeClassifier()
+    
+    param_dist = {"max_depth": [3, None],
+                  "max_features": randint(1, len(features)-1),
+                  "min_samples_leaf": randint(1, len(features)-1),
+                  "criterion": ["gini", "entropy"]}
+    
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
+    
+    RCV = RandomizedSearchCV(DT_model, param_dist, n_iter=50, scoring='roc_auc', n_jobs=-1, cv=5, random_state=1)
+    
+    DT = RCV.fit(Train_X_std, Train_Y).best_estimator_
+    pred = DT.predict(Test_X_std)
+    pred_prob = DT.predict_proba(Test_X_std)
+    Classification_Summary(pred,pred_prob,1)
+    
+    print('\n\033[1mInterpreting the output of Decision Tree:\n\033[0m')
+    tree.plot_tree(DT)
+    plt.show()
+    
+    
+    
+    <<<----------------------------------- Evaluating Decision Tree Classifier (DT) ----------------------------------->>>
+    
+    Accuracy = 88.7%
+    F1 Score = 88.7%
+    
+     Confusiton Matrix:
+     [[116   8]
+     [ 21 111]]
+    
+    Classification Report:
+                   precision    recall  f1-score   support
+    
+               0       0.85      0.94      0.89       124
+               1       0.93      0.84      0.88       132
+    
+        accuracy                           0.89       256
+       macro avg       0.89      0.89      0.89       256
+    weighted avg       0.89      0.89      0.89       256
+    
+    
+
+![](__results___files/__results___64_1.png)
+
+    
+    
+    Interpreting the output of Decision Tree:
+    
+    
+
+![](__results___files/__results___64_3.png)
+
+* * *
+
+## 3\. Random Forest Classfier:¶
+
+In [29]:
+
+    
+    
+    # Building Random-Forest Classifier
+    
+    RF_model = RandomForestClassifier()
+    
+    param_dist={'bootstrap': [True, False],
+                'max_depth': [10, 20, 50, 100, None],
+                'max_features': ['auto', 'sqrt'],
+                'min_samples_leaf': [1, 2, 4],
+                'min_samples_split': [2, 5, 10],
+                'n_estimators': [50, 100]}
+    
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
+    
+    RCV = RandomizedSearchCV(RF_model, param_dist, n_iter=50, scoring='roc_auc', n_jobs=-1, cv=5, random_state=1)
+    
+    RF = RCV.fit(Train_X_std, Train_Y).best_estimator_
+    pred = RF.predict(Test_X_std)
+    pred_prob = RF.predict_proba(Test_X_std)
+    Classification_Summary(pred,pred_prob,2)
+    
+    print('\n\033[1mInterpreting the output of Random Forest:\n\033[0m')
+    rfi=pd.Series(RF.feature_importances_, index=Train_X_std.columns).sort_values(ascending=False)
+    plt.barh(rfi.index,rfi.values)
+    plt.show()
+    
+    
+    
+    <<<----------------------------------- Evaluating Random Forest Classifier (RF) ----------------------------------->>>
+    
+    Accuracy = 90.60000000000001%
+    F1 Score = 90.60000000000001%
+    
+     Confusiton Matrix:
+     [[114  10]
+     [ 14 118]]
+    
+    Classification Report:
+                   precision    recall  f1-score   support
+    
+               0       0.89      0.92      0.90       124
+               1       0.92      0.89      0.91       132
+    
+        accuracy                           0.91       256
+       macro avg       0.91      0.91      0.91       256
+    weighted avg       0.91      0.91      0.91       256
+    
+    
+
+![](__results___files/__results___67_1.png)
+
+    
+    
+    Interpreting the output of Random Forest:
+    
+    
+
+![](__results___files/__results___67_3.png)
+
+* * *
+
+## 4\. Naive Bayes Classfier:¶
+
+In [30]:
+
+    
+    
+    # Building Naive Bayes Classifier
+    
+    NB_model = BernoulliNB()
+    
+    params = {'alpha': [0.01, 0.1, 0.5, 1.0, 10.0]}
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
+    
+    RCV = RandomizedSearchCV(NB_model, params, n_iter=50, scoring='roc_auc', n_jobs=-1, cv=5, random_state=1)
+    
+    NB = RCV.fit(Train_X_std, Train_Y).best_estimator_
+    pred = NB.predict(Test_X_std)
+    pred_prob = NB.predict_proba(Test_X_std)
+    Classification_Summary(pred,pred_prob,3)
+    
+    
+    
+    <<<----------------------------------- Evaluating NaÃ¯ve Bayes Classifier (NB) ----------------------------------->>>
+    
+    Accuracy = 68.8%
+    F1 Score = 68.7%
+    
+     Confusiton Matrix:
+     [[81 43]
+     [37 95]]
+    
+    Classification Report:
+                   precision    recall  f1-score   support
+    
+               0       0.69      0.65      0.67       124
+               1       0.69      0.72      0.70       132
+    
+        accuracy                           0.69       256
+       macro avg       0.69      0.69      0.69       256
+    weighted avg       0.69      0.69      0.69       256
+    
+    
+
+![](__results___files/__results___70_1.png)
+
+* * *
+
+## 5\. Support Vector Machine Classfier:¶
+
+In [31]:
+
+    
+    
+    # Building Support Vector Machine Classifier
+    
+    SVM_model = SVC(probability=True).fit(Train_X_std, Train_Y)
+    
+    svm_param = {"C": [.01, .1, 1, 5, 10, 100],             
+                 "gamma": [.01, .1, 1, 5, 10, 100],
+                 "kernel": ["rbf"],
+                 "random_state": [1]}
+    
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
+    
+    RCV = RandomizedSearchCV(SVM_model, svm_param, n_iter=50, scoring='roc_auc', n_jobs=-1, cv=5, random_state=1)
+    
+    SVM = RCV.fit(Train_X_std, Train_Y).best_estimator_
+    pred = SVM.predict(Test_X_std)
+    pred_prob = SVM.predict_proba(Test_X_std)
+    Classification_Summary(pred,pred_prob,4)
+    
+    
+    
+    <<<----------------------------------- Evaluating Support Vector Machine (SVM) ----------------------------------->>>
+    
+    Accuracy = 84.39999999999999%
+    F1 Score = 84.39999999999999%
+    
+     Confusiton Matrix:
+     [[108  16]
+     [ 24 108]]
+    
+    Classification Report:
+                   precision    recall  f1-score   support
+    
+               0       0.82      0.87      0.84       124
+               1       0.87      0.82      0.84       132
+    
+        accuracy                           0.84       256
+       macro avg       0.84      0.84      0.84       256
+    weighted avg       0.85      0.84      0.84       256
+    
+    
+
+![](__results___files/__results___73_1.png)
+
+* * *
+
+## 6\. K-Nearest Neighbours Classfier:¶
+
+In [32]:
+
+    
+    
+    # Building K-Neareset Neighbours Classifier
+    
+    KNN_model = KNeighborsClassifier()
+    
+    knn_param = {"n_neighbors": [i for i in range(1,30,5)],
+                 "weights": ["uniform", "distance"],
+                 "algorithm": ["ball_tree", "kd_tree", "brute"],
+                 "leaf_size": [1, 10, 30],
+                 "p": [1,2]}
+    
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
+    
+    RCV = RandomizedSearchCV(KNN_model, knn_param, n_iter=50, scoring='roc_auc', n_jobs=-1, cv=5, random_state=1)
+    
+    KNN = RCV.fit(Train_X_std, Train_Y).best_estimator_
+    pred = KNN.predict(Test_X_std)
+    pred_prob = KNN.predict_proba(Test_X_std)
+    Classification_Summary(pred,pred_prob,5)
+    
+    
+    
+    <<<----------------------------------- Evaluating K Nearest Neighbours (KNN) ----------------------------------->>>
+    
+    Accuracy = 83.6%
+    F1 Score = 83.6%
+    
+     Confusiton Matrix:
+     [[102  22]
+     [ 20 112]]
+    
+    Classification Report:
+                   precision    recall  f1-score   support
+    
+               0       0.84      0.82      0.83       124
+               1       0.84      0.85      0.84       132
+    
+        accuracy                           0.84       256
+       macro avg       0.84      0.84      0.84       256
+    weighted avg       0.84      0.84      0.84       256
+    
+    
+
+![](__results___files/__results___76_1.png)
+
+* * *
+
+## 7\. Gradient Boosting Classfier:¶
+
+In [33]:
+
+    
+    
+    # Building Gradient Boosting Classifier
+    
+    GB_model = GradientBoostingClassifier().fit(Train_X_std, Train_Y)
+    param_dist = {
+        "n_estimators":[5,20,100,500],
+        "max_depth":[1,3,5,7,9],
+        "learning_rate":[0.01,0.1,1,10,100]
+    }
+    
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
+    
+    #RCV = RandomizedSearchCV(GB_model, param_dist, n_iter=50, scoring='roc_auc', n_jobs=-1, cv=5, random_state=1)
+    
+    GB = GB_model.fit(Train_X_std, Train_Y)#.best_estimator_
+    pred = GB.predict(Test_X_std)
+    pred_prob = GB.predict_proba(Test_X_std)
+    Classification_Summary(pred,pred_prob,6)
+    
+    
+    
+    <<<----------------------------------- Evaluating Gradient Boosting (GB) ----------------------------------->>>
+    
+    Accuracy = 92.60000000000001%
+    F1 Score = 92.60000000000001%
+    
+     Confusiton Matrix:
+     [[112  12]
+     [  7 125]]
+    
+    Classification Report:
+                   precision    recall  f1-score   support
+    
+               0       0.94      0.90      0.92       124
+               1       0.91      0.95      0.93       132
+    
+        accuracy                           0.93       256
+       macro avg       0.93      0.93      0.93       256
+    weighted avg       0.93      0.93      0.93       256
+    
+    
+
+![](__results___files/__results___79_1.png)
+
+* * *
+
+## 8\. Extreme Gradient Boosting Classfier:¶
+
+In [34]:
+
+    
+    
+    # Building Extreme Gradient Boosting Classifier
+    
+    XGB_model = XGBClassifier()#.fit(Train_X_std, Train_Y, eval_metric='logloss')
+    
+    param_dist = {
+     "learning_rate" : [0.05,0.10,0.15,0.20,0.25,0.30],
+     "max_depth" : [ 3, 4, 5, 6, 8, 10, 12, 15],
+     "min_child_weight" : [ 1, 3, 5, 7 ],
+     "gamma": [ 0.0, 0.1, 0.2 , 0.3, 0.4 ],
+     "colsample_bytree" : [ 0.3, 0.4, 0.5 , 0.7 ]
+    }
+    
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
+    
+    #RCV = RandomizedSearchCV(XGB_model, param_dist, n_iter=50, scoring='roc_auc', n_jobs=-1, cv=5, random_state=1)
+    
+    XGB = XGB_model.fit(Train_X_std, Train_Y, eval_metric='logloss')#.best_estimator_
+    pred = XGB.predict(Test_X_std)
+    pred_prob = XGB.predict_proba(Test_X_std)
+    Classification_Summary(pred,pred_prob,7)
+    
+    xgbf=pd.DataFrame(XGB.feature_importances_, index=Train_X_std.columns).sort_values(by=0)
+    plt.barh(xgbf.index,xgbf.values[:,0])
+    plt.show()
+    
+    
+    
+    <<<----------------------------------- Evaluating Extreme Gradient Boosting (XGB) ----------------------------------->>>
+    
+    Accuracy = 93.8%
+    F1 Score = 93.7%
+    
+     Confusiton Matrix:
+     [[115   9]
+     [  7 125]]
+    
+    Classification Report:
+                   precision    recall  f1-score   support
+    
+               0       0.94      0.93      0.93       124
+               1       0.93      0.95      0.94       132
+    
+        accuracy                           0.94       256
+       macro avg       0.94      0.94      0.94       256
+    weighted avg       0.94      0.94      0.94       256
+    
+    
+
+![](__results___files/__results___82_1.png)
+
+![](__results___files/__results___82_2.png)
+
+In [35]:
+
+    
+    
+    #Plotting Confusion-Matrix of all the predictive Models
+    
+    def plot_cm(y_true, y_pred):
+        cm = confusion_matrix(y_true, y_pred, labels=np.unique(y_true))
+        cm_sum = np.sum(cm, axis=1, keepdims=True)
+        cm_perc = cm / cm_sum.astype(float) * 100
+        annot = np.empty_like(cm).astype(str)
+        nrows, ncols = cm.shape
+        for i in range(nrows):
+            for j in range(ncols):
+                c = cm[i, j]
+                p = cm_perc[i, j]
+                if i == j:
+                    s = cm_sum[i]
+                    annot[i, j] = '%.1f%%\n%d/%d' % (p, c, s)
+                elif c == 0:
+                    annot[i, j] = ''
+                else:
+                    annot[i, j] = '%.1f%%\n%d' % (p, c)
+        cm = pd.DataFrame(cm, index=np.unique(y_true), columns=np.unique(y_true))
+        cm.columns=labels
+        cm.index=labels
+        cm.index.name = 'Actual'
+        cm.columns.name = 'Predicted'
+        #fig, ax = plt.subplots()
+        sns.heatmap(cm, annot=annot, fmt='')# cmap= "GnBu"
+        
+    def conf_mat_plot(all_models):
+        plt.figure(figsize=[20,3.5*math.ceil(len(all_models)*len(labels)/14)])
+        
+        for i in range(len(all_models)):
+            if len(labels)<=4:
+                plt.subplot(2,4,i+1)
+            else:
+                plt.subplot(math.ceil(len(all_models)/3),3,i+1)
+            pred = all_models[i].predict(Test_X_std)
+            #plot_cm(Test_Y, pred)
+            sns.heatmap(confusion_matrix(Test_Y, pred), annot=True, cmap='Blues', fmt='.0f') #vmin=0,vmax=5
+            plt.title(Evaluation_Results.index[i])
+        plt.tight_layout()
+        plt.show()
+    
+    conf_mat_plot([LR,DT,RF,NB,SVM,KNN,GB,XGB])
+    
+
+![](__results___files/__results___83_0.png)
+
+In [36]:
+
+    
+    
+    #Comparing all the models Scores
+    
+    print('\033[1mML Algorithms Comparison'.center(100))
+    plt.figure(figsize=[12,8])
+    sns.heatmap(Evaluation_Results, annot=True, vmin=60, vmax=95, cmap='Blues', fmt='.1f')
+    plt.show()
+    
+    
+    
+                                        ML Algorithms Comparison                                    
+    
+
+![](__results___files/__results___84_1.png)
+
+**Insights:** For the current problem statement, it is more important to focus
+on the F1-score. Except Naive Baye's Classifier, most of the algorithms
+perform well. The best performing algorithm is Extreme Gradient Boosting
+Classifier...
+
+* * *
+
+#  7\. Project Outcomes & Conclusions
+
+### Here are some of the key outcomes of the project:¶
+
+  * The Dataset was small totally around 1338 samples & after preprocessing 17% of the datasamples were dropped. 
+  * The samples were highly imbalanced, hence SMOTE Technique was applied on the data to balance the classes, adding 5.5% more samples to the dataset.
+  * Visualising the distribution of data & their relationships, helped us to get some insights on the relationship between the featureset.
+  * Feature Selection/Eliminination was carried out and appropriate features were shortlisted.
+  * Testing multiple algorithms with fine-tuning hyperparamters gave us some understanding on the model performance for various algorithms on this specific dataset.
+  * The boosting & ensemble algorithms perform the best on the current dataset, followed by Nearest Neighbours Algorithm.
+  * Yet it wise to also consider simpler model like Logistic Regression as it is more generalisable & is computationally less expensive.
+
+In [37]:
+
+    
+    
+    #<<<---------------------------------------THE END------------------------------------------------>>>
+    
+

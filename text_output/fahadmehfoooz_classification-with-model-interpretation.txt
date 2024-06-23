@@ -1,0 +1,2618 @@
+# **Classification With Model Interpretation** 💯 💯¶
+
+# **Importing Modules**¶
+
+In [1]:
+
+    
+    
+    from sklearn.metrics import log_loss
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from sklearn.ensemble import RandomForestClassifier
+    from pprint import pprint
+    from sklearn.model_selection import train_test_split
+    from sklearn.preprocessing import OneHotEncoder
+    from sklearn.model_selection import GridSearchCV
+    from sklearn.model_selection import RandomizedSearchCV
+    from sklearn.model_selection import train_test_split
+    from sklearn import ensemble
+    from sklearn.ensemble import GradientBoostingClassifier
+    from xgboost import XGBClassifier
+    from sklearn.metrics import accuracy_score,roc_auc_score,confusion_matrix
+    from sklearn.linear_model import LogisticRegression 
+    from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, classification_report, confusion_matrix,r2_score
+    import warnings
+    from mlxtend.classifier import StackingClassifier
+    import missingno as msno
+    from sklearn.ensemble import VotingClassifier
+    import shap
+    shap.initjs()
+    import lime
+    from lime import lime_tabular
+    warnings.simplefilter('ignore')
+    import os
+    plt.style.use('fivethirtyeight')
+    plt.style.use('dark_background')
+    
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    
+    
+    2022-01-06 08:33:53.063662: W tensorflow/stream_executor/platform/default/dso_loader.cc:60] Could not load dynamic library 'libcudart.so.11.0'; dlerror: libcudart.so.11.0: cannot open shared object file: No such file or directory; LD_LIBRARY_PATH: /opt/conda/lib
+    2022-01-06 08:33:53.063779: I tensorflow/stream_executor/cuda/cudart_stub.cc:29] Ignore above cudart dlerror if you do not have a GPU set up on your machine.
+    
+
+![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAAWCAYAAAA1vze2AAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAdxJREFUeNq0Vt1Rg0AQJjcpgBJiBWIFkgoMFYhPPAIVECogPuYpdJBYgXQQrMCUkA50V7+d2ZwXuXPGm9khHLu3f9+3l1nkWNvtNqfHLgpfQ1EUS3tz5nAQ0+NIsiAZSc6eDlI8M3J00B/mDuUKDk6kfOebAgW3pkdD0pFcODGW4gKKvOrAUm04MA4QDt1OEIXU9hDigfS5rC1eS5T90gltck1Xrizo257kgySZcNRzgCSxCvgiE9nckPJo2b/B2AcEkk2OwL8bD8gmOKR1GPbaCUqxEgTq0tLvgb6zfo7+DgYGkkWL2tqLDV4RSITfbHPPfJKIrWz4nJQTMPAWA7IbD6imcNaDeDfgk+4No+wZr40BL3g9eQJJCFqRQ54KiSt72lsLpE3o3MCBSxDuq4yOckU2hKXRuwBH3OyMR4g1UpyTYw6mlmBqNdUXRM1NfyF5EPI6JkcpIDBIX8jX6DR/6ckAZJ0wEAdLR8DEk6OfC1Pp8BKo6TQIwPJbvJ6toK5lmuvJoRtfK6Ym1iRYIarRo2UyYHvRN5qpakR3yoizWrouoyuXXQqI185LCw07op5ZyCRGL99h24InP0e9xdQukEKVmhzrqZuRIfwISB//cP3Wk3f8f/yR+BRgAHu00HjLcEQBAAAAAElFTkSuQmCC)
+
+    
+    
+    /kaggle/input/prudential-life-insurance-assessment/train.csv.zip
+    /kaggle/input/prudential-life-insurance-assessment/sample_submission.csv.zip
+    /kaggle/input/prudential-life-insurance-assessment/test.csv.zip
+    
+
+# **Reading Data**¶
+
+In [2]:
+
+    
+    
+    insurance_df = pd.read_csv('../input/prudential-life-insurance-assessment/train.csv.zip', index_col='Id')
+    insurance_df.head()
+    
+
+Out[2]:
+
+| Product_Info_1 | Product_Info_2 | Product_Info_3 | Product_Info_4 | Product_Info_5 | Product_Info_6 | Product_Info_7 | Ins_Age | Ht | Wt | ... | Medical_Keyword_40 | Medical_Keyword_41 | Medical_Keyword_42 | Medical_Keyword_43 | Medical_Keyword_44 | Medical_Keyword_45 | Medical_Keyword_46 | Medical_Keyword_47 | Medical_Keyword_48 | Response  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+Id |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |   
+2 | 1 | D3 | 10 | 0.076923 | 2 | 1 | 1 | 0.641791 | 0.581818 | 0.148536 | ... | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8  
+5 | 1 | A1 | 26 | 0.076923 | 2 | 3 | 1 | 0.059701 | 0.600000 | 0.131799 | ... | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4  
+6 | 1 | E1 | 26 | 0.076923 | 2 | 3 | 1 | 0.029851 | 0.745455 | 0.288703 | ... | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8  
+7 | 1 | D4 | 10 | 0.487179 | 2 | 3 | 1 | 0.164179 | 0.672727 | 0.205021 | ... | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8  
+8 | 1 | D2 | 26 | 0.230769 | 2 | 3 | 1 | 0.417910 | 0.654545 | 0.234310 | ... | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8  
+  
+5 rows Ã 127 columns
+
+# **Shape**¶
+
+In [3]:
+
+    
+    
+    insurance_df.shape
+    
+
+Out[3]:
+
+    
+    
+    (59381, 127)
+
+# **Distribution of Target Variable**¶
+
+In [4]:
+
+    
+    
+    insurance_df['Response'].value_counts()
+    
+
+Out[4]:
+
+    
+    
+    8    19489
+    6    11233
+    7     8027
+    2     6552
+    1     6207
+    5     5432
+    4     1428
+    3     1013
+    Name: Response, dtype: int64
+
+> **Class imbalance can be seen here. Also there 8 categories, lets combine
+> them to 3 categories**
+
+In [5]:
+
+    
+    
+    sns.countplot(x=insurance_df['Response']);
+    
+
+![](__results___files/__results___10_0.png)
+
+**Response 8 has highest values and 3 has the least**
+
+# **Processing Target Variable**¶
+
+In [6]:
+
+    
+    
+    #Combining the Categores to 3 categories
+    insurance_df['Modified_Response']  = insurance_df['Response'].apply(lambda x : 0 if x<=7 and x>=0 else (1 if x==8 else -1))
+    
+
+In [7]:
+
+    
+    
+    sns.countplot(x= insurance_df['Modified_Response']);
+    
+
+![](__results___files/__results___14_0.png)
+
+> **Still some imbalance can be seen**
+
+# **Removing old target variable**¶
+
+In [8]:
+
+    
+    
+    # Dropping old response columns
+    insurance_df.drop('Response',axis = 1, inplace=True)
+    
+
+# **Making categorical and numerical columns list**¶
+
+In [9]:
+
+    
+    
+    # Making lists with categorical and numerical features.
+    categorical =  [col for col in insurance_df.columns if insurance_df[col].dtype =='object']
+    
+    numerical = categorical =  [col for col in insurance_df.columns if insurance_df[col].dtype !='object']
+    
+
+# **Visualizations On Categorical Features**¶
+
+In [10]:
+
+    
+    
+    # Doing count plots for categorical
+    for col in categorical:
+        counts = insurance_df[col].value_counts().sort_index()
+        if len(counts) > 10 and len(counts) < 50 :
+          fig = plt.figure(figsize=(30, 10))
+        elif len(counts) >50 :
+          continue
+        else:
+          fig = plt.figure(figsize=(9, 6))
+        ax = fig.gca()
+        counts.plot.bar(ax = ax, color='steelblue')
+        ax.set_title(col + ' counts')
+        ax.set_xlabel(col) 
+        ax.set_ylabel("Frequency")
+    plt.show()
+    
+
+![](__results___files/__results___21_0.png)
+
+![](__results___files/__results___21_1.png)
+
+![](__results___files/__results___21_2.png)
+
+![](__results___files/__results___21_3.png)
+
+![](__results___files/__results___21_4.png)
+
+![](__results___files/__results___21_5.png)
+
+![](__results___files/__results___21_6.png)
+
+![](__results___files/__results___21_7.png)
+
+![](__results___files/__results___21_8.png)
+
+![](__results___files/__results___21_9.png)
+
+![](__results___files/__results___21_10.png)
+
+![](__results___files/__results___21_11.png)
+
+![](__results___files/__results___21_12.png)
+
+![](__results___files/__results___21_13.png)
+
+![](__results___files/__results___21_14.png)
+
+![](__results___files/__results___21_15.png)
+
+![](__results___files/__results___21_16.png)
+
+![](__results___files/__results___21_17.png)
+
+![](__results___files/__results___21_18.png)
+
+![](__results___files/__results___21_19.png)
+
+![](__results___files/__results___21_20.png)
+
+![](__results___files/__results___21_21.png)
+
+![](__results___files/__results___21_22.png)
+
+![](__results___files/__results___21_23.png)
+
+![](__results___files/__results___21_24.png)
+
+![](__results___files/__results___21_25.png)
+
+![](__results___files/__results___21_26.png)
+
+![](__results___files/__results___21_27.png)
+
+![](__results___files/__results___21_28.png)
+
+![](__results___files/__results___21_29.png)
+
+![](__results___files/__results___21_30.png)
+
+![](__results___files/__results___21_31.png)
+
+![](__results___files/__results___21_32.png)
+
+![](__results___files/__results___21_33.png)
+
+![](__results___files/__results___21_34.png)
+
+![](__results___files/__results___21_35.png)
+
+![](__results___files/__results___21_36.png)
+
+![](__results___files/__results___21_37.png)
+
+![](__results___files/__results___21_38.png)
+
+![](__results___files/__results___21_39.png)
+
+![](__results___files/__results___21_40.png)
+
+![](__results___files/__results___21_41.png)
+
+![](__results___files/__results___21_42.png)
+
+![](__results___files/__results___21_43.png)
+
+![](__results___files/__results___21_44.png)
+
+![](__results___files/__results___21_45.png)
+
+![](__results___files/__results___21_46.png)
+
+![](__results___files/__results___21_47.png)
+
+![](__results___files/__results___21_48.png)
+
+![](__results___files/__results___21_49.png)
+
+![](__results___files/__results___21_50.png)
+
+![](__results___files/__results___21_51.png)
+
+![](__results___files/__results___21_52.png)
+
+![](__results___files/__results___21_53.png)
+
+![](__results___files/__results___21_54.png)
+
+![](__results___files/__results___21_55.png)
+
+![](__results___files/__results___21_56.png)
+
+![](__results___files/__results___21_57.png)
+
+![](__results___files/__results___21_58.png)
+
+![](__results___files/__results___21_59.png)
+
+![](__results___files/__results___21_60.png)
+
+![](__results___files/__results___21_61.png)
+
+![](__results___files/__results___21_62.png)
+
+![](__results___files/__results___21_63.png)
+
+![](__results___files/__results___21_64.png)
+
+![](__results___files/__results___21_65.png)
+
+![](__results___files/__results___21_66.png)
+
+![](__results___files/__results___21_67.png)
+
+![](__results___files/__results___21_68.png)
+
+![](__results___files/__results___21_69.png)
+
+![](__results___files/__results___21_70.png)
+
+![](__results___files/__results___21_71.png)
+
+![](__results___files/__results___21_72.png)
+
+![](__results___files/__results___21_73.png)
+
+![](__results___files/__results___21_74.png)
+
+![](__results___files/__results___21_75.png)
+
+![](__results___files/__results___21_76.png)
+
+![](__results___files/__results___21_77.png)
+
+![](__results___files/__results___21_78.png)
+
+![](__results___files/__results___21_79.png)
+
+![](__results___files/__results___21_80.png)
+
+![](__results___files/__results___21_81.png)
+
+![](__results___files/__results___21_82.png)
+
+![](__results___files/__results___21_83.png)
+
+![](__results___files/__results___21_84.png)
+
+![](__results___files/__results___21_85.png)
+
+![](__results___files/__results___21_86.png)
+
+![](__results___files/__results___21_87.png)
+
+![](__results___files/__results___21_88.png)
+
+![](__results___files/__results___21_89.png)
+
+![](__results___files/__results___21_90.png)
+
+![](__results___files/__results___21_91.png)
+
+![](__results___files/__results___21_92.png)
+
+![](__results___files/__results___21_93.png)
+
+![](__results___files/__results___21_94.png)
+
+![](__results___files/__results___21_95.png)
+
+![](__results___files/__results___21_96.png)
+
+![](__results___files/__results___21_97.png)
+
+![](__results___files/__results___21_98.png)
+
+![](__results___files/__results___21_99.png)
+
+![](__results___files/__results___21_100.png)
+
+![](__results___files/__results___21_101.png)
+
+![](__results___files/__results___21_102.png)
+
+![](__results___files/__results___21_103.png)
+
+![](__results___files/__results___21_104.png)
+
+![](__results___files/__results___21_105.png)
+
+![](__results___files/__results___21_106.png)
+
+![](__results___files/__results___21_107.png)
+
+> **D3 has the highest frequencies**
+>
+> Most of the features here are unbalanced.
+
+In [11]:
+
+    
+    
+    fig, axes = plt.subplots(1,2,figsize=(10,5))
+    sns.distplot(insurance_df['Employment_Info_1'], ax=axes[0])
+    sns.boxplot(insurance_df['Employment_Info_1'], ax=axes[1])
+    
+
+Out[11]:
+
+    
+    
+    <AxesSubplot:xlabel='Employment_Info_1'>
+
+![](__results___files/__results___23_1.png)
+
+> Right skewed.
+>
+> Outliers can be seen.
+
+In [12]:
+
+    
+    
+    fig, axes = plt.subplots(1,2,figsize=(10,5))
+    sns.distplot(insurance_df['Employment_Info_4'], ax=axes[0])
+    sns.boxplot(insurance_df['Employment_Info_4'], ax=axes[1])
+    
+
+Out[12]:
+
+    
+    
+    <AxesSubplot:xlabel='Employment_Info_4'>
+
+![](__results___files/__results___25_1.png)
+
+In [13]:
+
+    
+    
+    fig, axes = plt.subplots(1,2,figsize=(10,5))
+    sns.distplot(insurance_df['Employment_Info_6'], ax=axes[0])
+    sns.boxplot(insurance_df['Employment_Info_6'], ax=axes[1])
+    
+
+Out[13]:
+
+    
+    
+    <AxesSubplot:xlabel='Employment_Info_6'>
+
+![](__results___files/__results___26_1.png)
+
+In [14]:
+
+    
+    
+    fig, axes = plt.subplots(1,2,figsize=(10,5))
+    sns.distplot(insurance_df['Family_Hist_4'], ax=axes[0])
+    sns.boxplot(insurance_df['Family_Hist_4'], ax=axes[1])
+    
+
+Out[14]:
+
+    
+    
+    <AxesSubplot:xlabel='Family_Hist_4'>
+
+![](__results___files/__results___27_1.png)
+
+# **Checking Correlation For Features greater than .8**¶
+
+In [15]:
+
+    
+    
+    # I just checked correlated feature with greater than .8 here 
+    corr = insurance_df.corr()
+    corr_greater_than_80 = corr[corr>=.8]
+    corr_greater_than_80
+    
+
+Out[15]:
+
+| Product_Info_1 | Product_Info_3 | Product_Info_4 | Product_Info_5 | Product_Info_6 | Product_Info_7 | Ins_Age | Ht | Wt | BMI | ... | Medical_Keyword_40 | Medical_Keyword_41 | Medical_Keyword_42 | Medical_Keyword_43 | Medical_Keyword_44 | Medical_Keyword_45 | Medical_Keyword_46 | Medical_Keyword_47 | Medical_Keyword_48 | Modified_Response  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+Product_Info_1 | 1.0 | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | ... | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN  
+Product_Info_3 | NaN | 1.0 | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | ... | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN  
+Product_Info_4 | NaN | NaN | 1.0 | NaN | NaN | NaN | NaN | NaN | NaN | NaN | ... | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN  
+Product_Info_5 | NaN | NaN | NaN | 1.0 | NaN | NaN | NaN | NaN | NaN | NaN | ... | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN  
+Product_Info_6 | NaN | NaN | NaN | NaN | 1.0 | NaN | NaN | NaN | NaN | NaN | ... | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN  
+... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ...  
+Medical_Keyword_45 | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | ... | NaN | NaN | NaN | NaN | NaN | 1.0 | NaN | NaN | NaN | NaN  
+Medical_Keyword_46 | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | ... | NaN | NaN | NaN | NaN | NaN | NaN | 1.0 | NaN | NaN | NaN  
+Medical_Keyword_47 | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | ... | NaN | NaN | NaN | NaN | NaN | NaN | NaN | 1.0 | NaN | NaN  
+Medical_Keyword_48 | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | ... | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | 1.0 | NaN  
+Modified_Response | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | ... | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | 1.0  
+  
+126 rows Ã 126 columns
+
+In [16]:
+
+    
+    
+    plt.figure(figsize=(12,8))
+    sns.heatmap(corr_greater_than_80, cmap="Reds");
+    
+
+![](__results___files/__results___30_0.png)
+
+### **CONCLUSION**¶
+
+> BMI and Weight are highly correlated, which makes sense also as these 2
+> features are directly proprtional.
+>
+> Ins_Age and Family_Hist_4, Family_Hist_2 highly correlated
+>
+> Although, I am not going to perform any transformation on any feature or
+> drop any as these are tree based models and they don't get affected by
+> correlation much because of their non parametric nature.
+
+In [17]:
+
+    
+    
+    #setting max columns to 200
+    pd.set_option('display.max_columns', 200)
+    pd.set_option('display.max_rows', 200)
+    
+
+# **Null Value Check**¶
+
+In [18]:
+
+    
+    
+    #checking percentage of missing values in a column
+    missing_val_count_by_column = insurance_df.isnull().sum()/len(insurance_df)
+    
+    print(missing_val_count_by_column[missing_val_count_by_column > 0.4].sort_values(ascending=False))
+    
+    
+    
+    Medical_History_10     0.990620
+    Medical_History_32     0.981358
+    Medical_History_24     0.935990
+    Medical_History_15     0.751015
+    Family_Hist_5          0.704114
+    Family_Hist_3          0.576632
+    Family_Hist_2          0.482579
+    Insurance_History_5    0.427679
+    dtype: float64
+    
+
+# **Removing unimportant column**¶
+
+In [19]:
+
+    
+    
+    # Dropping all columns in which greater than 40 percent null values
+    insurance_df = insurance_df.dropna(thresh=insurance_df.shape[0]*0.4,how='all',axis=1)
+    
+
+In [20]:
+
+    
+    
+    # Does not contain important information
+    insurance_df.drop('Product_Info_2',axis=1,inplace=True)
+    
+
+# **X and Y split**¶
+
+In [21]:
+
+    
+    
+    # Data for all the independent variables
+    X = insurance_df.drop(labels='Modified_Response',axis=1)
+    
+    # Data for the dependent variable
+    Y = insurance_df['Modified_Response']
+    
+
+# **Filling Remaining Missing Values**¶
+
+In [22]:
+
+    
+    
+    # Filling remaining missing values with mean
+    X = X.fillna(X.mean())
+    
+
+# **Train Test Split**¶
+
+In [23]:
+
+    
+    
+    # Train-test split
+    
+    X_train, X_test, Y_train, Y_test = train_test_split(X,Y,test_size = 0.25, random_state=1)
+    
+
+# **Shapes of Train and Test Data**¶
+
+In [24]:
+
+    
+    
+    # Check the shape of train dataset
+    print(X_train.shape,Y_train.shape)
+    
+    # Check the shape of test dataset
+    print(X_test.shape, Y_test.shape)
+    
+    
+    
+    (44535, 120) (44535,)
+    (14846, 120) (14846,)
+    
+
+# **Some Important functions that I will be using throughout**¶
+
+In [25]:
+
+    
+    
+    # Utility Functions
+    def check_scores(model, X_train, X_test ):
+      # Making predictions on train and test data
+    
+      train_class_preds = model.predict(X_train)
+      test_class_preds = model.predict(X_test)
+    
+    
+      # Get the probabilities on train and test
+      train_preds = model.predict_proba(X_train)[:,1]
+      test_preds = model.predict_proba(X_test)[:,1]
+    
+    
+      # Calculating accuracy on train and test
+      train_accuracy = accuracy_score(Y_train,train_class_preds)
+      test_accuracy = accuracy_score(Y_test,test_class_preds)
+    
+      print("The accuracy on train dataset is", train_accuracy)
+      print("The accuracy on test dataset is", test_accuracy)
+      print()
+      # Get the confusion matrices for train and test
+      train_cm = confusion_matrix(Y_train,train_class_preds)
+      test_cm = confusion_matrix(Y_test,test_class_preds )
+    
+      print('Train confusion matrix:')
+      print( train_cm)
+      print()
+      print('Test confusion matrix:')
+      print(test_cm)
+      print()
+    
+      # Get the roc_auc score for train and test dataset
+      train_auc = roc_auc_score(Y_train,train_preds)
+      test_auc = roc_auc_score(Y_test,test_preds)
+    
+      print('ROC on train data:', train_auc)
+      print('ROC on test data:', test_auc)
+      
+      # Fscore, precision and recall on test data
+      f1 = f1_score(Y_test, test_class_preds)
+      precision = precision_score(Y_test, test_class_preds)
+      recall = recall_score(Y_test, test_class_preds) 
+      
+      
+      #R2 score on train and test data
+      train_log = log_loss(Y_train,train_preds)
+      test_log = log_loss(Y_test, test_preds)
+    
+      print()
+      print('Train log loss:', train_log)
+      print('Test log loss:', test_log)
+      print()
+      print("F score is:",f1 )
+      print("Precision is:",precision)
+      print("Recall is:", recall)
+      return model, train_auc, test_auc, train_accuracy, test_accuracy,f1, precision,recall, train_log, test_log
+    
+    
+    def check_importance(model, X_train):
+      #Checking importance of features
+      importances = model.feature_importances_
+      
+      #List of columns and their importances
+      importance_dict = {'Feature' : list(X_train.columns),
+                        'Feature Importance' : importances}
+      #Creating a dataframe
+      importance_df = pd.DataFrame(importance_dict)
+      
+      #Rounding it off to 2 digits as we might get exponential numbers
+      importance_df['Feature Importance'] = round(importance_df['Feature Importance'],2)
+      return importance_df.sort_values(by=['Feature Importance'],ascending=False)
+    
+    def grid_search(model, parameters, X_train, Y_train):
+      #Doing a grid
+      grid = GridSearchCV(estimator=model,
+                           param_grid = parameters,
+                           cv = 2, verbose=2, scoring='roc_auc')
+      #Fitting the grid 
+      grid.fit(X_train,Y_train)
+      print()
+      print()
+      # Best model found using grid search
+      optimal_model = grid.best_estimator_
+      print('Best parameters are: ')
+      pprint( grid.best_params_)
+    
+      return optimal_model
+    
+    
+    
+    # This function will show how a feature is pushing towards 0 or 1
+    def interpret_with_lime(model, X_test):
+      # New data
+      interpretor = lime_tabular.LimeTabularExplainer(
+        training_data=np.array(X_train),
+        feature_names=X_train.columns,
+        mode='classification')
+      
+    
+      exp = interpretor.explain_instance(
+          data_row=X_test.iloc[10], 
+          predict_fn=model.predict_proba
+      )
+    
+      exp.show_in_notebook(show_table=True)
+    
+    # This gives feature importance
+    def plot_feature_importance(model, X_train):
+      # PLotting features vs their importance factors
+      fig = plt.figure(figsize = (15, 8))
+      
+      # Extracting importance values
+      values =check_importance(model, X_train)[check_importance(model, X_train)['Feature Importance']>0]['Feature Importance'].values
+      
+      
+      # Extracting importance features
+      features = check_importance(model, X_train)[check_importance(model, X_train)['Feature Importance']>0]['Feature'].values
+    
+      plt.bar(features, values, color ='blue',
+              width = 0.4)
+      plt.xticks( rotation='vertical')
+      plt.show()
+    
+
+# **Random Forest**¶
+
+In [26]:
+
+    
+    
+    # Number of trees
+    n_estimators = [50,80,100]
+    
+    # Maximum depth of trees
+    max_depth = [4,6,8]
+    
+    # Minimum number of samples required to split a node
+    min_samples_split = [50,100,150]
+    
+    # Minimum number of samples required at each leaf node
+    min_samples_leaf = [40,50]
+    
+    # Hyperparameter Grid
+    rf_parameters = {'n_estimators' : n_estimators,
+                  'max_depth' : max_depth,
+                  'min_samples_split' : min_samples_split,
+                  'min_samples_leaf' : min_samples_leaf}
+    
+    pprint(rf_parameters)
+    
+    #finding the best model
+    rf_optimal_model = grid_search(RandomForestClassifier(), rf_parameters, X_train, Y_train)
+    
+    
+    
+    {'max_depth': [4, 6, 8],
+     'min_samples_leaf': [40, 50],
+     'min_samples_split': [50, 100, 150],
+     'n_estimators': [50, 80, 100]}
+    Fitting 2 folds for each of 54 candidates, totalling 108 fits
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=50, n_estimators=50 
+    
+    
+    
+    [Parallel(n_jobs=1)]: Using backend SequentialBackend with 1 concurrent workers.
+    
+    
+    
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=50, n_estimators=50, total=   0.8s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=50, n_estimators=50 
+    
+    
+    
+    [Parallel(n_jobs=1)]: Done   1 out of   1 | elapsed:    0.8s remaining:    0.0s
+    
+    
+    
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=50, n_estimators=50, total=   0.7s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=50, n_estimators=80 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=50, n_estimators=80, total=   1.1s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=50, n_estimators=80 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=50, n_estimators=80, total=   1.1s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=50, n_estimators=100 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=50, n_estimators=100, total=   1.3s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=50, n_estimators=100 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=50, n_estimators=100, total=   1.3s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=100, n_estimators=50 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=100, n_estimators=50, total=   0.7s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=100, n_estimators=50 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=100, n_estimators=50, total=   0.7s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=100, n_estimators=80 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=100, n_estimators=80, total=   1.1s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=100, n_estimators=80 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=100, n_estimators=80, total=   1.1s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=100, n_estimators=100 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=100, n_estimators=100, total=   1.3s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=100, n_estimators=100 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=100, n_estimators=100, total=   1.3s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=150, n_estimators=50 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=150, n_estimators=50, total=   0.7s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=150, n_estimators=50 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=150, n_estimators=50, total=   0.7s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=150, n_estimators=80 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=150, n_estimators=80, total=   1.1s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=150, n_estimators=80 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=150, n_estimators=80, total=   1.1s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=150, n_estimators=100 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=150, n_estimators=100, total=   1.3s
+    [CV] max_depth=4, min_samples_leaf=40, min_samples_split=150, n_estimators=100 
+    [CV]  max_depth=4, min_samples_leaf=40, min_samples_split=150, n_estimators=100, total=   1.3s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=50, n_estimators=50 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=50, n_estimators=50, total=   0.7s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=50, n_estimators=50 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=50, n_estimators=50, total=   0.7s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=50, n_estimators=80 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=50, n_estimators=80, total=   1.1s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=50, n_estimators=80 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=50, n_estimators=80, total=   1.1s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=50, n_estimators=100 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=50, n_estimators=100, total=   1.3s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=50, n_estimators=100 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=50, n_estimators=100, total=   1.3s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=100, n_estimators=50 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=100, n_estimators=50, total=   0.7s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=100, n_estimators=50 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=100, n_estimators=50, total=   0.7s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=100, n_estimators=80 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=100, n_estimators=80, total=   1.1s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=100, n_estimators=80 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=100, n_estimators=80, total=   1.0s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=100, n_estimators=100 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=100, n_estimators=100, total=   1.3s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=100, n_estimators=100 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=100, n_estimators=100, total=   1.3s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=150, n_estimators=50 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=150, n_estimators=50, total=   0.7s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=150, n_estimators=50 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=150, n_estimators=50, total=   0.7s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=150, n_estimators=80 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=150, n_estimators=80, total=   1.1s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=150, n_estimators=80 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=150, n_estimators=80, total=   1.0s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=150, n_estimators=100 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=150, n_estimators=100, total=   1.3s
+    [CV] max_depth=4, min_samples_leaf=50, min_samples_split=150, n_estimators=100 
+    [CV]  max_depth=4, min_samples_leaf=50, min_samples_split=150, n_estimators=100, total=   1.3s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=50, n_estimators=50 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=50, n_estimators=50, total=   0.9s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=50, n_estimators=50 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=50, n_estimators=50, total=   0.9s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=50, n_estimators=80 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=50, n_estimators=80, total=   1.4s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=50, n_estimators=80 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=50, n_estimators=80, total=   1.4s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=50, n_estimators=100 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=50, n_estimators=100, total=   1.7s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=50, n_estimators=100 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=50, n_estimators=100, total=   1.8s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=100, n_estimators=50 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=100, n_estimators=50, total=   0.9s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=100, n_estimators=50 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=100, n_estimators=50, total=   0.9s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=100, n_estimators=80 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=100, n_estimators=80, total=   1.5s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=100, n_estimators=80 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=100, n_estimators=80, total=   1.5s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=100, n_estimators=100 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=100, n_estimators=100, total=   1.7s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=100, n_estimators=100 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=100, n_estimators=100, total=   1.7s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=150, n_estimators=50 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=150, n_estimators=50, total=   0.9s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=150, n_estimators=50 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=150, n_estimators=50, total=   0.9s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=150, n_estimators=80 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=150, n_estimators=80, total=   1.4s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=150, n_estimators=80 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=150, n_estimators=80, total=   1.4s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=150, n_estimators=100 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=150, n_estimators=100, total=   1.7s
+    [CV] max_depth=6, min_samples_leaf=40, min_samples_split=150, n_estimators=100 
+    [CV]  max_depth=6, min_samples_leaf=40, min_samples_split=150, n_estimators=100, total=   1.7s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=50, n_estimators=50 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=50, n_estimators=50, total=   0.9s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=50, n_estimators=50 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=50, n_estimators=50, total=   0.9s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=50, n_estimators=80 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=50, n_estimators=80, total=   1.4s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=50, n_estimators=80 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=50, n_estimators=80, total=   1.4s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=50, n_estimators=100 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=50, n_estimators=100, total=   1.8s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=50, n_estimators=100 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=50, n_estimators=100, total=   1.7s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=100, n_estimators=50 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=100, n_estimators=50, total=   0.9s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=100, n_estimators=50 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=100, n_estimators=50, total=   0.9s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=100, n_estimators=80 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=100, n_estimators=80, total=   1.4s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=100, n_estimators=80 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=100, n_estimators=80, total=   1.4s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=100, n_estimators=100 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=100, n_estimators=100, total=   1.7s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=100, n_estimators=100 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=100, n_estimators=100, total=   1.7s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=150, n_estimators=50 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=150, n_estimators=50, total=   0.9s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=150, n_estimators=50 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=150, n_estimators=50, total=   0.9s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=150, n_estimators=80 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=150, n_estimators=80, total=   1.4s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=150, n_estimators=80 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=150, n_estimators=80, total=   1.4s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=150, n_estimators=100 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=150, n_estimators=100, total=   1.7s
+    [CV] max_depth=6, min_samples_leaf=50, min_samples_split=150, n_estimators=100 
+    [CV]  max_depth=6, min_samples_leaf=50, min_samples_split=150, n_estimators=100, total=   1.7s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=50, n_estimators=50 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=50, n_estimators=50, total=   1.2s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=50, n_estimators=50 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=50, n_estimators=50, total=   1.2s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=50, n_estimators=80 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=50, n_estimators=80, total=   1.8s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=50, n_estimators=80 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=50, n_estimators=80, total=   1.8s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=50, n_estimators=100 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=50, n_estimators=100, total=   2.2s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=50, n_estimators=100 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=50, n_estimators=100, total=   2.2s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=100, n_estimators=50 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=100, n_estimators=50, total=   1.1s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=100, n_estimators=50 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=100, n_estimators=50, total=   1.1s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=100, n_estimators=80 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=100, n_estimators=80, total=   1.8s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=100, n_estimators=80 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=100, n_estimators=80, total=   1.8s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=100, n_estimators=100 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=100, n_estimators=100, total=   2.2s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=100, n_estimators=100 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=100, n_estimators=100, total=   2.2s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=150, n_estimators=50 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=150, n_estimators=50, total=   1.1s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=150, n_estimators=50 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=150, n_estimators=50, total=   1.1s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=150, n_estimators=80 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=150, n_estimators=80, total=   1.8s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=150, n_estimators=80 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=150, n_estimators=80, total=   1.7s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=150, n_estimators=100 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=150, n_estimators=100, total=   2.1s
+    [CV] max_depth=8, min_samples_leaf=40, min_samples_split=150, n_estimators=100 
+    [CV]  max_depth=8, min_samples_leaf=40, min_samples_split=150, n_estimators=100, total=   2.1s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=50, n_estimators=50 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=50, n_estimators=50, total=   1.1s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=50, n_estimators=50 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=50, n_estimators=50, total=   1.1s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=50, n_estimators=80 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=50, n_estimators=80, total=   1.8s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=50, n_estimators=80 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=50, n_estimators=80, total=   1.8s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=50, n_estimators=100 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=50, n_estimators=100, total=   2.2s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=50, n_estimators=100 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=50, n_estimators=100, total=   2.2s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=100, n_estimators=50 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=100, n_estimators=50, total=   1.1s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=100, n_estimators=50 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=100, n_estimators=50, total=   1.1s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=100, n_estimators=80 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=100, n_estimators=80, total=   1.7s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=100, n_estimators=80 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=100, n_estimators=80, total=   1.8s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=100, n_estimators=100 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=100, n_estimators=100, total=   2.2s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=100, n_estimators=100 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=100, n_estimators=100, total=   2.1s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=150, n_estimators=50 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=150, n_estimators=50, total=   1.1s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=150, n_estimators=50 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=150, n_estimators=50, total=   1.1s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=150, n_estimators=80 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=150, n_estimators=80, total=   1.7s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=150, n_estimators=80 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=150, n_estimators=80, total=   1.7s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=150, n_estimators=100 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=150, n_estimators=100, total=   2.2s
+    [CV] max_depth=8, min_samples_leaf=50, min_samples_split=150, n_estimators=100 
+    [CV]  max_depth=8, min_samples_leaf=50, min_samples_split=150, n_estimators=100, total=   2.2s
+    
+    
+    
+    [Parallel(n_jobs=1)]: Done 108 out of 108 | elapsed:  2.4min finished
+    
+    
+    
+    
+    Best parameters are: 
+    {'max_depth': 8,
+     'min_samples_leaf': 50,
+     'min_samples_split': 150,
+     'n_estimators': 80}
+    
+
+In [27]:
+
+    
+    
+    # Getting scores from all the metrices
+    rf_model, rf_train_auc, rf_test_auc, rf_train_accuracy, rf_test_accuracy,rf_f1, rf_precision,rf_recall,rf_train_log, rf_test_log = check_scores(rf_optimal_model, X_train, X_test )
+    
+    
+    
+    The accuracy on train dataset is 0.8076793533176153
+    The accuracy on test dataset is 0.7998113970092955
+    
+    Train confusion matrix:
+    [[27351  2556]
+     [ 6009  8619]]
+    
+    Test confusion matrix:
+    [[9096  889]
+     [2083 2778]]
+    
+    ROC on train data: 0.8908840059365877
+    ROC on test data: 0.8843636159855912
+    
+    Train log loss: 0.4319842751774738
+    Test log loss: 0.4362688605034963
+    
+    F score is: 0.6515009380863039
+    Precision is: 0.7575674938641942
+    Recall is: 0.5714873482822465
+    
+
+# **Feature Importance For Random Forest**¶
+
+In [28]:
+
+    
+    
+    # Getting the feature importance for all the features
+    check_importance(rf_model, X_train)
+    
+
+Out[28]:
+
+| Feature | Feature Importance  
+---|---|---  
+9 | BMI | 0.24  
+8 | Wt | 0.16  
+38 | Medical_History_4 | 0.11  
+86 | Medical_Keyword_15 | 0.10  
+55 | Medical_History_23 | 0.10  
+2 | Product_Info_4 | 0.04  
+21 | InsuredInfo_6 | 0.03  
+34 | Family_Hist_4 | 0.02  
+7 | Ht | 0.02  
+6 | Ins_Age | 0.02  
+74 | Medical_Keyword_3 | 0.02  
+48 | Medical_History_16 | 0.01  
+61 | Medical_History_30 | 0.01  
+63 | Medical_History_33 | 0.01  
+35 | Medical_History_1 | 0.01  
+33 | Family_Hist_3 | 0.01  
+32 | Family_Hist_2 | 0.01  
+31 | Family_Hist_1 | 0.01  
+96 | Medical_Keyword_25 | 0.01  
+119 | Medical_Keyword_48 | 0.01  
+69 | Medical_History_39 | 0.01  
+106 | Medical_Keyword_35 | 0.00  
+113 | Medical_Keyword_42 | 0.00  
+85 | Medical_Keyword_14 | 0.00  
+114 | Medical_Keyword_43 | 0.00  
+84 | Medical_Keyword_13 | 0.00  
+83 | Medical_Keyword_12 | 0.00  
+82 | Medical_Keyword_11 | 0.00  
+81 | Medical_Keyword_10 | 0.00  
+80 | Medical_Keyword_9 | 0.00  
+79 | Medical_Keyword_8 | 0.00  
+115 | Medical_Keyword_44 | 0.00  
+78 | Medical_Keyword_7 | 0.00  
+77 | Medical_Keyword_6 | 0.00  
+76 | Medical_Keyword_5 | 0.00  
+75 | Medical_Keyword_4 | 0.00  
+116 | Medical_Keyword_45 | 0.00  
+117 | Medical_Keyword_46 | 0.00  
+73 | Medical_Keyword_2 | 0.00  
+118 | Medical_Keyword_47 | 0.00  
+72 | Medical_Keyword_1 | 0.00  
+71 | Medical_History_41 | 0.00  
+70 | Medical_History_40 | 0.00  
+87 | Medical_Keyword_16 | 0.00  
+105 | Medical_Keyword_34 | 0.00  
+89 | Medical_Keyword_18 | 0.00  
+108 | Medical_Keyword_37 | 0.00  
+104 | Medical_Keyword_33 | 0.00  
+103 | Medical_Keyword_32 | 0.00  
+102 | Medical_Keyword_31 | 0.00  
+101 | Medical_Keyword_30 | 0.00  
+100 | Medical_Keyword_29 | 0.00  
+99 | Medical_Keyword_28 | 0.00  
+98 | Medical_Keyword_27 | 0.00  
+97 | Medical_Keyword_26 | 0.00  
+107 | Medical_Keyword_36 | 0.00  
+109 | Medical_Keyword_38 | 0.00  
+90 | Medical_Keyword_19 | 0.00  
+110 | Medical_Keyword_39 | 0.00  
+68 | Medical_History_38 | 0.00  
+111 | Medical_Keyword_40 | 0.00  
+95 | Medical_Keyword_24 | 0.00  
+94 | Medical_Keyword_23 | 0.00  
+112 | Medical_Keyword_41 | 0.00  
+93 | Medical_Keyword_22 | 0.00  
+92 | Medical_Keyword_21 | 0.00  
+91 | Medical_Keyword_20 | 0.00  
+88 | Medical_Keyword_17 | 0.00  
+0 | Product_Info_1 | 0.00  
+67 | Medical_History_37 | 0.00  
+18 | InsuredInfo_3 | 0.00  
+29 | Insurance_History_8 | 0.00  
+28 | Insurance_History_7 | 0.00  
+27 | Insurance_History_5 | 0.00  
+26 | Insurance_History_4 | 0.00  
+25 | Insurance_History_3 | 0.00  
+24 | Insurance_History_2 | 0.00  
+23 | Insurance_History_1 | 0.00  
+22 | InsuredInfo_7 | 0.00  
+20 | InsuredInfo_5 | 0.00  
+19 | InsuredInfo_4 | 0.00  
+17 | InsuredInfo_2 | 0.00  
+36 | Medical_History_2 | 0.00  
+16 | InsuredInfo_1 | 0.00  
+15 | Employment_Info_6 | 0.00  
+14 | Employment_Info_5 | 0.00  
+13 | Employment_Info_4 | 0.00  
+12 | Employment_Info_3 | 0.00  
+11 | Employment_Info_2 | 0.00  
+10 | Employment_Info_1 | 0.00  
+5 | Product_Info_7 | 0.00  
+4 | Product_Info_6 | 0.00  
+3 | Product_Info_5 | 0.00  
+30 | Insurance_History_9 | 0.00  
+37 | Medical_History_3 | 0.00  
+66 | Medical_History_36 | 0.00  
+52 | Medical_History_20 | 0.00  
+65 | Medical_History_35 | 0.00  
+64 | Medical_History_34 | 0.00  
+62 | Medical_History_31 | 0.00  
+1 | Product_Info_3 | 0.00  
+59 | Medical_History_28 | 0.00  
+58 | Medical_History_27 | 0.00  
+57 | Medical_History_26 | 0.00  
+56 | Medical_History_25 | 0.00  
+54 | Medical_History_22 | 0.00  
+53 | Medical_History_21 | 0.00  
+51 | Medical_History_19 | 0.00  
+39 | Medical_History_5 | 0.00  
+50 | Medical_History_18 | 0.00  
+49 | Medical_History_17 | 0.00  
+47 | Medical_History_14 | 0.00  
+46 | Medical_History_13 | 0.00  
+45 | Medical_History_12 | 0.00  
+44 | Medical_History_11 | 0.00  
+43 | Medical_History_9 | 0.00  
+42 | Medical_History_8 | 0.00  
+41 | Medical_History_7 | 0.00  
+40 | Medical_History_6 | 0.00  
+60 | Medical_History_29 | 0.00  
+  
+# **Plotting only those features which are contributing something**¶
+
+In [29]:
+
+    
+    
+    # PLotting only those features which are contributing something
+    plot_feature_importance(rf_model, X_train)
+    
+
+![](__results___files/__results___54_0.png)
+
+### **CONCLUSION:**¶
+
+> BMI, weight, Medical_History_23, Medical_History_4 and Medical_Keyword_15
+> seems to be important features according to random forest.
+>
+> Also, only these features are contributing to the model prediction. Some
+> features can be elmininated which are not contributing on further
+> investigation.
+
+## **Model Interpretability For Random Forest**¶
+
+### **Using Lime**¶
+
+In [30]:
+
+    
+    
+    # Interpretting the model using lime
+    interpret_with_lime(rf_model,X_test)
+    
+
+### **Using Shap**¶
+
+In [31]:
+
+    
+    
+    # Interpretting the model using shaply
+    X_shap=X_train
+    
+    rf_explainer = shap.TreeExplainer(rf_model)
+    rf_shap_values = rf_explainer.shap_values(X_shap)
+    shap.summary_plot(rf_shap_values, X_shap, plot_type="bar")
+    
+
+![](__results___files/__results___60_0.png)
+
+#### **Findings**¶
+
+> Medical keyword 15,medical history 9, Wt, medical history 3 all pushing
+> towards 1.
+>
+> Orange ones are pusing towards 1.
+
+## **Dependence Plots**¶
+
+In [32]:
+
+    
+    
+    # Plotting for top 5 features
+    top_vars = ['BMI','Medical_Keyword_15','Medical_History_4','Wt','Medical_History_23']
+    index_top_vars =[list(X_train.columns).index(var) for var in top_vars]
+    
+    for elem in index_top_vars:
+        shap.dependence_plot(elem, rf_shap_values[0], X_train)
+    
+
+![](__results___files/__results___63_0.png)
+
+![](__results___files/__results___63_1.png)
+
+![](__results___files/__results___63_2.png)
+
+![](__results___files/__results___63_3.png)
+
+![](__results___files/__results___63_4.png)
+
+### **Findings**¶
+
+> With high medical history 23 and low bmi we get class 1
+
+# **Gradient Boosting**¶
+
+In [33]:
+
+    
+    
+    #finding the best model
+    gb_parameters ={
+        "n_estimators":[5,50,250],
+        "max_depth":[1,3,5,7],
+        "learning_rate":[0.01,0.1,1]
+    }
+    
+    pprint(gb_parameters)
+    
+    gb_optimal_model = grid_search(GradientBoostingClassifier(), gb_parameters, X_train, Y_train)
+    
+    
+    
+    {'learning_rate': [0.01, 0.1, 1],
+     'max_depth': [1, 3, 5, 7],
+     'n_estimators': [5, 50, 250]}
+    Fitting 2 folds for each of 36 candidates, totalling 72 fits
+    [CV] learning_rate=0.01, max_depth=1, n_estimators=5 .................
+    
+    
+    
+    [Parallel(n_jobs=1)]: Using backend SequentialBackend with 1 concurrent workers.
+    
+    
+    
+    [CV] .. learning_rate=0.01, max_depth=1, n_estimators=5, total=   0.2s
+    [CV] learning_rate=0.01, max_depth=1, n_estimators=5 .................
+    
+    
+    
+    [Parallel(n_jobs=1)]: Done   1 out of   1 | elapsed:    0.2s remaining:    0.0s
+    
+    
+    
+    [CV] .. learning_rate=0.01, max_depth=1, n_estimators=5, total=   0.2s
+    [CV] learning_rate=0.01, max_depth=1, n_estimators=50 ................
+    [CV] . learning_rate=0.01, max_depth=1, n_estimators=50, total=   1.6s
+    [CV] learning_rate=0.01, max_depth=1, n_estimators=50 ................
+    [CV] . learning_rate=0.01, max_depth=1, n_estimators=50, total=   1.6s
+    [CV] learning_rate=0.01, max_depth=1, n_estimators=250 ...............
+    [CV]  learning_rate=0.01, max_depth=1, n_estimators=250, total=   7.7s
+    [CV] learning_rate=0.01, max_depth=1, n_estimators=250 ...............
+    [CV]  learning_rate=0.01, max_depth=1, n_estimators=250, total=   7.7s
+    [CV] learning_rate=0.01, max_depth=3, n_estimators=5 .................
+    [CV] .. learning_rate=0.01, max_depth=3, n_estimators=5, total=   0.5s
+    [CV] learning_rate=0.01, max_depth=3, n_estimators=5 .................
+    [CV] .. learning_rate=0.01, max_depth=3, n_estimators=5, total=   0.5s
+    [CV] learning_rate=0.01, max_depth=3, n_estimators=50 ................
+    [CV] . learning_rate=0.01, max_depth=3, n_estimators=50, total=   4.6s
+    [CV] learning_rate=0.01, max_depth=3, n_estimators=50 ................
+    [CV] . learning_rate=0.01, max_depth=3, n_estimators=50, total=   4.6s
+    [CV] learning_rate=0.01, max_depth=3, n_estimators=250 ...............
+    [CV]  learning_rate=0.01, max_depth=3, n_estimators=250, total=  22.7s
+    [CV] learning_rate=0.01, max_depth=3, n_estimators=250 ...............
+    [CV]  learning_rate=0.01, max_depth=3, n_estimators=250, total=  22.6s
+    [CV] learning_rate=0.01, max_depth=5, n_estimators=5 .................
+    [CV] .. learning_rate=0.01, max_depth=5, n_estimators=5, total=   0.9s
+    [CV] learning_rate=0.01, max_depth=5, n_estimators=5 .................
+    [CV] .. learning_rate=0.01, max_depth=5, n_estimators=5, total=   0.9s
+    [CV] learning_rate=0.01, max_depth=5, n_estimators=50 ................
+    [CV] . learning_rate=0.01, max_depth=5, n_estimators=50, total=   8.0s
+    [CV] learning_rate=0.01, max_depth=5, n_estimators=50 ................
+    [CV] . learning_rate=0.01, max_depth=5, n_estimators=50, total=   8.0s
+    [CV] learning_rate=0.01, max_depth=5, n_estimators=250 ...............
+    [CV]  learning_rate=0.01, max_depth=5, n_estimators=250, total=  39.7s
+    [CV] learning_rate=0.01, max_depth=5, n_estimators=250 ...............
+    [CV]  learning_rate=0.01, max_depth=5, n_estimators=250, total=  39.6s
+    [CV] learning_rate=0.01, max_depth=7, n_estimators=5 .................
+    [CV] .. learning_rate=0.01, max_depth=7, n_estimators=5, total=   1.2s
+    [CV] learning_rate=0.01, max_depth=7, n_estimators=5 .................
+    [CV] .. learning_rate=0.01, max_depth=7, n_estimators=5, total=   1.2s
+    [CV] learning_rate=0.01, max_depth=7, n_estimators=50 ................
+    [CV] . learning_rate=0.01, max_depth=7, n_estimators=50, total=  11.6s
+    [CV] learning_rate=0.01, max_depth=7, n_estimators=50 ................
+    [CV] . learning_rate=0.01, max_depth=7, n_estimators=50, total=  11.5s
+    [CV] learning_rate=0.01, max_depth=7, n_estimators=250 ...............
+    [CV]  learning_rate=0.01, max_depth=7, n_estimators=250, total=  58.4s
+    [CV] learning_rate=0.01, max_depth=7, n_estimators=250 ...............
+    [CV]  learning_rate=0.01, max_depth=7, n_estimators=250, total=  57.6s
+    [CV] learning_rate=0.1, max_depth=1, n_estimators=5 ..................
+    [CV] ... learning_rate=0.1, max_depth=1, n_estimators=5, total=   0.2s
+    [CV] learning_rate=0.1, max_depth=1, n_estimators=5 ..................
+    [CV] ... learning_rate=0.1, max_depth=1, n_estimators=5, total=   0.2s
+    [CV] learning_rate=0.1, max_depth=1, n_estimators=50 .................
+    [CV] .. learning_rate=0.1, max_depth=1, n_estimators=50, total=   1.6s
+    [CV] learning_rate=0.1, max_depth=1, n_estimators=50 .................
+    [CV] .. learning_rate=0.1, max_depth=1, n_estimators=50, total=   1.7s
+    [CV] learning_rate=0.1, max_depth=1, n_estimators=250 ................
+    [CV] . learning_rate=0.1, max_depth=1, n_estimators=250, total=   7.8s
+    [CV] learning_rate=0.1, max_depth=1, n_estimators=250 ................
+    [CV] . learning_rate=0.1, max_depth=1, n_estimators=250, total=   7.6s
+    [CV] learning_rate=0.1, max_depth=3, n_estimators=5 ..................
+    [CV] ... learning_rate=0.1, max_depth=3, n_estimators=5, total=   0.5s
+    [CV] learning_rate=0.1, max_depth=3, n_estimators=5 ..................
+    [CV] ... learning_rate=0.1, max_depth=3, n_estimators=5, total=   0.5s
+    [CV] learning_rate=0.1, max_depth=3, n_estimators=50 .................
+    [CV] .. learning_rate=0.1, max_depth=3, n_estimators=50, total=   4.5s
+    [CV] learning_rate=0.1, max_depth=3, n_estimators=50 .................
+    [CV] .. learning_rate=0.1, max_depth=3, n_estimators=50, total=   4.5s
+    [CV] learning_rate=0.1, max_depth=3, n_estimators=250 ................
+    [CV] . learning_rate=0.1, max_depth=3, n_estimators=250, total=  21.9s
+    [CV] learning_rate=0.1, max_depth=3, n_estimators=250 ................
+    [CV] . learning_rate=0.1, max_depth=3, n_estimators=250, total=  21.9s
+    [CV] learning_rate=0.1, max_depth=5, n_estimators=5 ..................
+    [CV] ... learning_rate=0.1, max_depth=5, n_estimators=5, total=   0.9s
+    [CV] learning_rate=0.1, max_depth=5, n_estimators=5 ..................
+    [CV] ... learning_rate=0.1, max_depth=5, n_estimators=5, total=   0.9s
+    [CV] learning_rate=0.1, max_depth=5, n_estimators=50 .................
+    [CV] .. learning_rate=0.1, max_depth=5, n_estimators=50, total=   7.8s
+    [CV] learning_rate=0.1, max_depth=5, n_estimators=50 .................
+    [CV] .. learning_rate=0.1, max_depth=5, n_estimators=50, total=   7.8s
+    [CV] learning_rate=0.1, max_depth=5, n_estimators=250 ................
+    [CV] . learning_rate=0.1, max_depth=5, n_estimators=250, total=  37.0s
+    [CV] learning_rate=0.1, max_depth=5, n_estimators=250 ................
+    [CV] . learning_rate=0.1, max_depth=5, n_estimators=250, total=  37.1s
+    [CV] learning_rate=0.1, max_depth=7, n_estimators=5 ..................
+    [CV] ... learning_rate=0.1, max_depth=7, n_estimators=5, total=   1.3s
+    [CV] learning_rate=0.1, max_depth=7, n_estimators=5 ..................
+    [CV] ... learning_rate=0.1, max_depth=7, n_estimators=5, total=   1.2s
+    [CV] learning_rate=0.1, max_depth=7, n_estimators=50 .................
+    [CV] .. learning_rate=0.1, max_depth=7, n_estimators=50, total=  11.5s
+    [CV] learning_rate=0.1, max_depth=7, n_estimators=50 .................
+    [CV] .. learning_rate=0.1, max_depth=7, n_estimators=50, total=  11.4s
+    [CV] learning_rate=0.1, max_depth=7, n_estimators=250 ................
+    [CV] . learning_rate=0.1, max_depth=7, n_estimators=250, total=  54.1s
+    [CV] learning_rate=0.1, max_depth=7, n_estimators=250 ................
+    [CV] . learning_rate=0.1, max_depth=7, n_estimators=250, total=  54.2s
+    [CV] learning_rate=1, max_depth=1, n_estimators=5 ....................
+    [CV] ..... learning_rate=1, max_depth=1, n_estimators=5, total=   0.2s
+    [CV] learning_rate=1, max_depth=1, n_estimators=5 ....................
+    [CV] ..... learning_rate=1, max_depth=1, n_estimators=5, total=   0.2s
+    [CV] learning_rate=1, max_depth=1, n_estimators=50 ...................
+    [CV] .... learning_rate=1, max_depth=1, n_estimators=50, total=   1.6s
+    [CV] learning_rate=1, max_depth=1, n_estimators=50 ...................
+    [CV] .... learning_rate=1, max_depth=1, n_estimators=50, total=   1.6s
+    [CV] learning_rate=1, max_depth=1, n_estimators=250 ..................
+    [CV] ... learning_rate=1, max_depth=1, n_estimators=250, total=   7.6s
+    [CV] learning_rate=1, max_depth=1, n_estimators=250 ..................
+    [CV] ... learning_rate=1, max_depth=1, n_estimators=250, total=   7.6s
+    [CV] learning_rate=1, max_depth=3, n_estimators=5 ....................
+    [CV] ..... learning_rate=1, max_depth=3, n_estimators=5, total=   0.5s
+    [CV] learning_rate=1, max_depth=3, n_estimators=5 ....................
+    [CV] ..... learning_rate=1, max_depth=3, n_estimators=5, total=   0.5s
+    [CV] learning_rate=1, max_depth=3, n_estimators=50 ...................
+    [CV] .... learning_rate=1, max_depth=3, n_estimators=50, total=   4.4s
+    [CV] learning_rate=1, max_depth=3, n_estimators=50 ...................
+    [CV] .... learning_rate=1, max_depth=3, n_estimators=50, total=   4.4s
+    [CV] learning_rate=1, max_depth=3, n_estimators=250 ..................
+    [CV] ... learning_rate=1, max_depth=3, n_estimators=250, total=  21.7s
+    [CV] learning_rate=1, max_depth=3, n_estimators=250 ..................
+    [CV] ... learning_rate=1, max_depth=3, n_estimators=250, total=  21.6s
+    [CV] learning_rate=1, max_depth=5, n_estimators=5 ....................
+    [CV] ..... learning_rate=1, max_depth=5, n_estimators=5, total=   0.8s
+    [CV] learning_rate=1, max_depth=5, n_estimators=5 ....................
+    [CV] ..... learning_rate=1, max_depth=5, n_estimators=5, total=   0.8s
+    [CV] learning_rate=1, max_depth=5, n_estimators=50 ...................
+    [CV] .... learning_rate=1, max_depth=5, n_estimators=50, total=   7.5s
+    [CV] learning_rate=1, max_depth=5, n_estimators=50 ...................
+    [CV] .... learning_rate=1, max_depth=5, n_estimators=50, total=   7.5s
+    [CV] learning_rate=1, max_depth=5, n_estimators=250 ..................
+    [CV] ... learning_rate=1, max_depth=5, n_estimators=250, total=  36.9s
+    [CV] learning_rate=1, max_depth=5, n_estimators=250 ..................
+    [CV] ... learning_rate=1, max_depth=5, n_estimators=250, total=  37.0s
+    [CV] learning_rate=1, max_depth=7, n_estimators=5 ....................
+    [CV] ..... learning_rate=1, max_depth=7, n_estimators=5, total=   1.2s
+    [CV] learning_rate=1, max_depth=7, n_estimators=5 ....................
+    [CV] ..... learning_rate=1, max_depth=7, n_estimators=5, total=   1.2s
+    [CV] learning_rate=1, max_depth=7, n_estimators=50 ...................
+    [CV] .... learning_rate=1, max_depth=7, n_estimators=50, total=  10.7s
+    [CV] learning_rate=1, max_depth=7, n_estimators=50 ...................
+    [CV] .... learning_rate=1, max_depth=7, n_estimators=50, total=  10.8s
+    [CV] learning_rate=1, max_depth=7, n_estimators=250 ..................
+    [CV] ... learning_rate=1, max_depth=7, n_estimators=250, total=  54.4s
+    [CV] learning_rate=1, max_depth=7, n_estimators=250 ..................
+    [CV] ... learning_rate=1, max_depth=7, n_estimators=250, total=  52.3s
+    
+    
+    
+    [Parallel(n_jobs=1)]: Done  72 out of  72 | elapsed: 15.1min finished
+    
+    
+    
+    
+    Best parameters are: 
+    {'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 250}
+    
+
+# **Feature Importance For Gradient Boosting**¶
+
+In [34]:
+
+    
+    
+    # Getting the scpres for all the score metrics used here
+    gb_model, gb_train_auc, gb_test_auc, gb_train_accuracy, gb_test_accuracy,gb_f1, gb_precision,gb_recall,gb_train_log, gb_test_log = check_scores(gb_optimal_model, X_train, X_test )
+    
+    
+    
+    The accuracy on train dataset is 0.8641517907263949
+    The accuracy on test dataset is 0.8345682338677085
+    
+    Train confusion matrix:
+    [[26638  3269]
+     [ 2781 11847]]
+    
+    Test confusion matrix:
+    [[8726 1259]
+     [1197 3664]]
+    
+    ROC on train data: 0.9377448234180047
+    ROC on test data: 0.9096560495958915
+    
+    Train log loss: 0.30320271156477785
+    Test log loss: 0.35305418924232024
+    
+    F score is: 0.74897792313982
+    Precision is: 0.7442616290879545
+    Recall is: 0.7537543715284921
+    
+
+In [35]:
+
+    
+    
+    # Getting feature importance
+    check_importance(gb_model, X_train)
+    
+
+Out[35]:
+
+| Feature | Feature Importance  
+---|---|---  
+9 | BMI | 0.39  
+55 | Medical_History_23 | 0.14  
+38 | Medical_History_4 | 0.13  
+2 | Product_Info_4 | 0.05  
+86 | Medical_Keyword_15 | 0.03  
+6 | Ins_Age | 0.03  
+8 | Wt | 0.03  
+74 | Medical_Keyword_3 | 0.02  
+34 | Family_Hist_4 | 0.01  
+33 | Family_Hist_3 | 0.01  
+21 | InsuredInfo_6 | 0.01  
+31 | Family_Hist_1 | 0.01  
+32 | Family_Hist_2 | 0.01  
+15 | Employment_Info_6 | 0.01  
+61 | Medical_History_30 | 0.01  
+10 | Employment_Info_1 | 0.01  
+35 | Medical_History_1 | 0.01  
+36 | Medical_History_2 | 0.01  
+90 | Medical_Keyword_19 | 0.00  
+84 | Medical_Keyword_13 | 0.00  
+89 | Medical_Keyword_18 | 0.00  
+88 | Medical_Keyword_17 | 0.00  
+87 | Medical_Keyword_16 | 0.00  
+91 | Medical_Keyword_20 | 0.00  
+85 | Medical_Keyword_14 | 0.00  
+80 | Medical_Keyword_9 | 0.00  
+83 | Medical_Keyword_12 | 0.00  
+82 | Medical_Keyword_11 | 0.00  
+81 | Medical_Keyword_10 | 0.00  
+93 | Medical_Keyword_22 | 0.00  
+79 | Medical_Keyword_8 | 0.00  
+78 | Medical_Keyword_7 | 0.00  
+77 | Medical_Keyword_6 | 0.00  
+76 | Medical_Keyword_5 | 0.00  
+75 | Medical_Keyword_4 | 0.00  
+73 | Medical_Keyword_2 | 0.00  
+72 | Medical_Keyword_1 | 0.00  
+71 | Medical_History_41 | 0.00  
+70 | Medical_History_40 | 0.00  
+92 | Medical_Keyword_21 | 0.00  
+0 | Product_Info_1 | 0.00  
+94 | Medical_Keyword_23 | 0.00  
+107 | Medical_Keyword_36 | 0.00  
+118 | Medical_Keyword_47 | 0.00  
+117 | Medical_Keyword_46 | 0.00  
+116 | Medical_Keyword_45 | 0.00  
+115 | Medical_Keyword_44 | 0.00  
+114 | Medical_Keyword_43 | 0.00  
+113 | Medical_Keyword_42 | 0.00  
+112 | Medical_Keyword_41 | 0.00  
+111 | Medical_Keyword_40 | 0.00  
+110 | Medical_Keyword_39 | 0.00  
+109 | Medical_Keyword_38 | 0.00  
+108 | Medical_Keyword_37 | 0.00  
+106 | Medical_Keyword_35 | 0.00  
+95 | Medical_Keyword_24 | 0.00  
+105 | Medical_Keyword_34 | 0.00  
+104 | Medical_Keyword_33 | 0.00  
+103 | Medical_Keyword_32 | 0.00  
+102 | Medical_Keyword_31 | 0.00  
+101 | Medical_Keyword_30 | 0.00  
+100 | Medical_Keyword_29 | 0.00  
+99 | Medical_Keyword_28 | 0.00  
+98 | Medical_Keyword_27 | 0.00  
+97 | Medical_Keyword_26 | 0.00  
+68 | Medical_History_38 | 0.00  
+96 | Medical_Keyword_25 | 0.00  
+69 | Medical_History_39 | 0.00  
+60 | Medical_History_29 | 0.00  
+67 | Medical_History_37 | 0.00  
+19 | InsuredInfo_4 | 0.00  
+30 | Insurance_History_9 | 0.00  
+29 | Insurance_History_8 | 0.00  
+28 | Insurance_History_7 | 0.00  
+27 | Insurance_History_5 | 0.00  
+26 | Insurance_History_4 | 0.00  
+25 | Insurance_History_3 | 0.00  
+24 | Insurance_History_2 | 0.00  
+23 | Insurance_History_1 | 0.00  
+22 | InsuredInfo_7 | 0.00  
+20 | InsuredInfo_5 | 0.00  
+18 | InsuredInfo_3 | 0.00  
+39 | Medical_History_5 | 0.00  
+17 | InsuredInfo_2 | 0.00  
+16 | InsuredInfo_1 | 0.00  
+14 | Employment_Info_5 | 0.00  
+13 | Employment_Info_4 | 0.00  
+12 | Employment_Info_3 | 0.00  
+11 | Employment_Info_2 | 0.00  
+7 | Ht | 0.00  
+5 | Product_Info_7 | 0.00  
+4 | Product_Info_6 | 0.00  
+3 | Product_Info_5 | 0.00  
+37 | Medical_History_3 | 0.00  
+40 | Medical_History_6 | 0.00  
+66 | Medical_History_36 | 0.00  
+53 | Medical_History_21 | 0.00  
+65 | Medical_History_35 | 0.00  
+64 | Medical_History_34 | 0.00  
+63 | Medical_History_33 | 0.00  
+62 | Medical_History_31 | 0.00  
+1 | Product_Info_3 | 0.00  
+59 | Medical_History_28 | 0.00  
+58 | Medical_History_27 | 0.00  
+57 | Medical_History_26 | 0.00  
+56 | Medical_History_25 | 0.00  
+54 | Medical_History_22 | 0.00  
+52 | Medical_History_20 | 0.00  
+41 | Medical_History_7 | 0.00  
+51 | Medical_History_19 | 0.00  
+50 | Medical_History_18 | 0.00  
+49 | Medical_History_17 | 0.00  
+48 | Medical_History_16 | 0.00  
+47 | Medical_History_14 | 0.00  
+46 | Medical_History_13 | 0.00  
+45 | Medical_History_12 | 0.00  
+44 | Medical_History_11 | 0.00  
+43 | Medical_History_9 | 0.00  
+42 | Medical_History_8 | 0.00  
+119 | Medical_Keyword_48 | 0.00  
+  
+In [36]:
+
+    
+    
+    # PLotting only those features which are contributing something
+    plot_feature_importance(gb_model, X_train)
+    
+
+![](__results___files/__results___70_0.png)
+
+#### **CONCLUSION:**¶
+
+> BMI, weight, Medical_History_23, Medical_History_4 and Medical_Keyword_15
+> seems to be the most important 5 features according to Gradient boosting.
+
+# **Model Interpretability For Gradient Boosting**¶
+
+### **Using Lime**¶
+
+In [37]:
+
+    
+    
+    # Interpretting the model using lime
+    interpret_with_lime(gb_model,X_test)
+    
+
+### **Using Shap**¶
+
+In [38]:
+
+    
+    
+    # Interpretting the model using shaply
+    X_shap=X_train
+    
+    gb_explainer = shap.TreeExplainer(gb_model)
+    gb_shap_values = gb_explainer.shap_values(X_shap)
+    shap.summary_plot(gb_shap_values, X_shap, plot_type="dot")
+    
+
+![](__results___files/__results___76_0.png)
+
+#### **Findings**¶
+
+> BMI is pushing models prediction towards 0.
+>
+> Medical keyword 15 is pushing towards 1. However, medical keyword 4 is
+> pushing towards 0.
+>
+> Also, according to feature plot Wt. was in top 5 most important features,
+> same isn't followed here.
+
+## **Dependence Plots**¶
+
+In [39]:
+
+    
+    
+    #PLotting for top 5 features
+    top_vars = ['BMI','Medical_Keyword_15','Medical_History_4','Product_Info_4','Medical_History_23']
+    index_top_vars =[list(X_train.columns).index(var) for var in top_vars]
+    
+    for elem in index_top_vars:
+        shap.dependence_plot(elem, gb_shap_values, X_train)
+    
+
+![](__results___files/__results___79_0.png)
+
+![](__results___files/__results___79_1.png)
+
+![](__results___files/__results___79_2.png)
+
+![](__results___files/__results___79_3.png)
+
+![](__results___files/__results___79_4.png)
+
+### **Findings**¶
+
+> For low BMI and high medical history 23 we get class as 1.
+
+# **XGBOOST**¶
+
+In [40]:
+
+    
+    
+    # Parameter grid for xgboost
+    xgb_parameters = {'max_depth': [1,3,5], 'n_estimators': [2,5,10], 'learning_rate': [.01 , .1, .5]}
+    print('XGB parameters areL:')
+    pprint(xgb_parameters)
+    #finding the best model
+    xgb_optimal_model = grid_search(XGBClassifier(), xgb_parameters, X_train, Y_train)
+    
+    
+    
+    XGB parameters areL:
+    {'learning_rate': [0.01, 0.1, 0.5],
+     'max_depth': [1, 3, 5],
+     'n_estimators': [2, 5, 10]}
+    Fitting 2 folds for each of 27 candidates, totalling 54 fits
+    [CV] learning_rate=0.01, max_depth=1, n_estimators=2 .................
+    [08:57:08] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    
+    
+    
+    [Parallel(n_jobs=1)]: Using backend SequentialBackend with 1 concurrent workers.
+    [Parallel(n_jobs=1)]: Done   1 out of   1 | elapsed:    0.2s remaining:    0.0s
+    
+    
+    
+    [CV] .. learning_rate=0.01, max_depth=1, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.01, max_depth=1, n_estimators=2 .................
+    [08:57:08] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.01, max_depth=1, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.01, max_depth=1, n_estimators=5 .................
+    [08:57:09] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.01, max_depth=1, n_estimators=5, total=   0.2s
+    [CV] learning_rate=0.01, max_depth=1, n_estimators=5 .................
+    [08:57:09] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.01, max_depth=1, n_estimators=5, total=   0.2s
+    [CV] learning_rate=0.01, max_depth=1, n_estimators=10 ................
+    [08:57:09] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] . learning_rate=0.01, max_depth=1, n_estimators=10, total=   0.2s
+    [CV] learning_rate=0.01, max_depth=1, n_estimators=10 ................
+    [08:57:09] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] . learning_rate=0.01, max_depth=1, n_estimators=10, total=   0.2s
+    [CV] learning_rate=0.01, max_depth=3, n_estimators=2 .................
+    [08:57:10] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.01, max_depth=3, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.01, max_depth=3, n_estimators=2 .................
+    [08:57:10] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.01, max_depth=3, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.01, max_depth=3, n_estimators=5 .................
+    [08:57:10] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.01, max_depth=3, n_estimators=5, total=   0.3s
+    [CV] learning_rate=0.01, max_depth=3, n_estimators=5 .................
+    [08:57:10] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.01, max_depth=3, n_estimators=5, total=   0.3s
+    [CV] learning_rate=0.01, max_depth=3, n_estimators=10 ................
+    [08:57:10] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] . learning_rate=0.01, max_depth=3, n_estimators=10, total=   0.4s
+    [CV] learning_rate=0.01, max_depth=3, n_estimators=10 ................
+    [08:57:11] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] . learning_rate=0.01, max_depth=3, n_estimators=10, total=   0.4s
+    [CV] learning_rate=0.01, max_depth=5, n_estimators=2 .................
+    [08:57:11] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.01, max_depth=5, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.01, max_depth=5, n_estimators=2 .................
+    [08:57:12] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.01, max_depth=5, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.01, max_depth=5, n_estimators=5 .................
+    [08:57:12] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.01, max_depth=5, n_estimators=5, total=   0.3s
+    [CV] learning_rate=0.01, max_depth=5, n_estimators=5 .................
+    [08:57:12] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.01, max_depth=5, n_estimators=5, total=   0.3s
+    [CV] learning_rate=0.01, max_depth=5, n_estimators=10 ................
+    [08:57:12] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] . learning_rate=0.01, max_depth=5, n_estimators=10, total=   0.5s
+    [CV] learning_rate=0.01, max_depth=5, n_estimators=10 ................
+    [08:57:13] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] . learning_rate=0.01, max_depth=5, n_estimators=10, total=   0.5s
+    [CV] learning_rate=0.1, max_depth=1, n_estimators=2 ..................
+    [08:57:13] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.1, max_depth=1, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.1, max_depth=1, n_estimators=2 ..................
+    [08:57:14] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.1, max_depth=1, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.1, max_depth=1, n_estimators=5 ..................
+    [08:57:14] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.1, max_depth=1, n_estimators=5, total=   0.2s
+    [CV] learning_rate=0.1, max_depth=1, n_estimators=5 ..................
+    [08:57:14] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.1, max_depth=1, n_estimators=5, total=   0.2s
+    [CV] learning_rate=0.1, max_depth=1, n_estimators=10 .................
+    [08:57:14] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.1, max_depth=1, n_estimators=10, total=   0.2s
+    [CV] learning_rate=0.1, max_depth=1, n_estimators=10 .................
+    [08:57:14] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.1, max_depth=1, n_estimators=10, total=   0.2s
+    [CV] learning_rate=0.1, max_depth=3, n_estimators=2 ..................
+    [08:57:15] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.1, max_depth=3, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.1, max_depth=3, n_estimators=2 ..................
+    [08:57:15] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.1, max_depth=3, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.1, max_depth=3, n_estimators=5 ..................
+    [08:57:15] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.1, max_depth=3, n_estimators=5, total=   0.3s
+    [CV] learning_rate=0.1, max_depth=3, n_estimators=5 ..................
+    [08:57:15] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.1, max_depth=3, n_estimators=5, total=   0.3s
+    [CV] learning_rate=0.1, max_depth=3, n_estimators=10 .................
+    [08:57:16] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.1, max_depth=3, n_estimators=10, total=   0.5s
+    [CV] learning_rate=0.1, max_depth=3, n_estimators=10 .................
+    [08:57:16] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.1, max_depth=3, n_estimators=10, total=   0.9s
+    [CV] learning_rate=0.1, max_depth=5, n_estimators=2 ..................
+    [08:57:17] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.1, max_depth=5, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.1, max_depth=5, n_estimators=2 ..................
+    [08:57:17] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.1, max_depth=5, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.1, max_depth=5, n_estimators=5 ..................
+    [08:57:18] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.1, max_depth=5, n_estimators=5, total=   0.3s
+    [CV] learning_rate=0.1, max_depth=5, n_estimators=5 ..................
+    [08:57:18] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.1, max_depth=5, n_estimators=5, total=   0.3s
+    [CV] learning_rate=0.1, max_depth=5, n_estimators=10 .................
+    [08:57:18] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.1, max_depth=5, n_estimators=10, total=   0.5s
+    [CV] learning_rate=0.1, max_depth=5, n_estimators=10 .................
+    [08:57:19] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.1, max_depth=5, n_estimators=10, total=   0.5s
+    [CV] learning_rate=0.5, max_depth=1, n_estimators=2 ..................
+    [08:57:19] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.5, max_depth=1, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.5, max_depth=1, n_estimators=2 ..................
+    [08:57:19] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.5, max_depth=1, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.5, max_depth=1, n_estimators=5 ..................
+    [08:57:20] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.5, max_depth=1, n_estimators=5, total=   0.2s
+    [CV] learning_rate=0.5, max_depth=1, n_estimators=5 ..................
+    [08:57:20] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.5, max_depth=1, n_estimators=5, total=   0.2s
+    [CV] learning_rate=0.5, max_depth=1, n_estimators=10 .................
+    [08:57:20] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.5, max_depth=1, n_estimators=10, total=   0.3s
+    [CV] learning_rate=0.5, max_depth=1, n_estimators=10 .................
+    [08:57:20] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.5, max_depth=1, n_estimators=10, total=   0.2s
+    [CV] learning_rate=0.5, max_depth=3, n_estimators=2 ..................
+    [08:57:21] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.5, max_depth=3, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.5, max_depth=3, n_estimators=2 ..................
+    [08:57:21] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.5, max_depth=3, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.5, max_depth=3, n_estimators=5 ..................
+    [08:57:21] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.5, max_depth=3, n_estimators=5, total=   0.3s
+    [CV] learning_rate=0.5, max_depth=3, n_estimators=5 ..................
+    [08:57:21] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.5, max_depth=3, n_estimators=5, total=   0.3s
+    [CV] learning_rate=0.5, max_depth=3, n_estimators=10 .................
+    [08:57:21] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.5, max_depth=3, n_estimators=10, total=   0.4s
+    [CV] learning_rate=0.5, max_depth=3, n_estimators=10 .................
+    [08:57:22] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.5, max_depth=3, n_estimators=10, total=   0.4s
+    [CV] learning_rate=0.5, max_depth=5, n_estimators=2 ..................
+    [08:57:22] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.5, max_depth=5, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.5, max_depth=5, n_estimators=2 ..................
+    [08:57:22] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.5, max_depth=5, n_estimators=2, total=   0.2s
+    [CV] learning_rate=0.5, max_depth=5, n_estimators=5 ..................
+    [08:57:23] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.5, max_depth=5, n_estimators=5, total=   0.3s
+    [CV] learning_rate=0.5, max_depth=5, n_estimators=5 ..................
+    [08:57:23] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] ... learning_rate=0.5, max_depth=5, n_estimators=5, total=   0.3s
+    [CV] learning_rate=0.5, max_depth=5, n_estimators=10 .................
+    [08:57:23] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.5, max_depth=5, n_estimators=10, total=   0.5s
+    [CV] learning_rate=0.5, max_depth=5, n_estimators=10 .................
+    [08:57:24] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    [CV] .. learning_rate=0.5, max_depth=5, n_estimators=10, total=   0.5s
+    
+    
+    
+    [Parallel(n_jobs=1)]: Done  54 out of  54 | elapsed:   16.2s finished
+    
+    
+    
+    [08:57:25] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    
+    
+    Best parameters are: 
+    {'learning_rate': 0.5, 'max_depth': 5, 'n_estimators': 10}
+    
+
+In [41]:
+
+    
+    
+    # Getting the scores for all the score metrics used here
+    xgb_model, xgb_train_auc, xgb_test_auc, xgb_train_accuracy, xgb_test_accuracy,xgb_f1, xgb_precision,xgb_recall,xgb_train_log, xgb_test_log= check_scores(xgb_optimal_model, X_train, X_test )
+    
+    
+    
+    The accuracy on train dataset is 0.830672504771528
+    The accuracy on test dataset is 0.825272800754412
+    
+    Train confusion matrix:
+    [[25730  4177]
+     [ 3364 11264]]
+    
+    Test confusion matrix:
+    [[8566 1419]
+     [1175 3686]]
+    
+    ROC on train data: 0.9070705299819286
+    ROC on test data: 0.9015875283816488
+    
+    Train log loss: 0.3602193490127893
+    Test log loss: 0.36868035877731037
+    
+    F score is: 0.7397150311057596
+    Precision is: 0.7220372184133202
+    Recall is: 0.7582801892614688
+    
+
+# **Feature Importance For XGBoost**¶
+
+In [42]:
+
+    
+    
+    # Getting feature importance
+    
+    check_importance(xgb_model, X_train)
+    
+
+Out[42]:
+
+| Feature | Feature Importance  
+---|---|---  
+55 | Medical_History_23 | 0.19  
+9 | BMI | 0.15  
+38 | Medical_History_4 | 0.13  
+74 | Medical_Keyword_3 | 0.06  
+86 | Medical_Keyword_15 | 0.05  
+61 | Medical_History_30 | 0.05  
+46 | Medical_History_13 | 0.04  
+22 | InsuredInfo_7 | 0.04  
+21 | InsuredInfo_6 | 0.03  
+112 | Medical_Keyword_41 | 0.03  
+2 | Product_Info_4 | 0.03  
+39 | Medical_History_5 | 0.02  
+94 | Medical_Keyword_23 | 0.02  
+31 | Family_Hist_1 | 0.02  
+52 | Medical_History_20 | 0.01  
+59 | Medical_History_28 | 0.01  
+37 | Medical_History_3 | 0.01  
+69 | Medical_History_39 | 0.01  
+33 | Family_Hist_3 | 0.01  
+24 | Insurance_History_2 | 0.01  
+0 | Product_Info_1 | 0.01  
+70 | Medical_History_40 | 0.01  
+20 | InsuredInfo_5 | 0.01  
+6 | Ins_Age | 0.01  
+106 | Medical_Keyword_35 | 0.01  
+17 | InsuredInfo_2 | 0.01  
+78 | Medical_Keyword_7 | 0.00  
+85 | Medical_Keyword_14 | 0.00  
+84 | Medical_Keyword_13 | 0.00  
+83 | Medical_Keyword_12 | 0.00  
+115 | Medical_Keyword_44 | 0.00  
+82 | Medical_Keyword_11 | 0.00  
+81 | Medical_Keyword_10 | 0.00  
+80 | Medical_Keyword_9 | 0.00  
+79 | Medical_Keyword_8 | 0.00  
+116 | Medical_Keyword_45 | 0.00  
+87 | Medical_Keyword_16 | 0.00  
+77 | Medical_Keyword_6 | 0.00  
+117 | Medical_Keyword_46 | 0.00  
+76 | Medical_Keyword_5 | 0.00  
+75 | Medical_Keyword_4 | 0.00  
+118 | Medical_Keyword_47 | 0.00  
+73 | Medical_Keyword_2 | 0.00  
+72 | Medical_Keyword_1 | 0.00  
+71 | Medical_History_41 | 0.00  
+114 | Medical_Keyword_43 | 0.00  
+88 | Medical_Keyword_17 | 0.00  
+113 | Medical_Keyword_42 | 0.00  
+104 | Medical_Keyword_33 | 0.00  
+105 | Medical_Keyword_34 | 0.00  
+103 | Medical_Keyword_32 | 0.00  
+102 | Medical_Keyword_31 | 0.00  
+101 | Medical_Keyword_30 | 0.00  
+100 | Medical_Keyword_29 | 0.00  
+99 | Medical_Keyword_28 | 0.00  
+98 | Medical_Keyword_27 | 0.00  
+97 | Medical_Keyword_26 | 0.00  
+107 | Medical_Keyword_36 | 0.00  
+95 | Medical_Keyword_24 | 0.00  
+108 | Medical_Keyword_37 | 0.00  
+109 | Medical_Keyword_38 | 0.00  
+110 | Medical_Keyword_39 | 0.00  
+111 | Medical_Keyword_40 | 0.00  
+93 | Medical_Keyword_22 | 0.00  
+92 | Medical_Keyword_21 | 0.00  
+91 | Medical_Keyword_20 | 0.00  
+90 | Medical_Keyword_19 | 0.00  
+89 | Medical_Keyword_18 | 0.00  
+96 | Medical_Keyword_25 | 0.00  
+60 | Medical_History_29 | 0.00  
+68 | Medical_History_38 | 0.00  
+16 | InsuredInfo_1 | 0.00  
+32 | Family_Hist_2 | 0.00  
+30 | Insurance_History_9 | 0.00  
+29 | Insurance_History_8 | 0.00  
+28 | Insurance_History_7 | 0.00  
+27 | Insurance_History_5 | 0.00  
+26 | Insurance_History_4 | 0.00  
+25 | Insurance_History_3 | 0.00  
+23 | Insurance_History_1 | 0.00  
+19 | InsuredInfo_4 | 0.00  
+18 | InsuredInfo_3 | 0.00  
+15 | Employment_Info_6 | 0.00  
+67 | Medical_History_37 | 0.00  
+14 | Employment_Info_5 | 0.00  
+13 | Employment_Info_4 | 0.00  
+12 | Employment_Info_3 | 0.00  
+11 | Employment_Info_2 | 0.00  
+10 | Employment_Info_1 | 0.00  
+8 | Wt | 0.00  
+7 | Ht | 0.00  
+5 | Product_Info_7 | 0.00  
+4 | Product_Info_6 | 0.00  
+3 | Product_Info_5 | 0.00  
+34 | Family_Hist_4 | 0.00  
+35 | Medical_History_1 | 0.00  
+36 | Medical_History_2 | 0.00  
+40 | Medical_History_6 | 0.00  
+66 | Medical_History_36 | 0.00  
+65 | Medical_History_35 | 0.00  
+64 | Medical_History_34 | 0.00  
+63 | Medical_History_33 | 0.00  
+62 | Medical_History_31 | 0.00  
+1 | Product_Info_3 | 0.00  
+58 | Medical_History_27 | 0.00  
+57 | Medical_History_26 | 0.00  
+56 | Medical_History_25 | 0.00  
+54 | Medical_History_22 | 0.00  
+53 | Medical_History_21 | 0.00  
+51 | Medical_History_19 | 0.00  
+50 | Medical_History_18 | 0.00  
+49 | Medical_History_17 | 0.00  
+48 | Medical_History_16 | 0.00  
+47 | Medical_History_14 | 0.00  
+45 | Medical_History_12 | 0.00  
+44 | Medical_History_11 | 0.00  
+43 | Medical_History_9 | 0.00  
+42 | Medical_History_8 | 0.00  
+41 | Medical_History_7 | 0.00  
+119 | Medical_Keyword_48 | 0.00  
+  
+### **Conclusion:**¶
+
+> Same trend is seen here.
+>
+> They all are giving similar scores also so it could be that same features
+> are contributing the most thus similar scores.
+
+# **Model Interpretability for XGBoost**¶
+
+## **Using Shap**¶
+
+In [43]:
+
+    
+    
+    # Interpretting the model using shaply
+    
+    xgb_explainer = shap.TreeExplainer(xgb_model)
+    xgb_shap_values = xgb_explainer.shap_values(X_shap)
+    shap.summary_plot(xgb_shap_values, X_shap, plot_type="dot")
+    
+
+![](__results___files/__results___89_0.png)
+
+> Again BMI is pushing towards class 0.
+>
+> MEdical history 4 pushing towards class 1.
+
+## **Dependence Plots**¶
+
+In [44]:
+
+    
+    
+    #PLotting for top 5 features
+    top_vars = ['BMI','Medical_Keyword_15','Medical_History_4','Product_Info_4','Medical_History_23']
+    index_top_vars =[list(X_train.columns).index(var) for var in top_vars]
+    
+    for elem in index_top_vars:
+        shap.dependence_plot(elem, xgb_shap_values, X_train)
+    
+
+![](__results___files/__results___92_0.png)
+
+![](__results___files/__results___92_1.png)
+
+![](__results___files/__results___92_2.png)
+
+![](__results___files/__results___92_3.png)
+
+![](__results___files/__results___92_4.png)
+
+> For product info 4 and wt we see some interesting trend
+
+# **Logistic Regression**¶
+
+In [45]:
+
+    
+    
+    # Parameter grid for Logistic Regression
+    solvers = ['lbfgs']
+    penalty = ['l2']
+    c_values = [100, 10, 1.0, 0.1, 0.01]
+    lr_parameters = dict(solver=solvers,penalty=penalty,C=c_values)# define grid search
+    
+    #finding the best model
+    lr_optimal_model = grid_search(LogisticRegression( max_iter=5000), lr_parameters, X_train, Y_train)
+    
+    
+    
+    Fitting 2 folds for each of 5 candidates, totalling 10 fits
+    [CV] C=100, penalty=l2, solver=lbfgs .................................
+    
+    
+    
+    [Parallel(n_jobs=1)]: Using backend SequentialBackend with 1 concurrent workers.
+    
+    
+    
+    [CV] .................. C=100, penalty=l2, solver=lbfgs, total=  25.2s
+    [CV] C=100, penalty=l2, solver=lbfgs .................................
+    
+    
+    
+    [Parallel(n_jobs=1)]: Done   1 out of   1 | elapsed:   25.2s remaining:    0.0s
+    
+    
+    
+    [CV] .................. C=100, penalty=l2, solver=lbfgs, total=  28.0s
+    [CV] C=10, penalty=l2, solver=lbfgs ..................................
+    [CV] ................... C=10, penalty=l2, solver=lbfgs, total=  26.8s
+    [CV] C=10, penalty=l2, solver=lbfgs ..................................
+    [CV] ................... C=10, penalty=l2, solver=lbfgs, total=  29.6s
+    [CV] C=1.0, penalty=l2, solver=lbfgs .................................
+    [CV] .................. C=1.0, penalty=l2, solver=lbfgs, total=  24.8s
+    [CV] C=1.0, penalty=l2, solver=lbfgs .................................
+    [CV] .................. C=1.0, penalty=l2, solver=lbfgs, total=  21.9s
+    [CV] C=0.1, penalty=l2, solver=lbfgs .................................
+    [CV] .................. C=0.1, penalty=l2, solver=lbfgs, total=  18.1s
+    [CV] C=0.1, penalty=l2, solver=lbfgs .................................
+    [CV] .................. C=0.1, penalty=l2, solver=lbfgs, total=  15.3s
+    [CV] C=0.01, penalty=l2, solver=lbfgs ................................
+    [CV] ................. C=0.01, penalty=l2, solver=lbfgs, total=   9.7s
+    [CV] C=0.01, penalty=l2, solver=lbfgs ................................
+    [CV] ................. C=0.01, penalty=l2, solver=lbfgs, total=   7.5s
+    
+    
+    
+    [Parallel(n_jobs=1)]: Done  10 out of  10 | elapsed:  3.4min finished
+    
+    
+    
+    
+    Best parameters are: 
+    {'C': 10, 'penalty': 'l2', 'solver': 'lbfgs'}
+    
+
+In [46]:
+
+    
+    
+    # Getting the scores for all the score metrics used here
+    
+    lr_model, lr_train_auc, lr_test_auc, lr_train_accuracy, lr_test_accuracy,lr_f1, lr_precision, lr_recall,lr_train_log, lr_test_log = check_scores(lr_optimal_model, X_train, X_test )
+    
+    
+    
+    The accuracy on train dataset is 0.8131357359380262
+    The accuracy on test dataset is 0.8097804122322511
+    
+    Train confusion matrix:
+    [[26084  3823]
+     [ 4499 10129]]
+    
+    Test confusion matrix:
+    [[8711 1274]
+     [1550 3311]]
+    
+    ROC on train data: 0.8852870957666332
+    ROC on test data: 0.8810632529745039
+    
+    Train log loss: 0.3957111298769975
+    Test log loss: 0.40146141550953307
+    
+    F score is: 0.7010374761803939
+    Precision is: 0.7221374045801526
+    Recall is: 0.6811355688130014
+    
+
+# **Feature Importance For Logistic Regression**¶
+
+In [47]:
+
+    
+    
+    # Making a dataframe with coefficients and the feature names respectively
+    importance_df_lr = pd.concat([ pd.DataFrame(data =((X_train.columns).values).reshape(-1,1), columns = ['Feature']), pd.DataFrame(data =np.round(lr_optimal_model.coef_,2).reshape(-1,1), columns = ['Feature Importance'])], axis=1 )
+    importance_df_lr.sort_values(by=['Feature Importance'],ascending=False, inplace = True)
+    importance_df_lr
+    
+
+Out[47]:
+
+| Feature | Feature Importance  
+---|---|---  
+112 | Medical_Keyword_41 | 1.97  
+7 | Ht | 1.72  
+33 | Family_Hist_3 | 1.37  
+52 | Medical_History_20 | 1.33  
+38 | Medical_History_4 | 1.25  
+2 | Product_Info_4 | 0.84  
+114 | Medical_Keyword_43 | 0.84  
+70 | Medical_History_40 | 0.80  
+83 | Medical_Keyword_12 | 0.79  
+44 | Medical_History_11 | 0.64  
+77 | Medical_Keyword_6 | 0.63  
+116 | Medical_Keyword_45 | 0.62  
+49 | Medical_History_17 | 0.61  
+100 | Medical_Keyword_29 | 0.53  
+62 | Medical_History_31 | 0.52  
+34 | Family_Hist_4 | 0.46  
+41 | Medical_History_7 | 0.40  
+32 | Family_Hist_2 | 0.40  
+55 | Medical_History_23 | 0.38  
+21 | InsuredInfo_6 | 0.35  
+101 | Medical_Keyword_30 | 0.35  
+97 | Medical_Keyword_26 | 0.34  
+93 | Medical_Keyword_22 | 0.33  
+47 | Medical_History_14 | 0.32  
+69 | Medical_History_39 | 0.31  
+91 | Medical_Keyword_20 | 0.27  
+58 | Medical_History_27 | 0.27  
+115 | Medical_Keyword_44 | 0.26  
+37 | Medical_History_3 | 0.25  
+81 | Medical_Keyword_10 | 0.23  
+96 | Medical_Keyword_25 | 0.22  
+25 | Insurance_History_3 | 0.21  
+31 | Family_Hist_1 | 0.21  
+110 | Medical_Keyword_39 | 0.20  
+78 | Medical_Keyword_7 | 0.20  
+98 | Medical_Keyword_27 | 0.19  
+54 | Medical_History_22 | 0.18  
+46 | Medical_History_13 | 0.15  
+103 | Medical_Keyword_32 | 0.14  
+87 | Medical_Keyword_16 | 0.14  
+76 | Medical_Keyword_5 | 0.14  
+5 | Product_Info_7 | 0.13  
+104 | Medical_Keyword_33 | 0.13  
+105 | Medical_Keyword_34 | 0.12  
+19 | InsuredInfo_4 | 0.12  
+73 | Medical_Keyword_2 | 0.11  
+28 | Insurance_History_7 | 0.11  
+60 | Medical_History_29 | 0.11  
+14 | Employment_Info_5 | 0.10  
+85 | Medical_Keyword_14 | 0.09  
+79 | Medical_Keyword_8 | 0.09  
+15 | Employment_Info_6 | 0.09  
+26 | Insurance_History_4 | 0.08  
+29 | Insurance_History_8 | 0.08  
+90 | Medical_Keyword_19 | 0.07  
+108 | Medical_Keyword_37 | 0.07  
+92 | Medical_Keyword_21 | 0.06  
+63 | Medical_History_33 | 0.06  
+10 | Employment_Info_1 | 0.06  
+71 | Medical_History_41 | 0.06  
+30 | Insurance_History_9 | 0.05  
+107 | Medical_Keyword_36 | 0.04  
+118 | Medical_Keyword_47 | 0.04  
+64 | Medical_History_34 | 0.02  
+53 | Medical_History_21 | 0.01  
+66 | Medical_History_36 | -0.00  
+1 | Product_Info_3 | -0.00  
+48 | Medical_History_16 | 0.00  
+18 | InsuredInfo_3 | -0.00  
+35 | Medical_History_1 | 0.00  
+36 | Medical_History_2 | 0.00  
+11 | Employment_Info_2 | -0.00  
+82 | Medical_Keyword_11 | -0.01  
+99 | Medical_Keyword_28 | -0.01  
+27 | Insurance_History_5 | -0.03  
+40 | Medical_History_6 | -0.03  
+67 | Medical_History_37 | -0.03  
+88 | Medical_Keyword_17 | -0.04  
+4 | Product_Info_6 | -0.05  
+89 | Medical_Keyword_18 | -0.05  
+72 | Medical_Keyword_1 | -0.07  
+43 | Medical_History_9 | -0.07  
+95 | Medical_Keyword_24 | -0.07  
+12 | Employment_Info_3 | -0.07  
+59 | Medical_History_28 | -0.10  
+13 | Employment_Info_4 | -0.11  
+42 | Medical_History_8 | -0.11  
+113 | Medical_Keyword_42 | -0.14  
+45 | Medical_History_12 | -0.16  
+117 | Medical_Keyword_46 | -0.17  
+94 | Medical_Keyword_23 | -0.18  
+84 | Medical_Keyword_13 | -0.20  
+56 | Medical_History_25 | -0.21  
+16 | InsuredInfo_1 | -0.22  
+111 | Medical_Keyword_40 | -0.23  
+23 | Insurance_History_1 | -0.24  
+57 | Medical_History_26 | -0.28  
+24 | Insurance_History_2 | -0.33  
+119 | Medical_Keyword_48 | -0.34  
+51 | Medical_History_19 | -0.41  
+50 | Medical_History_18 | -0.43  
+22 | InsuredInfo_7 | -0.46  
+75 | Medical_Keyword_4 | -0.46  
+20 | InsuredInfo_5 | -0.46  
+102 | Medical_Keyword_31 | -0.48  
+68 | Medical_History_38 | -0.50  
+80 | Medical_Keyword_9 | -0.68  
+3 | Product_Info_5 | -0.72  
+65 | Medical_History_35 | -0.78  
+0 | Product_Info_1 | -0.85  
+6 | Ins_Age | -1.05  
+109 | Medical_Keyword_38 | -1.33  
+106 | Medical_Keyword_35 | -1.80  
+61 | Medical_History_30 | -1.91  
+39 | Medical_History_5 | -2.22  
+17 | InsuredInfo_2 | -2.22  
+86 | Medical_Keyword_15 | -2.25  
+74 | Medical_Keyword_3 | -3.34  
+8 | Wt | -4.20  
+9 | BMI | -8.84  
+  
+In [48]:
+
+    
+    
+    # Plotting feature vs importance
+    fig = plt.figure(figsize = (15, 8))
+    
+    values =importance_df_lr[importance_df_lr['Feature Importance']>0]['Feature Importance'].values
+    
+    features = importance_df_lr[importance_df_lr['Feature Importance']>0]['Feature'].values
+    
+    plt.bar(features, values, color ='blue',
+              width = 0.4)
+    plt.xticks( rotation='vertical')
+    plt.show()
+    
+
+![](__results___files/__results___99_0.png)
+
+#### **Conclusion**¶
+
+> **And again the same pattern when doing feature importance**
+
+# **Model Interpretability for logistic regression**¶
+
+## **Using Lime**¶
+
+In [49]:
+
+    
+    
+    # Interpretting the model using lime
+    interpret_with_lime(lr_model,X_test)
+    
+
+### **Findings**¶
+
+> Only BMI and medical history 4 pushing towards class 0
+
+# **Max Voting Model**¶
+
+In [50]:
+
+    
+    
+    # Appending all the models to estimators list
+    estimators = []
+    
+    estimators.append(('logistic', lr_optimal_model))
+    estimators.append(('XGB', xgb_optimal_model))
+    estimators.append(('GB', gb_optimal_model))
+    estimators.append(('rf', rf_optimal_model))
+    
+    # create the voting model
+    voting_model = VotingClassifier(estimators, voting='soft')
+    
+    voting_model.fit(X_train, Y_train)
+    
+    
+    
+    [09:03:04] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    
+
+Out[50]:
+
+    
+    
+    VotingClassifier(estimators=[('logistic',
+                                  LogisticRegression(C=10, max_iter=5000)),
+                                 ('XGB',
+                                  XGBClassifier(base_score=0.5, booster='gbtree',
+                                                colsample_bylevel=1,
+                                                colsample_bynode=1,
+                                                colsample_bytree=1, gamma=0,
+                                                gpu_id=-1, importance_type='gain',
+                                                interaction_constraints='',
+                                                learning_rate=0.5, max_delta_step=0,
+                                                max_depth=5, min_child_weight=1,
+                                                missing=nan,
+                                                monotone_con...
+                                                n_estimators=10, n_jobs=4,
+                                                num_parallel_tree=1, random_state=0,
+                                                reg_alpha=0, reg_lambda=1,
+                                                scale_pos_weight=1, subsample=1,
+                                                tree_method='exact',
+                                                validate_parameters=1,
+                                                verbosity=None)),
+                                 ('GB',
+                                  GradientBoostingClassifier(max_depth=5,
+                                                             n_estimators=250)),
+                                 ('rf',
+                                  RandomForestClassifier(max_depth=8,
+                                                         min_samples_leaf=50,
+                                                         min_samples_split=150,
+                                                         n_estimators=80))],
+                     voting='soft')
+
+In [51]:
+
+    
+    
+    # Getting all the scores and errors
+    voting_model, voting_train_auc, voting_test_auc, voting_train_accuracy, voting_test_accuracy, voting_f1, voting_precision, voting_recall, voting_train_log, voting_test_log = check_scores(voting_model, X_train, X_test )
+    
+    
+    
+    The accuracy on train dataset is 0.8390928483215448
+    The accuracy on test dataset is 0.8284386366698101
+    
+    Train confusion matrix:
+    [[26519  3388]
+     [ 3778 10850]]
+    
+    Test confusion matrix:
+    [[8816 1169]
+     [1378 3483]]
+    
+    ROC on train data: 0.9175054349277583
+    ROC on test data: 0.9039957179134264
+    
+    Train log loss: 0.3583130602902759
+    Test log loss: 0.3753932938094437
+    
+    F score is: 0.7322611163670767
+    Precision is: 0.7487102321582115
+    Recall is: 0.7165192347253652
+    
+
+# **Stacked Model**¶
+
+In [52]:
+
+    
+    
+    #Building a stacked classifier
+    stacked_classifier = StackingClassifier(classifiers =[lr_optimal_model, xgb_optimal_model, gb_model], meta_classifier = RandomForestClassifier(), use_probas = True, use_features_in_secondary = True)
+    
+    # training of stacked model
+    stacked_model = stacked_classifier.fit(X_train, Y_train)   
+    
+    
+    
+    [09:05:10] WARNING: ../src/learner.cc:1095: Starting in XGBoost 1.3.0, the default evaluation metric used with the objective 'binary:logistic' was changed from 'error' to 'logloss'. Explicitly set eval_metric if you'd like to restore the old behavior.
+    
+
+In [53]:
+
+    
+    
+    stacked_model, stacked_train_auc, stacked_test_auc, stacked_train_accuracy, stacked_test_accuracy, stacked_f1, stacked_precision, stacked_recall, stacked_train_log, stacked_test_log = check_scores(stacked_model, X_train, X_test )
+    
+    
+    
+    The accuracy on train dataset is 1.0
+    The accuracy on test dataset is 0.8290448605685034
+    
+    Train confusion matrix:
+    [[29907     0]
+     [    0 14628]]
+    
+    Test confusion matrix:
+    [[8737 1248]
+     [1290 3571]]
+    
+    ROC on train data: 1.0
+    ROC on test data: 0.9051203528188807
+    
+    Train log loss: 0.0768839296653117
+    Test log loss: 0.39853520373919976
+    
+    F score is: 0.7378099173553718
+    Precision is: 0.7410251089437643
+    Recall is: 0.7346225056572722
+    
+
+# **Models And Their Accuracies**¶
+
+In [54]:
+
+    
+    
+    # Making a dataframe of all the scores for every model
+    
+    scores_ = [("Random Forest", rf_train_auc, rf_test_auc, rf_train_accuracy, rf_test_accuracy,rf_train_log, rf_test_log,rf_f1, rf_precision, rf_recall),
+    ("Gradient Boosting",  gb_train_auc, gb_test_auc, gb_train_accuracy, gb_test_accuracy,gb_train_log, gb_test_log,gb_f1, gb_precision,gb_recall,),
+    ("XG Boost", xgb_train_auc, xgb_test_auc, xgb_train_accuracy, xgb_test_accuracy,xgb_train_log, xgb_test_log,xgb_f1, xgb_precision, xgb_recall),
+    ("Logistic Regression", lr_train_auc, lr_test_auc, lr_train_accuracy, lr_test_accuracy,lr_train_log, lr_test_log,lr_f1, lr_precision, lr_recall,),
+    ("Voting Classifier", voting_train_auc, voting_test_auc, voting_train_accuracy, voting_test_accuracy, voting_train_log, voting_test_log, voting_f1, voting_precision, voting_recall),
+    ("Stacked Model", stacked_train_auc, stacked_test_auc, stacked_train_accuracy, stacked_test_accuracy, stacked_train_log, stacked_test_log, stacked_f1, stacked_precision, stacked_recall)]
+    
+    Scores_ =pd.DataFrame(data = scores_, columns=['Model Name', 'Train ROC', 'Test ROC', 'Train Accuracy', 'Test Accuracy', 'Train Log Loss','Test Log Loss','F-Score', 'Precision','Recall',])
+    Scores_.set_index('Model Name', inplace = True)
+    
+    Scores_
+    
+
+Out[54]:
+
+| Train ROC | Test ROC | Train Accuracy | Test Accuracy | Train Log Loss | Test Log Loss | F-Score | Precision | Recall  
+---|---|---|---|---|---|---|---|---|---  
+Model Name |  |  |  |  |  |  |  |  |   
+Random Forest | 0.890884 | 0.884364 | 0.807679 | 0.799811 | 0.431984 | 0.436269 | 0.651501 | 0.757567 | 0.571487  
+Gradient Boosting | 0.937745 | 0.909656 | 0.864152 | 0.834568 | 0.303203 | 0.353054 | 0.748978 | 0.744262 | 0.753754  
+XG Boost | 0.907071 | 0.901588 | 0.830673 | 0.825273 | 0.360219 | 0.368680 | 0.739715 | 0.722037 | 0.758280  
+Logistic Regression | 0.885287 | 0.881063 | 0.813136 | 0.809780 | 0.395711 | 0.401461 | 0.701037 | 0.722137 | 0.681136  
+Voting Classifier | 0.917505 | 0.903996 | 0.839093 | 0.828439 | 0.358313 | 0.375393 | 0.732261 | 0.748710 | 0.716519  
+Stacked Model | 1.000000 | 0.905120 | 1.000000 | 0.829045 | 0.076884 | 0.398535 | 0.737810 | 0.741025 | 0.734623  
+  
+# **Final Results**¶
+
+> **Gradient Boosting, Voting Classifier and Stacked models are performing
+> really well. Their train and test errors and also the roc scores and f
+> scores are really close and good.**
+

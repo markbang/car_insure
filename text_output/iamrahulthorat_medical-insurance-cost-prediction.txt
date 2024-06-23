@@ -1,0 +1,706 @@
+In [1]:
+
+    
+    
+    import pandas as pd
+    
+    from sklearn.model_selection import train_test_split
+    
+    from sklearn.linear_model import LinearRegression
+    from sklearn.svm import SVR #support vector regressor
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.ensemble import GradientBoostingRegressor
+    
+    import matplotlib.pyplot as plt
+    
+    from sklearn import metrics
+    
+    
+    
+    /opt/conda/lib/python3.10/site-packages/scipy/__init__.py:146: UserWarning: A NumPy version >=1.16.5 and <1.23.0 is required for this version of SciPy (detected version 1.23.5
+      warnings.warn(f"A NumPy version >={np_minversion} and <{np_maxversion}"
+    
+
+In [2]:
+
+    
+    
+    #loading the dataset to a pandas dataframe
+    ins_dataset = pd.read_csv("/kaggle/input/insurance/insurance.csv")
+    
+
+In [3]:
+
+    
+    
+    #checking top 5 rows of the dataset
+    ins_dataset.head()
+    
+
+Out[3]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+  
+In [4]:
+
+    
+    
+    #checking last 5 rows of the dataset
+    ins_dataset.tail()
+    
+
+Out[4]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+1333 | 50 | male | 30.97 | 3 | no | northwest | 10600.5483  
+1334 | 18 | female | 31.92 | 0 | no | northeast | 2205.9808  
+1335 | 18 | female | 36.85 | 0 | no | southeast | 1629.8335  
+1336 | 21 | female | 25.80 | 0 | no | southwest | 2007.9450  
+1337 | 61 | female | 29.07 | 0 | yes | northwest | 29141.3603  
+  
+In [5]:
+
+    
+    
+    #checking number of rows and columns
+    ins_dataset.shape
+    
+
+Out[5]:
+
+    
+    
+    (1338, 7)
+
+In [6]:
+
+    
+    
+    #getting more information about the dataset
+    ins_dataset.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 1338 entries, 0 to 1337
+    Data columns (total 7 columns):
+     #   Column    Non-Null Count  Dtype  
+    ---  ------    --------------  -----  
+     0   age       1338 non-null   int64  
+     1   sex       1338 non-null   object 
+     2   bmi       1338 non-null   float64
+     3   children  1338 non-null   int64  
+     4   smoker    1338 non-null   object 
+     5   region    1338 non-null   object 
+     6   charges   1338 non-null   float64
+    dtypes: float64(2), int64(2), object(3)
+    memory usage: 73.3+ KB
+    
+
+In [7]:
+
+    
+    
+    #checking null values in the dataset
+    ins_dataset.isnull()
+    
+
+Out[7]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | False | False | False | False | False | False | False  
+1 | False | False | False | False | False | False | False  
+2 | False | False | False | False | False | False | False  
+3 | False | False | False | False | False | False | False  
+4 | False | False | False | False | False | False | False  
+... | ... | ... | ... | ... | ... | ... | ...  
+1333 | False | False | False | False | False | False | False  
+1334 | False | False | False | False | False | False | False  
+1335 | False | False | False | False | False | False | False  
+1336 | False | False | False | False | False | False | False  
+1337 | False | False | False | False | False | False | False  
+  
+1338 rows Ã 7 columns
+
+In [8]:
+
+    
+    
+    ins_dataset.isnull().sum()
+    
+
+Out[8]:
+
+    
+    
+    age         0
+    sex         0
+    bmi         0
+    children    0
+    smoker      0
+    region      0
+    charges     0
+    dtype: int64
+
+> We dont have any missing values in this dataset
+
+In [9]:
+
+    
+    
+    #statistical measures of thge dataset
+    ins_dataset.describe() #displays stats for numerical columns only
+    
+
+Out[9]:
+
+| age | bmi | children | charges  
+---|---|---|---|---  
+count | 1338.000000 | 1338.000000 | 1338.000000 | 1338.000000  
+mean | 39.207025 | 30.663397 | 1.094918 | 13270.422265  
+std | 14.049960 | 6.098187 | 1.205493 | 12110.011237  
+min | 18.000000 | 15.960000 | 0.000000 | 1121.873900  
+25% | 27.000000 | 26.296250 | 0.000000 | 4740.287150  
+50% | 39.000000 | 30.400000 | 1.000000 | 9382.033000  
+75% | 51.000000 | 34.693750 | 2.000000 | 16639.912515  
+max | 64.000000 | 53.130000 | 5.000000 | 63770.428010  
+  
+In [10]:
+
+    
+    
+    #ins_dataset.describe(include="all") #displays stats for numerical as well as categorical columns
+    
+
+# Data Preprocessing¶
+
+**Converting categorical columns --sex, smoker, region to numerical values**
+
+In [11]:
+
+    
+    
+    ins_dataset["sex"].unique()
+    
+
+Out[11]:
+
+    
+    
+    array(['female', 'male'], dtype=object)
+
+In [12]:
+
+    
+    
+    #converting sex column values to numeric values
+    ins_dataset["sex"] = ins_dataset["sex"].map({"female":0, "male":1})
+    
+
+In [13]:
+
+    
+    
+    ins_dataset["smoker"].unique()
+    
+
+Out[13]:
+
+    
+    
+    array(['yes', 'no'], dtype=object)
+
+In [14]:
+
+    
+    
+    #converting smoker column values to numeric values
+    ins_dataset["smoker"] = ins_dataset["smoker"].map({"yes":0, "no":1})
+    
+
+In [15]:
+
+    
+    
+    ins_dataset["region"].unique()
+    
+
+Out[15]:
+
+    
+    
+    array(['southwest', 'southeast', 'northwest', 'northeast'], dtype=object)
+
+In [16]:
+
+    
+    
+    #converting region column values to numeric values
+    ins_dataset["region"] = ins_dataset["region"].map({"southwest":0, "southeast":1, "northwest":2, "northeast":3})
+    
+
+In [17]:
+
+    
+    
+    ins_dataset.head()
+    
+
+Out[17]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | 0 | 27.900 | 0 | 0 | 0 | 16884.92400  
+1 | 18 | 1 | 33.770 | 1 | 1 | 1 | 1725.55230  
+2 | 28 | 1 | 33.000 | 3 | 1 | 1 | 4449.46200  
+3 | 33 | 1 | 22.705 | 0 | 1 | 2 | 21984.47061  
+4 | 32 | 1 | 28.880 | 0 | 1 | 2 | 3866.85520  
+  
+In [18]:
+
+    
+    
+    ins_dataset.columns
+    
+
+Out[18]:
+
+    
+    
+    Index(['age', 'sex', 'bmi', 'children', 'smoker', 'region', 'charges'], dtype='object')
+
+In [19]:
+
+    
+    
+    #separating the features and label
+    X = ins_dataset.drop(["charges"], axis=1)
+    
+
+In [20]:
+
+    
+    
+    y = ins_dataset["charges"]
+    
+
+# Train & Test Split¶
+
+In [21]:
+
+    
+    
+    #splitting X,Y into training and testing set
+    X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.2, random_state=42)
+    
+
+In [22]:
+
+    
+    
+    print(X.shape, X_train.shape, X_test.shape)
+    
+    
+    
+    (1338, 6) (1070, 6) (268, 6)
+    
+
+In [23]:
+
+    
+    
+    X_train
+    
+
+Out[23]:
+
+| age | sex | bmi | children | smoker | region  
+---|---|---|---|---|---|---  
+560 | 46 | 0 | 19.950 | 2 | 1 | 2  
+1285 | 47 | 0 | 24.320 | 0 | 1 | 3  
+1142 | 52 | 0 | 24.860 | 0 | 1 | 1  
+969 | 39 | 0 | 34.320 | 5 | 1 | 1  
+486 | 54 | 0 | 21.470 | 3 | 1 | 2  
+... | ... | ... | ... | ... | ... | ...  
+1095 | 18 | 0 | 31.350 | 4 | 1 | 3  
+1130 | 39 | 0 | 23.870 | 5 | 1 | 1  
+1294 | 58 | 1 | 25.175 | 0 | 1 | 3  
+860 | 37 | 0 | 47.600 | 2 | 0 | 0  
+1126 | 55 | 1 | 29.900 | 0 | 1 | 0  
+  
+1070 rows Ã 6 columns
+
+In [24]:
+
+    
+    
+    y_train
+    
+
+Out[24]:
+
+    
+    
+    560      9193.83850
+    1285     8534.67180
+    1142    27117.99378
+    969      8596.82780
+    486     12475.35130
+               ...     
+    1095     4561.18850
+    1130     8582.30230
+    1294    11931.12525
+    860     46113.51100
+    1126    10214.63600
+    Name: charges, Length: 1070, dtype: float64
+
+# Model Training¶
+
+In [25]:
+
+    
+    
+    lr = LinearRegression()
+    lr.fit(X_train, y_train)
+    
+
+Out[25]:
+
+    
+    
+    LinearRegression()
+
+**In a Jupyter environment, please rerun this cell to show the HTML
+representation or trust the notebook.  
+On GitHub, the HTML representation is unable to render, please try loading
+this page with nbviewer.org.**
+
+LinearRegression
+
+    
+    
+    LinearRegression()
+
+In [26]:
+
+    
+    
+    svm = SVR()
+    svm.fit(X_train, y_train)
+    
+
+Out[26]:
+
+    
+    
+    SVR()
+
+**In a Jupyter environment, please rerun this cell to show the HTML
+representation or trust the notebook.  
+On GitHub, the HTML representation is unable to render, please try loading
+this page with nbviewer.org.**
+
+SVR
+
+    
+    
+    SVR()
+
+In [27]:
+
+    
+    
+    rf = RandomForestRegressor()
+    rf.fit(X_train, y_train)
+    
+
+Out[27]:
+
+    
+    
+    RandomForestRegressor()
+
+**In a Jupyter environment, please rerun this cell to show the HTML
+representation or trust the notebook.  
+On GitHub, the HTML representation is unable to render, please try loading
+this page with nbviewer.org.**
+
+RandomForestRegressor
+
+    
+    
+    RandomForestRegressor()
+
+In [28]:
+
+    
+    
+    gbr = GradientBoostingRegressor()
+    gbr.fit(X_train, y_train)
+    
+
+Out[28]:
+
+    
+    
+    GradientBoostingRegressor()
+
+**In a Jupyter environment, please rerun this cell to show the HTML
+representation or trust the notebook.  
+On GitHub, the HTML representation is unable to render, please try loading
+this page with nbviewer.org.**
+
+GradientBoostingRegressor
+
+    
+    
+    GradientBoostingRegressor()
+
+# Prediction on Test Data¶
+
+In [29]:
+
+    
+    
+    y_pred1 = lr.predict(X_test)
+    y_pred2 = svm.predict(X_test)
+    y_pred3 = rf.predict(X_test)
+    y_pred4 = gbr.predict(X_test)
+    
+    df1 = pd.DataFrame({"Actual":y_test, "lr":y_pred1, "svm":y_pred2, "rf":y_pred3, "gbr":y_pred4})
+    
+
+In [30]:
+
+    
+    
+    df1
+    
+
+Out[30]:
+
+| Actual | lr | svm | rf | gbr  
+---|---|---|---|---|---  
+764 | 9095.06825 | 8924.407244 | 9548.340804 | 9423.746122 | 11001.128629  
+887 | 5272.17580 | 7116.295018 | 9492.758696 | 4991.842603 | 5840.174656  
+890 | 29330.98315 | 36909.013521 | 9648.606829 | 28380.434784 | 28001.980112  
+1293 | 9301.89355 | 9507.874691 | 9555.103129 | 9488.657030 | 9745.291602  
+259 | 33750.29180 | 27013.350008 | 9420.768462 | 34724.243256 | 33639.100981  
+... | ... | ... | ... | ... | ...  
+109 | 47055.53210 | 39116.968669 | 9648.743773 | 47233.036048 | 45431.423211  
+575 | 12222.89830 | 11814.555568 | 9625.305132 | 12603.797092 | 12465.025294  
+535 | 6067.12675 | 7638.107736 | 9504.378670 | 6443.247904 | 6974.336525  
+543 | 63770.42801 | 40959.081722 | 9604.955520 | 46932.419999 | 47862.047791  
+846 | 9872.70100 | 12258.228529 | 9590.941355 | 10071.316500 | 10289.655388  
+  
+268 rows Ã 5 columns
+
+**Visualising Actual vs Predicted Values**
+
+In [31]:
+
+    
+    
+    plt.subplot(2,2,1)
+    plt.plot(df1["Actual"].iloc[0:11], label="Actual")
+    plt.plot(df1["lr"].iloc[0:11], label="lr")
+    plt.legend()
+    
+    plt.subplot(2,2,2)
+    plt.plot(df1["Actual"].iloc[0:11], label="Actual")
+    plt.plot(df1["svm"].iloc[0:11], label="svm")
+    plt.legend()
+    
+    plt.subplot(2,2,3)
+    plt.plot(df1["Actual"].iloc[0:11], label="Actual")
+    plt.plot(df1["rf"].iloc[0:11], label="rf")
+    plt.legend()
+    
+    plt.subplot(2,2,4)
+    plt.plot(df1["Actual"].iloc[0:11], label="Actual")
+    plt.plot(df1["gbr"].iloc[0:11], label="gbr")
+    plt.legend()
+    
+    plt.tight_layout()
+    
+
+![](__results___files/__results___37_0.png)
+
+> From the above plots we can observe that Model-3 and Model-4 appears to be
+> pretty close to the actual values.
+>
+> Comparing Model-3 and Model-4 -- Model-4 is better than Model-3
+
+**Let's further evaluate our model to select the best one**
+
+# Evaluating the Algorithm¶
+
+In [32]:
+
+    
+    
+    #r-squared
+    rs1 = metrics.r2_score(y_test, y_pred1)
+    rs2 = metrics.r2_score(y_test, y_pred2)
+    rs3 = metrics.r2_score(y_test, y_pred3)
+    rs4 = metrics.r2_score(y_test, y_pred4)
+    
+
+In [33]:
+
+    
+    
+    print(rs1, rs2, rs3, rs4)
+    
+    
+    
+    0.7833463107364539 -0.07230117560847282 0.8673502954513399 0.8779726251291786
+    
+
+> From these R-squared values, we can see that Model-4 is performing better
+> than other models.
+
+In [34]:
+
+    
+    
+    #mean absolute error
+    mae1 = metrics.mean_absolute_error(y_test, y_pred1)
+    mae2 = metrics.mean_absolute_error(y_test, y_pred2)
+    mae3 = metrics.mean_absolute_error(y_test, y_pred3)
+    mae4 = metrics.mean_absolute_error(y_test, y_pred4)
+    
+
+In [35]:
+
+    
+    
+    print(mae1, mae2, mae3, mae4)
+    
+    
+    
+    4186.508898366434 8592.550593461085 2464.3412223922896 2447.951558054584
+    
+
+> From these Mean Absolute Error values, we can see that Model-4 is performing
+> better than others (as lower the MAE --considered as better).
+
+# Predictive System for New Data¶
+
+In [36]:
+
+    
+    
+    new_data = {"age":35, "sex":1, "bmi":40.50, "children":4, "smoker":1, "region":2}
+    df = pd.DataFrame(new_data, index=[0])
+    df
+    
+
+Out[36]:
+
+| age | sex | bmi | children | smoker | region  
+---|---|---|---|---|---|---  
+0 | 35 | 1 | 40.5 | 4 | 1 | 2  
+  
+In [37]:
+
+    
+    
+    #predicting charges for the newly entered customer data
+    new_pred = gbr.predict(df)
+    print(new_pred)
+    
+    
+    
+    [8833.4257988]
+    
+
+# Saving the model using Joblib¶
+
+Before deployment we have to train the model on entire dataset.
+
+We have trained our model on X_train and y_train just to evaluate the model
+and to find best one.
+
+As we already found out best model --GradientBoostingRegressor; now we are
+going to train gbr on entire dataset.
+
+In [38]:
+
+    
+    
+    #training gbr model on entire dataset
+    gbr = GradientBoostingRegressor()
+    gbr.fit(X,y)
+    
+
+Out[38]:
+
+    
+    
+    GradientBoostingRegressor()
+
+**In a Jupyter environment, please rerun this cell to show the HTML
+representation or trust the notebook.  
+On GitHub, the HTML representation is unable to render, please try loading
+this page with nbviewer.org.**
+
+GradientBoostingRegressor
+
+    
+    
+    GradientBoostingRegressor()
+
+> Now our model is trained on entire dataset.
+
+In [39]:
+
+    
+    
+    import joblib
+    
+
+In [40]:
+
+    
+    
+    #saving the model
+    joblib.dump(gbr, "med_insurance_cost_pred_model_gbr")
+    
+
+Out[40]:
+
+    
+    
+    ['med_insurance_cost_pred_model_gbr']
+
+> Now in future we can perform prediction using this saved model.
+
+In [41]:
+
+    
+    
+    model = joblib.load("med_insurance_cost_pred_model_gbr")
+    
+
+In [42]:
+
+    
+    
+    model.predict(df)
+    
+
+Out[42]:
+
+    
+    
+    array([9202.58697802])
+

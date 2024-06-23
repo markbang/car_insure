@@ -1,0 +1,618 @@
+# Hypothesis Testing and EDA
+
+#### _Francis Paul C. Flores_
+
+#### _April 20, 2018_
+
+# Introduction
+
+Given the simplicity, ease to comprehend, and size of the dataset, make it
+great for introductory kernels like this one that is intended for people with
+little knowledge of regression analysis. At the end of this kernel expect to
+learn more about most common type of regression: ordinary least squares. To
+give you some background, to make their profit, insurance companies should
+collect higher premium than the amount paid to the insured person. Due to
+this, insurance companies invests a lot of time, effort, and money in creating
+models that accurately predicts health care costs. In this kernel, we will try
+to build the most accurate model as possible but at the same time we would
+keep everything simple.
+
+## Load packages and dataset
+
+    
+    
+    # Load libraries
+    library(ggplot2)
+    library(ggthemes)
+    library(psych)
+    library(relaimpo)
+    
+    
+    # Read in our dataset
+    insurance <- read.csv("../input/insurance.csv")
+    
+    # Have a peek at our dataset
+    head(insurance, n = 5)
+    
+    
+    ##   age    sex    bmi children smoker    region   charges
+    ## 1  19 female 27.900        0    yes southwest 16884.924
+    ## 2  18   male 33.770        1     no southeast  1725.552
+    ## 3  28   male 33.000        3     no southeast  4449.462
+    ## 4  33   male 22.705        0     no northwest 21984.471
+    ## 5  32   male 28.880        0     no northwest  3866.855
+    
+    
+    str(insurance)
+    
+    
+    ## 'data.frame':    1338 obs. of  7 variables:
+    ##  $ age     : int  19 18 28 33 32 31 46 37 37 60 ...
+    ##  $ sex     : Factor w/ 2 levels "female","male": 1 2 2 2 2 1 1 1 2 1 ...
+    ##  $ bmi     : num  27.9 33.8 33 22.7 28.9 ...
+    ##  $ children: int  0 1 3 0 0 0 1 3 2 0 ...
+    ##  $ smoker  : Factor w/ 2 levels "no","yes": 2 1 1 1 1 1 1 1 1 1 ...
+    ##  $ region  : Factor w/ 4 levels "northeast","northwest",..: 4 3 3 2 2 3 3 2 1 2 ...
+    ##  $ charges : num  16885 1726 4449 21984 3867 ...
+
+As we can see, we are working with a rather small dataset with only 1338
+observations and 7 variables. What weâd be most interested here, is with the
+variable _charges_ , that is what we would try to predict.
+
+## Exploratory Data Analysis
+
+    
+    
+    # Descriptive Statistics
+    summary(insurance)
+    
+    
+    ##       age            sex           bmi           children     smoker    
+    ##  Min.   :18.00   female:662   Min.   :15.96   Min.   :0.000   no :1064  
+    ##  1st Qu.:27.00   male  :676   1st Qu.:26.30   1st Qu.:0.000   yes: 274  
+    ##  Median :39.00                Median :30.40   Median :1.000             
+    ##  Mean   :39.21                Mean   :30.66   Mean   :1.095             
+    ##  3rd Qu.:51.00                3rd Qu.:34.69   3rd Qu.:2.000             
+    ##  Max.   :64.00                Max.   :53.13   Max.   :5.000             
+    ##        region       charges     
+    ##  northeast:324   Min.   : 1122  
+    ##  northwest:325   1st Qu.: 4740  
+    ##  southeast:364   Median : 9382  
+    ##  southwest:325   Mean   :13270  
+    ##                  3rd Qu.:16640  
+    ##                  Max.   :63770
+
+The respondentsâ gender and region of origin is evenly distributed, having
+age ranging from 18 to 64 years old. Non-smokers outnumber smokers 4 to 1. The
+average, medical cost is USD 13,270 with a median value of USD 9382.
+
+    
+    
+    # Per region
+    describeBy(insurance$charges,insurance$region)
+    
+    
+    ## 
+    ##  Descriptive statistics by group 
+    ## group: northeast
+    ##    vars   n     mean      sd   median  trimmed     mad    min      max
+    ## X1    1 324 13406.38 11255.8 10057.65 11444.31 7806.78 1694.8 58571.07
+    ##       range skew kurtosis     se
+    ## X1 56876.28 1.48     1.68 625.32
+    ## -------------------------------------------------------- 
+    ## group: northwest
+    ##    vars   n     mean       sd median  trimmed     mad     min     max
+    ## X1    1 325 12417.58 11072.28 8965.8 10414.54 7001.14 1621.34 60021.4
+    ##       range skew kurtosis     se
+    ## X1 58400.06 1.67     2.53 614.18
+    ## -------------------------------------------------------- 
+    ## group: southeast
+    ##    vars   n     mean      sd  median  trimmed     mad     min      max
+    ## X1    1 364 14735.41 13971.1 9294.13 12563.65 8749.51 1121.87 63770.43
+    ##       range skew kurtosis     se
+    ## X1 62648.55 1.24     0.48 732.28
+    ## -------------------------------------------------------- 
+    ## group: southwest
+    ##    vars   n     mean       sd  median  trimmed     mad     min      max
+    ## X1    1 325 12346.94 11557.18 8798.59 10120.52 6329.39 1241.57 52590.83
+    ##       range skew kurtosis     se
+    ## X1 51349.26 1.67     2.03 641.08
+    
+    
+    ggplot(data = insurance,aes(region,charges)) + geom_boxplot(fill = c(2:5)) +
+      theme_classic() + ggtitle("Boxplot of Medical Charges per Region")
+
+![](__results___files/figure-html/unnamed-chunk-4-1.png)
+
+Bsed from above plot, we can disclose that region of origin doesnât have
+much impact with the amount of medical cost.
+
+    
+    
+    # Smoking status
+    describeBy(insurance$charges,insurance$smoker)
+    
+    
+    ## 
+    ##  Descriptive statistics by group 
+    ## group: no
+    ##    vars    n    mean      sd  median trimmed     mad     min      max
+    ## X1    1 1064 8434.27 5993.78 7345.41 7599.76 5477.15 1121.87 36910.61
+    ##       range skew kurtosis     se
+    ## X1 35788.73 1.53     3.12 183.75
+    ## -------------------------------------------------------- 
+    ## group: yes
+    ##    vars   n     mean       sd   median  trimmed      mad      min      max
+    ## X1    1 274 32050.23 11541.55 34456.35 31782.89 15167.19 12829.46 63770.43
+    ##       range skew kurtosis     se
+    ## X1 50940.97 0.13    -1.05 697.25
+    
+    
+    ggplot(data = insurance,aes(smoker,charges)) + geom_boxplot(fill = c(2:3)) +
+      theme_classic() + ggtitle("Boxplot of Medical Charges by Smoking Status")
+
+![](__results___files/figure-html/unnamed-chunk-5-1.png)
+
+On the other hand, the same cannot be said with smoking status. It can be
+clearly deceived that smokers spends a lot more in terms of medical expenses
+compared to non-smokers by almost 4x.
+
+    
+    
+    # By gender
+    describeBy(insurance$charges,insurance$sex)
+    
+    
+    ## 
+    ##  Descriptive statistics by group 
+    ## group: female
+    ##    vars   n     mean      sd  median  trimmed     mad     min      max
+    ## X1    1 662 12569.58 11128.7 9412.96 10455.16 7129.08 1607.51 63770.43
+    ##       range skew kurtosis     se
+    ## X1 62162.92 1.72     2.71 432.53
+    ## -------------------------------------------------------- 
+    ## group: male
+    ##    vars   n     mean       sd  median trimmed     mad     min      max
+    ## X1    1 676 13956.75 12971.03 9369.62 11825.4 8121.53 1121.87 62592.87
+    ##    range skew kurtosis     se
+    ## X1 61471 1.33     0.79 498.89
+    
+    
+    ggplot(data = insurance,aes(sex,charges)) + geom_boxplot(fill = c(2:3)) +
+      theme_classic() + ggtitle("Boxplot of Medical Charges by Gender")
+
+![](__results___files/figure-html/unnamed-chunk-6-1.png)
+
+Medical expenses doesnât seem to be affected by gender as well.
+
+    
+    
+    # By number of children
+    describeBy(insurance$charges,insurance$children)
+    
+    
+    ## 
+    ##  Descriptive statistics by group 
+    ## group: 0
+    ##    vars   n     mean       sd  median  trimmed      mad     min      max
+    ## X1    1 574 12365.98 12023.29 9856.95 10155.21 10067.29 1121.87 63770.43
+    ##       range skew kurtosis     se
+    ## X1 62648.55 1.53     1.95 501.84
+    ## -------------------------------------------------------- 
+    ## group: 1
+    ##    vars   n     mean       sd  median trimmed     mad     min      max
+    ## X1    1 324 12731.17 11823.63 8483.87 10364.8 5859.46 1711.03 58571.07
+    ##       range skew kurtosis     se
+    ## X1 56860.05 1.66     1.97 656.87
+    ## -------------------------------------------------------- 
+    ## group: 2
+    ##    vars   n     mean       sd  median  trimmed     mad  min      max
+    ## X1    1 240 15073.56 12891.37 9264.98 12895.82 6587.43 2304 49577.66
+    ##       range skew kurtosis     se
+    ## X1 47273.66 1.28     0.35 832.13
+    ## -------------------------------------------------------- 
+    ## group: 3
+    ##    vars   n     mean       sd   median  trimmed     mad     min     max
+    ## X1    1 157 15355.32 12330.87 10600.55 13220.71 6918.06 3443.06 60021.4
+    ##       range skew kurtosis     se
+    ## X1 56578.33 1.45     1.21 984.11
+    ## -------------------------------------------------------- 
+    ## group: 4
+    ##    vars  n     mean      sd   median  trimmed    mad     min      max
+    ## X1    1 25 13850.66 9139.22 11033.66 12401.81 7109.3 4504.66 40182.25
+    ##       range skew kurtosis      se
+    ## X1 35677.58 1.45     1.59 1827.84
+    ## -------------------------------------------------------- 
+    ## group: 5
+    ##    vars  n    mean      sd  median trimmed     mad    min      max
+    ## X1    1 18 8786.04 3808.44 8589.57 8402.35 3631.71 4687.8 19023.26
+    ##       range skew kurtosis     se
+    ## X1 14335.46 1.04     0.54 897.66
+    
+    
+    ggplot(data = insurance,aes(as.factor(children),charges)) + geom_boxplot(fill = c(2:7)) +
+      theme_classic() +  xlab("children") +
+      ggtitle("Boxplot of Medical Charges by Number of Children")
+
+![](__results___files/figure-html/unnamed-chunk-7-1.png)
+
+People with 5 children, on average, has less medical expenditures compared to
+the other groups.
+
+    
+    
+    # Create new variable derived from bmi
+    insurance$bmi30 <- ifelse(insurance$bmi>=30,"yes","no")
+    
+    # By obesity status
+    describeBy(insurance$charges,insurance$bmi30)
+    
+    
+    ## 
+    ##  Descriptive statistics by group 
+    ## group: no
+    ##    vars   n     mean      sd  median trimmed     mad     min      max
+    ## X1    1 631 10713.67 7843.54 8604.48 9772.74 7024.01 1121.87 38245.59
+    ##       range skew kurtosis     se
+    ## X1 37123.72 0.97     0.23 312.25
+    ## -------------------------------------------------------- 
+    ## group: yes
+    ##    vars   n     mean       sd  median  trimmed     mad     min      max
+    ## X1    1 707 15552.34 14552.32 9964.06 13451.03 7883.43 1131.51 63770.43
+    ##       range skew kurtosis    se
+    ## X1 62638.92 1.18     0.08 547.3
+    
+    
+    ggplot(data = insurance,aes(bmi30,charges)) + geom_boxplot(fill = c(2:3)) +
+      theme_classic() + ggtitle("Boxplot of Medical Charges by Obesity")
+
+![](__results___files/figure-html/unnamed-chunk-8-1.png)
+
+The idea behind deriving a new variable _bmi30_ is that, 30 is the bmi
+threshold for obesity and we all know that obesity plays a huge role in a
+personâs health. As we can see, although obese and non-obese people has the
+same median medical expenses, their average expenditure differ by almost USD
+5000.
+
+    
+    
+    pairs.panels(insurance[c("age", "bmi", "children", "charges")])
+
+![](__results___files/figure-html/unnamed-chunk-9-1.png)
+
+We can see that _age_ has the highest correlation with _charges_ amongst our
+numeric variables. Another observation we can make from this plot is that none
+of our numeric values is highly correlated with each other, so
+multicollinearity wouldnât be a problem. Another thing to note is that the
+relationship between age and charges might not be really linear at all. (we
+would get into this later)
+
+## Model Building
+
+    
+    
+    # Build a model using the original set of variables
+    ins_model <- lm(charges ~ age + sex + bmi + children + smoker + region, data = insurance)
+    summary(ins_model)
+    
+    
+    ## 
+    ## Call:
+    ## lm(formula = charges ~ age + sex + bmi + children + smoker + 
+    ##     region, data = insurance)
+    ## 
+    ## Residuals:
+    ##      Min       1Q   Median       3Q      Max 
+    ## -11304.9  -2848.1   -982.1   1393.9  29992.8 
+    ## 
+    ## Coefficients:
+    ##                 Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)     -11938.5      987.8 -12.086  < 2e-16 ***
+    ## age                256.9       11.9  21.587  < 2e-16 ***
+    ## sexmale           -131.3      332.9  -0.394 0.693348    
+    ## bmi                339.2       28.6  11.860  < 2e-16 ***
+    ## children           475.5      137.8   3.451 0.000577 ***
+    ## smokeryes        23848.5      413.1  57.723  < 2e-16 ***
+    ## regionnorthwest   -353.0      476.3  -0.741 0.458769    
+    ## regionsoutheast  -1035.0      478.7  -2.162 0.030782 *  
+    ## regionsouthwest   -960.0      477.9  -2.009 0.044765 *  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 6062 on 1329 degrees of freedom
+    ## Multiple R-squared:  0.7509, Adjusted R-squared:  0.7494 
+    ## F-statistic: 500.8 on 8 and 1329 DF,  p-value: < 2.2e-16
+
+On the first model we only utilized those original variables included in the
+dataset and got a decent r-squared of 0.7509 which implies that 75.09% of the
+variation of _charges_ could be explained by the set of independent variables
+we have included. We could also observe that all of the independent variables
+we have included with the exception of gender is a statistically significant
+predictor of medical charges (p-value less than 0.05 <\- level of
+significance).
+
+    
+    
+    # Create new variable square of age
+    insurance$age2 <- insurance$age^2
+    
+    # Build a second model using derived variables
+    ins_model2 <- lm(charges ~ age + age2 + children + bmi + sex + bmi30*smoker + region, data = insurance)
+    summary(ins_model2)
+    
+    
+    ## 
+    ## Call:
+    ## lm(formula = charges ~ age + age2 + children + bmi + sex + bmi30 * 
+    ##     smoker + region, data = insurance)
+    ## 
+    ## Residuals:
+    ##      Min       1Q   Median       3Q      Max 
+    ## -17296.4  -1656.0  -1263.3   -722.1  24160.2 
+    ## 
+    ## Coefficients:
+    ##                      Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)          134.2509  1362.7511   0.099 0.921539    
+    ## age                  -32.6851    59.8242  -0.546 0.584915    
+    ## age2                   3.7316     0.7463   5.000 6.50e-07 ***
+    ## children             678.5612   105.8831   6.409 2.04e-10 ***
+    ## bmi                  120.0196    34.2660   3.503 0.000476 ***
+    ## sexmale             -496.8245   244.3659  -2.033 0.042240 *  
+    ## bmi30yes           -1000.1403   422.8402  -2.365 0.018159 *  
+    ## smokeryes          13404.6866   439.9491  30.469  < 2e-16 ***
+    ## regionnorthwest     -279.2038   349.2746  -0.799 0.424212    
+    ## regionsoutheast     -828.5467   351.6352  -2.356 0.018604 *  
+    ## regionsouthwest    -1222.6437   350.5285  -3.488 0.000503 ***
+    ## bmi30yes:smokeryes 19810.7533   604.6567  32.764  < 2e-16 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 4445 on 1326 degrees of freedom
+    ## Multiple R-squared:  0.8664, Adjusted R-squared:  0.8653 
+    ## F-statistic: 781.7 on 11 and 1326 DF,  p-value: < 2.2e-16
+
+First thing I did in this chunk is to create a new variable age2 which is
+basically age squared. Like Iâve said earlier, relationship between age and
+charges might not be totally linear so the idea behind this is to include the
+variable age2 to deal with this non-linearity in our model. As we can see, by
+adding those variables we have derived has significantly improved our model.
+We now have a r-squared of 0.8664 which implies 86.64% of variation of charges
+can be explained by our independent variables in the model. Adjusted R-squared
+of the second model is also a lot better compared to that of the previous one
+which further solidify our claim.
+
+## Visualizing linear regression model
+
+Letâs first have a look on the relationship of medical charges and a
+personâs age and smoking status.
+
+    
+    
+    attach(insurance)
+    plot(age,charges,col=smoker)
+
+![](__results___files/figure-html/unnamed-chunk-12-1.png)
+
+    
+    
+    summary(charges[smoker=="no"])
+    
+    
+    ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+    ##    1122    3986    7345    8434   11363   36911
+    
+    
+    summary(charges[smoker=="yes"])
+    
+    
+    ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+    ##   12829   20826   34456   32050   41019   63770
+
+We could see an interesting trend here, as people get older the higher their
+medical expenses would be which is kinda expected. But, regardless of age,
+smokers has higher medical expenses than non-smokers as previously inferred.
+Weâll try to create a model using only age and smoking status just for
+comparison. It really seems like _smoker_ is the single most important
+variable in predicting medical charges.
+
+    
+    
+    ins_model3<-lm(charges~age+smoker,insurance)
+    summary(ins_model3)
+    
+    
+    ## 
+    ## Call:
+    ## lm(formula = charges ~ age + smoker, data = insurance)
+    ## 
+    ## Residuals:
+    ##      Min       1Q   Median       3Q      Max 
+    ## -16088.1  -2046.8  -1336.4   -212.7  28760.0 
+    ## 
+    ## Coefficients:
+    ##             Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept) -2391.63     528.30  -4.527 6.52e-06 ***
+    ## age           274.87      12.46  22.069  < 2e-16 ***
+    ## smokeryes   23855.30     433.49  55.031  < 2e-16 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 6397 on 1335 degrees of freedom
+    ## Multiple R-squared:  0.7214, Adjusted R-squared:  0.721 
+    ## F-statistic:  1728 on 2 and 1335 DF,  p-value: < 2.2e-16
+
+Using just age and smoker as independent variables, we have built a model with
+an r-squared of 72.14% which is comparable with our first model which use all
+of the original variables. In regression analysis, we would want to create a
+model that is accurate but at the same time as simple as possible. So if I
+would have to choose, I would select this third model than the first one. But
+of course, the second model is way better than any of these models so it is
+what we would recommend for implementation.
+
+    
+    
+    intercepts<-c(coef(ins_model3)["(Intercept)"],coef(ins_model3)["(Intercept)"]+coef(ins_model3)["smokeryes"])
+    lines.df<- data.frame(intercepts = intercepts,
+                          slopes = rep(coef(ins_model3)["age"], 2),
+                          smoker = levels(insurance$smoker))
+    qplot(x=age,y=charges,color=smoker,data=insurance)+geom_abline(aes(intercept=intercepts,slope=slopes,color=smoker),data=lines.df) + theme_few() + scale_y_continuous(breaks = seq(0,65000,5000))
+
+![](__results___files/figure-html/unnamed-chunk-14-1.png)
+
+If we would visualize the most recent regression model we built, this is how
+it would like. As you can see, we have 2 parallel lines which indicates we
+have 2 different regression equations having the same slope but different
+intercepts. Slope of the regression lines is equal to the coefficient of the
+variable _age_ (274.87). While in terms of the intercept, intercept for
+smokers is higher by 23,855.30 compared to non-smokers. This indicates that,
+on average, smokersâ medical charges is higher by about USD 24,000 adjusting
+for age. (Smoking is bad for your health!)
+
+## Variable Importance
+
+    
+    
+    ins_model2_shapley<-calc.relimp(ins_model2,type="lmg")
+    ins_model2_shapley
+    
+    
+    ## Response variable: charges 
+    ## Total response variance: 146652372 
+    ## Analysis based on 1338 observations 
+    ## 
+    ## 11 Regressors: 
+    ## Some regressors combined in groups: 
+    ##         Group  region : regionnorthwest regionsoutheast regionsouthwest 
+    ## 
+    ##  Relative importance of 9 (groups of) regressors assessed: 
+    ##  region age age2 children bmi sex bmi30 smoker bmi30:smoker 
+    ##  
+    ## Proportion of variance explained by model: 86.64%
+    ## Metrics are not normalized (rela=FALSE). 
+    ## 
+    ## Relative importance metrics: 
+    ## 
+    ##                      lmg
+    ## region       0.002682933
+    ## age          0.044392080
+    ## age2         0.046041406
+    ## children     0.003886598
+    ## bmi          0.013687844
+    ## sex          0.001277144
+    ## bmi30        0.023448871
+    ## smoker       0.623415607
+    ## bmi30:smoker 0.107561957
+    ## 
+    ## Average coefficients for different model sizes: 
+    ## 
+    ##                       1group      2groups      3groups      4groups
+    ## age               257.722619   228.470222   196.751864   164.504682
+    ## age2                3.235437     3.103292     3.023972     3.013453
+    ## children          683.089382   654.163423   633.507034   620.360991
+    ## bmi               393.873031   348.077866   305.085940   262.675241
+    ## sex              1387.172334  1150.264816   923.304126   665.633078
+    ## bmi30            4838.668568  4335.744298  3801.151003  3154.497317
+    ## smoker          23615.963534 23673.807709 23256.998226 22254.676408
+    ## regionnorthwest  -988.809142  -907.743915  -823.676665  -724.909103
+    ## regionsoutheast  1329.026921   817.317818   396.616310    23.888685
+    ## regionsouthwest -1059.447139 -1126.432846 -1154.695337 -1151.640248
+    ## bmi30:smoker             NaN          NaN 19329.110797 19468.912368
+    ##                      5groups      6groups      7groups      8groups
+    ## age               135.803053   111.928238    84.170092    38.102457
+    ## age2                3.056857     3.122122     3.211978     3.392514
+    ## children          613.318275   611.695376   618.638987   640.025238
+    ## bmi               219.216350   176.366171   141.304370   121.887682
+    ## sex               353.544928    13.214385  -270.418476  -433.343776
+    ## bmi30            2363.449750  1468.889485   562.339236  -271.614687
+    ## smoker          20688.598511 18749.873666 16731.369790 14898.781549
+    ## regionnorthwest  -602.690065  -465.847334  -349.622105  -287.369449
+    ## regionsoutheast  -314.446075  -586.468344  -743.061163  -796.884262
+    ## regionsouthwest -1129.110818 -1108.710264 -1115.019953 -1156.070935
+    ## bmi30:smoker    19585.252057 19677.999284 19746.845486 19791.311926
+    ##                      9groups
+    ## age               -32.685149
+    ## age2                3.731576
+    ## children          678.561198
+    ## bmi               120.019552
+    ## sex              -496.824457
+    ## bmi30           -1000.140322
+    ## smoker          13404.686598
+    ## regionnorthwest  -279.203806
+    ## regionsoutheast  -828.546726
+    ## regionsouthwest -1222.643652
+    ## bmi30:smoker    19810.753339
+    
+    
+    ins_model2_shapley$lmg
+    
+    
+    ##       region          age         age2     children          bmi 
+    ##  0.002682933  0.044392080  0.046041406  0.003886598  0.013687844 
+    ##          sex        bmi30       smoker bmi30:smoker 
+    ##  0.001277144  0.023448871  0.623415607  0.107561957
+
+As we have concluded, the second model has the best performance with the
+highest r-squared out of the 3 models we have built. We would use it to derive
+the variable importance of our predictors. We will use a statistical method
+called `shapley value regression` which is a solution that originated from the
+Game Theory concept developed by Lloyd Shapley in the 1950s. Itâs aim is to
+fairly allocate predictor importance in regression analysis. Given n number of
+independent variables (IV), we will run all combination of linear regression
+models using this list of IVs against the dependent variable (DV) and get each
+modelâs R-Squared. To get the importance measure of each independent
+variable (IV), the average contribution to the total R-squared of each IV is
+computed by decomposing the total R-squared and computing for the proportion
+marginal contribution of each IV.
+
+Letâs say we have 2 IVs A and B and a dependent variable Y. We can build 3
+models as follows: 1) Y~A 2) Y~B 3) Y~A+B and each model would have their
+respective R-squared.
+
+To get the Shapley Value of A we have to decompose the r-squared of the third
+model and derive Attribute Aâs marginal contribution.
+
+Shapley Value (A) = {[R-squared (AB)- R-squared (B)] + R-squared (A)}/2
+
+We have used the calc.relimp() function from the relaimpo package to determine
+the Shapley Value of our predictors.
+
+    
+    
+    sum(ins_model2_shapley$lmg)
+    
+    
+    ## [1] 0.8663944
+
+As we can see, the Shapley Value of our attributes sums up to the R-squared of
+our second regression model. Like what I have said, Shapley Value Regression
+is a variance decomposition method by means of computing the marginal
+contribution of each attribute.
+
+    
+    
+    barplot(sort(ins_model2_shapley$lmg,decreasing = TRUE),col=c(2:10),main="Relative Importance of Predictors",xlab="Predictor Labels",ylab="Shapley Value Regression",font.lab=2)
+
+![](__results___files/figure-html/unnamed-chunk-17-1.png)
+
+The Shapley Value scores of each attribute shows their marginal contribution
+to the overall r-squared (0.8664) of the second model. So we can conclude
+that, on the 86.64% total variance explained by our model a little over 60% of
+it is due to the attribute smoker. Results also cemented our previous
+hypothesis that variable _smoker_ is the singlemost important variable in
+predicting medical charges. If you would also notice, _smoker_ is followed by
+bmi30:smoker, age2, age, and bmi30 where majority of which are variables we
+have derived and not included in the original dataset. Glad we have engineered
+those variables up! :)
+
+# Wrapping it up
+
+In this analysis we have used Shapley Value Regression in deriving key drivers
+of medical charges. It is very useful when dealing with multicollinearity
+problem since ordinary least squares estimation would be troublesome to use.
+On the other hand, Shapley Value Regression decomposes the r-squared
+proportionally to solve the problem of multicollinearity (although
+multicollinearity is not an issue in this dataset). We also learn the
+importance of feature engineering in improving our modelâs accuracy. And to
+top it all up, cigarette smoking is dangerous to your health! (pun intended
+haha!)
+

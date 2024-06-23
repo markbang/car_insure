@@ -1,0 +1,317 @@
+In [1]:
+
+    
+    
+    from pycaret.datasets import get_data
+    data = get_data('insurance')
+    
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+  
+# Experiment 1¶
+
+In [2]:
+
+    
+    
+    from pycaret.regression import *
+    
+
+In [5]:
+
+    
+    
+    s = setup(data, target = 'charges', session_id = 123)
+    
+    
+    
+     
+    
+    Setup Succesfully Completed!
+    
+
+| Description | Value  
+---|---|---  
+0 | session_id | 123  
+1 | Transform Target  | False  
+2 | Transform Target Method | None  
+3 | Original Data | (1338, 7)  
+4 | Missing Values  | False  
+5 | Numeric Features  | 2  
+6 | Categorical Features  | 4  
+7 | Ordinal Features  | False  
+8 | High Cardinality Features  | False  
+9 | High Cardinality Method  | None  
+10 | Sampled Data | (1338, 7)  
+11 | Transformed Train Set | (936, 14)  
+12 | Transformed Test Set | (402, 14)  
+13 | Numeric Imputer  | mean  
+14 | Categorical Imputer  | constant  
+15 | Normalize  | False  
+16 | Normalize Method  | None  
+17 | Transformation  | False  
+18 | Transformation Method  | None  
+19 | PCA  | False  
+20 | PCA Method  | None  
+21 | PCA Components  | None  
+22 | Ignore Low Variance  | False  
+23 | Combine Rare Levels  | False  
+24 | Rare Level Threshold  | None  
+25 | Numeric Binning  | False  
+26 | Remove Outliers  | False  
+27 | Outliers Threshold  | None  
+28 | Remove Multicollinearity  | False  
+29 | Multicollinearity Threshold  | None  
+30 | Clustering  | False  
+31 | Clustering Iteration  | None  
+32 | Polynomial Features  | False  
+33 | Polynomial Degree  | None  
+34 | Trignometry Features  | False  
+35 | Polynomial Threshold  | None  
+36 | Group Features  | False  
+37 | Feature Selection  | False  
+38 | Features Selection Threshold  | None  
+39 | Feature Interaction  | False  
+40 | Feature Ratio  | False  
+41 | Interaction Threshold  | None  
+  
+In [6]:
+
+    
+    
+    lr = create_model('lr')
+    
+
+| MAE | MSE | RMSE | R2 | RMSLE | MAPE  
+---|---|---|---|---|---|---  
+0 | 4165.9659 | 3.330203e+07 | 5770.7909 | 0.8011 | 0.4683 | 0.4153  
+1 | 4503.7366 | 4.374648e+07 | 6614.1122 | 0.7456 | 0.5633 | 0.4217  
+2 | 3880.5528 | 3.179514e+07 | 5638.7179 | 0.5974 | 0.7645 | 0.4396  
+3 | 3747.6457 | 2.680530e+07 | 5177.3833 | 0.7762 | 0.5015 | 0.5175  
+4 | 4471.0419 | 4.341053e+07 | 6588.6670 | 0.6771 | 0.5224 | 0.3767  
+5 | 4182.7551 | 3.616633e+07 | 6013.8450 | 0.7674 | 0.7416 | 0.4320  
+6 | 4081.1022 | 3.919259e+07 | 6260.3984 | 0.7333 | 0.6434 | 0.4241  
+7 | 4928.1534 | 4.641504e+07 | 6812.8581 | 0.7448 | 0.5887 | 0.4137  
+8 | 4609.3147 | 4.037035e+07 | 6353.7670 | 0.7392 | 0.5686 | 0.5111  
+9 | 4665.8647 | 4.259679e+07 | 6526.6220 | 0.7256 | 0.8131 | 0.4802  
+Mean | 4323.6133 | 3.838006e+07 | 6175.7162 | 0.7308 | 0.6175 | 0.4432  
+SD | 353.5472 | 5.908389e+06 | 490.4977 | 0.0543 | 0.1126 | 0.0431  
+  
+In [7]:
+
+    
+    
+    plot_model(lr)
+    
+
+![](__results___files/__results___5_0.png)
+
+# Experiment 2¶
+
+In [8]:
+
+    
+    
+    s2 = setup(data, target = 'charges', session_id = 123,
+               normalize = True,
+               polynomial_features = True, trigonometry_features = True, feature_interaction=True, 
+               bin_numeric_features= ['age', 'bmi'])
+    
+    
+    
+     
+    
+    Setup Succesfully Completed!
+    
+
+| Description | Value  
+---|---|---  
+0 | session_id | 123  
+1 | Transform Target  | False  
+2 | Transform Target Method | None  
+3 | Original Data | (1338, 7)  
+4 | Missing Values  | False  
+5 | Numeric Features  | 2  
+6 | Categorical Features  | 4  
+7 | Ordinal Features  | False  
+8 | High Cardinality Features  | False  
+9 | High Cardinality Method  | None  
+10 | Sampled Data | (1338, 7)  
+11 | Transformed Train Set | (936, 62)  
+12 | Transformed Test Set | (402, 62)  
+13 | Numeric Imputer  | mean  
+14 | Categorical Imputer  | constant  
+15 | Normalize  | True  
+16 | Normalize Method  | zscore  
+17 | Transformation  | False  
+18 | Transformation Method  | None  
+19 | PCA  | False  
+20 | PCA Method  | None  
+21 | PCA Components  | None  
+22 | Ignore Low Variance  | False  
+23 | Combine Rare Levels  | False  
+24 | Rare Level Threshold  | None  
+25 | Numeric Binning  | True  
+26 | Remove Outliers  | False  
+27 | Outliers Threshold  | None  
+28 | Remove Multicollinearity  | False  
+29 | Multicollinearity Threshold  | None  
+30 | Clustering  | False  
+31 | Clustering Iteration  | None  
+32 | Polynomial Features  | True  
+33 | Polynomial Degree  | 2  
+34 | Trignometry Features  | True  
+35 | Polynomial Threshold  | 0.1  
+36 | Group Features  | False  
+37 | Feature Selection  | False  
+38 | Features Selection Threshold  | None  
+39 | Feature Interaction  | True  
+40 | Feature Ratio  | False  
+41 | Interaction Threshold  | 0.01  
+  
+In [9]:
+
+    
+    
+    s2[0].columns
+    
+
+Out[9]:
+
+    
+    
+    Index(['age_Power2', 'bmi_Power2', 'sex_female', 'children_0', 'children_1',
+           'children_2', 'children_3', 'children_4', 'children_5', 'smoker_yes',
+           'region_northeast', 'region_northwest', 'region_southeast',
+           'region_southwest', 'age_0.0', 'age_1.0', 'age_10.0', 'age_11.0',
+           'age_2.0', 'age_3.0', 'age_4.0', 'age_5.0', 'age_6.0', 'age_7.0',
+           'age_8.0', 'age_9.0', 'bmi_0.0', 'bmi_1.0', 'bmi_10.0', 'bmi_11.0',
+           'bmi_2.0', 'bmi_3.0', 'bmi_4.0', 'bmi_5.0', 'bmi_6.0', 'bmi_7.0',
+           'bmi_8.0', 'bmi_9.0', 'smoker_yes_multiply_bmi_5.0',
+           'region_southeast_multiply_age_Power2',
+           'bmi_Power2_multiply_smoker_yes', 'age_Power2_multiply_smoker_yes',
+           'children_0_multiply_bmi_Power2',
+           'region_southeast_multiply_bmi_Power2',
+           'children_0_multiply_smoker_yes', 'sex_female_multiply_bmi_Power2',
+           'region_southeast_multiply_smoker_yes',
+           'smoker_yes_multiply_children_0', 'smoker_yes_multiply_bmi_Power2',
+           'children_0_multiply_age_Power2', 'children_1_multiply_smoker_yes',
+           'sex_female_multiply_smoker_yes', 'smoker_yes_multiply_children_2',
+           'children_2_multiply_age_Power2', 'children_1_multiply_age_Power2',
+           'region_southwest_multiply_smoker_yes',
+           'sex_female_multiply_age_Power2', 'bmi_7.0_multiply_smoker_yes',
+           'bmi_Power2_multiply_age_Power2', 'bmi_6.0_multiply_smoker_yes',
+           'smoker_yes_multiply_age_Power2', 'smoker_yes_multiply_sex_female'],
+          dtype='object')
+
+In [10]:
+
+    
+    
+    lr = create_model('lr')
+    
+
+| MAE | MSE | RMSE | R2 | RMSLE | MAPE  
+---|---|---|---|---|---|---  
+0 | 2476.5333 | 1.792665e+07 | 4233.9880 | 0.8929 | 0.3878 | 0.2842  
+1 | 3355.1345 | 3.404316e+07 | 5834.6515 | 0.8021 | 0.4613 | 0.3304  
+2 | 2919.7578 | 2.261994e+07 | 4756.0423 | 0.7136 | 0.5533 | 0.3790  
+3 | 2964.9649 | 2.283861e+07 | 4778.9761 | 0.8093 | 0.5456 | 0.4029  
+4 | 3097.0904 | 2.838265e+07 | 5327.5369 | 0.7889 | 0.5248 | 0.2831  
+5 | 2979.1330 | 2.035337e+07 | 4511.4710 | 0.8691 | 0.3543 | 0.2744  
+6 | 2687.7389 | 2.234181e+07 | 4726.7128 | 0.8480 | 0.4020 | 0.3279  
+7 | 3123.5060 | 2.697542e+07 | 5193.7863 | 0.8517 | 0.4707 | 0.3089  
+8 | 2813.0890 | 2.055905e+07 | 4534.2087 | 0.8672 | 0.3759 | 0.3151  
+9 | 3110.4590 | 2.651683e+07 | 5149.4496 | 0.8292 | 0.4661 | 0.3353  
+Mean | 2952.7407 | 2.425575e+07 | 4904.6823 | 0.8272 | 0.4542 | 0.3241  
+SD | 235.6330 | 4.501474e+06 | 447.0354 | 0.0490 | 0.0685 | 0.0393  
+  
+In [11]:
+
+    
+    
+    plot_model(lr)
+    
+
+![](__results___files/__results___10_0.png)
+
+In [12]:
+
+    
+    
+    save_model(lr, 'deployment_28042020')
+    
+    
+    
+    Transformation Pipeline and Model Succesfully Saved
+    
+
+In [13]:
+
+    
+    
+    deployment_28042020 = load_model('deployment_28042020')
+    
+    
+    
+    Transformation Pipeline and Model Sucessfully Loaded
+    
+
+In [14]:
+
+    
+    
+    deployment_28042020
+    
+
+Out[14]:
+
+    
+    
+    [Pipeline(memory=None,
+              steps=[('dtypes',
+                      DataTypes_Auto_infer(categorical_features=[],
+                                           display_types=True, features_todrop=[],
+                                           ml_usecase='regression',
+                                           numerical_features=[], target='charges',
+                                           time_features=[])),
+                     ('imputer',
+                      Simple_Imputer(categorical_strategy='not_available',
+                                     numeric_strategy='mean',
+                                     target_variable=None)),
+                     ('new_levels1',
+                      New_Catagorical_Levels...
+                     ('dummy', Dummify(target='charges')),
+                     ('fix_perfect', Remove_100(target='charges')),
+                     ('clean_names', Clean_Colum_Names()),
+                     ('feature_select', Empty()), ('fix_multi', Empty()),
+                     ('dfs',
+                      DFS_Classic(interactions=['multiply'], ml_usecase='regression',
+                                  random_state=123, subclass='binary',
+                                  target='charges',
+                                  top_features_to_pick_percentage=None)),
+                     ('pca', Empty())],
+              verbose=False),
+     LinearRegression(copy_X=True, fit_intercept=True, n_jobs=None, normalize=False),
+     None]
+
+In [16]:
+
+    
+    
+    import requests
+    url = 'https://pycaret-insurance.herokuapp.com/predict_api'
+    pred = requests.post(url,json={'age':55, 'sex':'male', 'bmi':59, 'children':1, 'smoker':'male', 'region':'northwest'})
+    print(pred.json())
+    
+    
+    
+    75714.0
+    
+

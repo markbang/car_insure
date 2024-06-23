@@ -1,0 +1,614 @@
+In [1]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 5GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/sample-insurance-claim-prediction-dataset/insurance2.csv
+    /kaggle/input/sample-insurance-claim-prediction-dataset/insurance3r2.csv
+    
+
+In [2]:
+
+    
+    
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    
+
+In [3]:
+
+    
+    
+    #importing dataset
+    df = pd.read_csv('../input/sample-insurance-claim-prediction-dataset/insurance2.csv')
+    df.head()
+    
+
+Out[3]:
+
+| age | sex | bmi | children | smoker | region | charges | insuranceclaim  
+---|---|---|---|---|---|---|---|---  
+0 | 19 | 0 | 27.900 | 0 | 1 | 3 | 16884.92400 | 1  
+1 | 18 | 1 | 33.770 | 1 | 0 | 2 | 1725.55230 | 1  
+2 | 28 | 1 | 33.000 | 3 | 0 | 2 | 4449.46200 | 0  
+3 | 33 | 1 | 22.705 | 0 | 0 | 1 | 21984.47061 | 0  
+4 | 32 | 1 | 28.880 | 0 | 0 | 1 | 3866.85520 | 1  
+  
+In [4]:
+
+    
+    
+    #checking for null values
+    df.isnull().sum()
+    
+
+Out[4]:
+
+    
+    
+    age               0
+    sex               0
+    bmi               0
+    children          0
+    smoker            0
+    region            0
+    charges           0
+    insuranceclaim    0
+    dtype: int64
+
+In [5]:
+
+    
+    
+    df.columns
+    
+
+Out[5]:
+
+    
+    
+    Index(['age', 'sex', 'bmi', 'children', 'smoker', 'region', 'charges',
+           'insuranceclaim'],
+          dtype='object')
+
+In [6]:
+
+    
+    
+    X = df.iloc[:,:-1]
+    y = df['insuranceclaim']
+    
+
+In [7]:
+
+    
+    
+    X.head()
+    
+
+Out[7]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | 0 | 27.900 | 0 | 1 | 3 | 16884.92400  
+1 | 18 | 1 | 33.770 | 1 | 0 | 2 | 1725.55230  
+2 | 28 | 1 | 33.000 | 3 | 0 | 2 | 4449.46200  
+3 | 33 | 1 | 22.705 | 0 | 0 | 1 | 21984.47061  
+4 | 32 | 1 | 28.880 | 0 | 0 | 1 | 3866.85520  
+  
+In [8]:
+
+    
+    
+    y.head()
+    
+
+Out[8]:
+
+    
+    
+    0    1
+    1    1
+    2    0
+    3    0
+    4    1
+    Name: insuranceclaim, dtype: int64
+
+In [9]:
+
+    
+    
+    df.head()
+    
+
+Out[9]:
+
+| age | sex | bmi | children | smoker | region | charges | insuranceclaim  
+---|---|---|---|---|---|---|---|---  
+0 | 19 | 0 | 27.900 | 0 | 1 | 3 | 16884.92400 | 1  
+1 | 18 | 1 | 33.770 | 1 | 0 | 2 | 1725.55230 | 1  
+2 | 28 | 1 | 33.000 | 3 | 0 | 2 | 4449.46200 | 0  
+3 | 33 | 1 | 22.705 | 0 | 0 | 1 | 21984.47061 | 0  
+4 | 32 | 1 | 28.880 | 0 | 0 | 1 | 3866.85520 | 1  
+  
+In [10]:
+
+    
+    
+    #Feature selection using EXtra Tree Classifier
+    from sklearn.ensemble import ExtraTreesClassifier
+    model = ExtraTreesClassifier()
+    model.fit(X,y)
+    
+
+Out[10]:
+
+    
+    
+    ExtraTreesClassifier()
+
+In [11]:
+
+    
+    
+    print(model.feature_importances_)
+    
+    
+    
+    [0.11586469 0.01326816 0.33366577 0.2499936  0.09580498 0.03855109
+     0.15285171]
+    
+
+In [12]:
+
+    
+    
+    ranked_features = pd.Series(model.feature_importances_, index=X.columns)
+    ranked_features.nlargest(len(X.columns)).plot(kind='barh')
+    plt.show()
+    
+
+![](__results___files/__results___11_0.png)
+
+In [13]:
+
+    
+    
+    from sklearn.model_selection import train_test_split
+    X_train,X_test,y_train,y_test = train_test_split(X,y,test_size=0.2,random_state=0)
+    
+
+In [14]:
+
+    
+    
+    print(X_train.head())
+    print(X_test.head())
+    print(y_train.head())
+    print(y_test.head())
+    
+    
+    
+          age  sex     bmi  children  smoker  region      charges
+    621    37    1  34.100         4       1       3  40182.24600
+    194    18    1  34.430         0       0       2   1137.46970
+    240    23    0  36.670         2       1       0  38511.62830
+    1168   32    1  35.200         2       0       3   4670.64000
+    1192   58    0  32.395         1       0       0  13019.16105
+          age  sex     bmi  children  smoker  region      charges
+    578    52    1  30.200         1       0       3   9724.53000
+    610    47    0  29.370         1       0       2   8547.69130
+    569    48    1  40.565         2       1       1  45702.02235
+    1034   61    1  38.380         0       0       1  12950.07120
+    198    51    0  18.050         0       0       1   9644.25250
+    621     1
+    194     1
+    240     1
+    1168    0
+    1192    1
+    Name: insuranceclaim, dtype: int64
+    578     1
+    610     0
+    569     1
+    1034    1
+    198     0
+    Name: insuranceclaim, dtype: int64
+    
+
+In [15]:
+
+    
+    
+    #Model Building
+    #Random Forest
+    from sklearn.ensemble import RandomForestClassifier
+    random_clf = RandomForestClassifier(n_estimators=900, min_samples_split=5, min_samples_leaf=5, max_features='sqrt', max_depth=10, criterion='entropy')
+    random_clf.fit(X_train,y_train)
+    
+
+Out[15]:
+
+    
+    
+    RandomForestClassifier(criterion='entropy', max_depth=10, max_features='sqrt',
+                           min_samples_leaf=5, min_samples_split=5,
+                           n_estimators=900)
+
+In [16]:
+
+    
+    
+    random_clf_predict = random_clf.predict(X_test)
+    
+
+In [17]:
+
+    
+    
+    random_clf_predict
+    
+
+Out[17]:
+
+    
+    
+    array([1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0,
+           1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1,
+           1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1,
+           1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1,
+           0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1,
+           0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1,
+           0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0,
+           0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0,
+           0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0,
+           0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 0,
+           0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1,
+           1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0,
+           0, 1, 1, 0])
+
+In [18]:
+
+    
+    
+    # #Performance Checking
+    from sklearn.metrics import confusion_matrix
+    random_clf_cm = confusion_matrix(y_test,random_clf_predict)
+    random_clf_cm
+    
+
+Out[18]:
+
+    
+    
+    array([[120,   3],
+           [  3, 142]])
+
+In [19]:
+
+    
+    
+    # #Classification Report
+    from sklearn.metrics import classification_report
+    random_clf_report = classification_report(y_test,random_clf_predict)
+    print(random_clf_report)
+    
+    
+    
+                  precision    recall  f1-score   support
+    
+               0       0.98      0.98      0.98       123
+               1       0.98      0.98      0.98       145
+    
+        accuracy                           0.98       268
+       macro avg       0.98      0.98      0.98       268
+    weighted avg       0.98      0.98      0.98       268
+    
+    
+
+In [20]:
+
+    
+    
+    from sklearn.model_selection import RandomizedSearchCV
+    #Randomized Search CV
+    
+    # Number of trees in random forest
+    n_estimators = [int(x) for x in np.linspace(start = 100, stop = 1200, num = 12)]
+    criterion = ['entropy','gini']
+    # Maximum number of levels in tree
+    max_depth = [int(x) for x in np.linspace(5, 30, num = 6)]
+    # max_depth.append(None)
+    # Minimum number of samples required to split a node
+    min_samples_split = [2, 5, 10, 15, 100]
+    # Minimum number of samples required at each leaf node
+    min_samples_leaf = [1, 2, 5, 10]
+    
+
+In [21]:
+
+    
+    
+    # Create the random grid
+    random_grid = {'n_estimators': n_estimators,
+                   'criterion':criterion,
+                   'max_depth': max_depth,
+                   'min_samples_split': min_samples_split,
+                   'min_samples_leaf': min_samples_leaf}
+    
+    print(random_grid)
+    
+    
+    
+    {'n_estimators': [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200], 'criterion': ['entropy', 'gini'], 'max_depth': [5, 10, 15, 20, 25, 30], 'min_samples_split': [2, 5, 10, 15, 100], 'min_samples_leaf': [1, 2, 5, 10]}
+    
+
+In [22]:
+
+    
+    
+    # Random search of parameters, using 3 fold cross validation, 
+    # search across 100 different combinations
+    rf_random = RandomizedSearchCV(estimator = random_clf, param_distributions = random_grid,scoring='neg_mean_squared_error', n_iter = 10, cv = 5, verbose=2, random_state=42, n_jobs = 1)
+    
+
+In [23]:
+
+    
+    
+    rf_random.fit(X_train,y_train)
+    
+    
+    
+    Fitting 5 folds for each of 10 candidates, totalling 50 fits
+    [CV] n_estimators=900, min_samples_split=5, min_samples_leaf=5, max_depth=20, criterion=entropy 
+    
+    
+    
+    [Parallel(n_jobs=1)]: Using backend SequentialBackend with 1 concurrent workers.
+    
+    
+    
+    [CV]  n_estimators=900, min_samples_split=5, min_samples_leaf=5, max_depth=20, criterion=entropy, total=   2.8s
+    [CV] n_estimators=900, min_samples_split=5, min_samples_leaf=5, max_depth=20, criterion=entropy 
+    
+    
+    
+    [Parallel(n_jobs=1)]: Done   1 out of   1 | elapsed:    2.8s remaining:    0.0s
+    
+    
+    
+    [CV]  n_estimators=900, min_samples_split=5, min_samples_leaf=5, max_depth=20, criterion=entropy, total=   2.6s
+    [CV] n_estimators=900, min_samples_split=5, min_samples_leaf=5, max_depth=20, criterion=entropy 
+    [CV]  n_estimators=900, min_samples_split=5, min_samples_leaf=5, max_depth=20, criterion=entropy, total=   2.8s
+    [CV] n_estimators=900, min_samples_split=5, min_samples_leaf=5, max_depth=20, criterion=entropy 
+    [CV]  n_estimators=900, min_samples_split=5, min_samples_leaf=5, max_depth=20, criterion=entropy, total=   2.6s
+    [CV] n_estimators=900, min_samples_split=5, min_samples_leaf=5, max_depth=20, criterion=entropy 
+    [CV]  n_estimators=900, min_samples_split=5, min_samples_leaf=5, max_depth=20, criterion=entropy, total=   2.6s
+    [CV] n_estimators=1100, min_samples_split=10, min_samples_leaf=2, max_depth=30, criterion=entropy 
+    [CV]  n_estimators=1100, min_samples_split=10, min_samples_leaf=2, max_depth=30, criterion=entropy, total=   3.2s
+    [CV] n_estimators=1100, min_samples_split=10, min_samples_leaf=2, max_depth=30, criterion=entropy 
+    [CV]  n_estimators=1100, min_samples_split=10, min_samples_leaf=2, max_depth=30, criterion=entropy, total=   3.2s
+    [CV] n_estimators=1100, min_samples_split=10, min_samples_leaf=2, max_depth=30, criterion=entropy 
+    [CV]  n_estimators=1100, min_samples_split=10, min_samples_leaf=2, max_depth=30, criterion=entropy, total=   3.3s
+    [CV] n_estimators=1100, min_samples_split=10, min_samples_leaf=2, max_depth=30, criterion=entropy 
+    [CV]  n_estimators=1100, min_samples_split=10, min_samples_leaf=2, max_depth=30, criterion=entropy, total=   3.4s
+    [CV] n_estimators=1100, min_samples_split=10, min_samples_leaf=2, max_depth=30, criterion=entropy 
+    [CV]  n_estimators=1100, min_samples_split=10, min_samples_leaf=2, max_depth=30, criterion=entropy, total=   3.3s
+    [CV] n_estimators=300, min_samples_split=100, min_samples_leaf=5, max_depth=25, criterion=entropy 
+    [CV]  n_estimators=300, min_samples_split=100, min_samples_leaf=5, max_depth=25, criterion=entropy, total=   0.8s
+    [CV] n_estimators=300, min_samples_split=100, min_samples_leaf=5, max_depth=25, criterion=entropy 
+    [CV]  n_estimators=300, min_samples_split=100, min_samples_leaf=5, max_depth=25, criterion=entropy, total=   0.8s
+    [CV] n_estimators=300, min_samples_split=100, min_samples_leaf=5, max_depth=25, criterion=entropy 
+    [CV]  n_estimators=300, min_samples_split=100, min_samples_leaf=5, max_depth=25, criterion=entropy, total=   0.8s
+    [CV] n_estimators=300, min_samples_split=100, min_samples_leaf=5, max_depth=25, criterion=entropy 
+    [CV]  n_estimators=300, min_samples_split=100, min_samples_leaf=5, max_depth=25, criterion=entropy, total=   0.9s
+    [CV] n_estimators=300, min_samples_split=100, min_samples_leaf=5, max_depth=25, criterion=entropy 
+    [CV]  n_estimators=300, min_samples_split=100, min_samples_leaf=5, max_depth=25, criterion=entropy, total=   0.9s
+    [CV] n_estimators=400, min_samples_split=5, min_samples_leaf=5, max_depth=25, criterion=entropy 
+    [CV]  n_estimators=400, min_samples_split=5, min_samples_leaf=5, max_depth=25, criterion=entropy, total=   1.2s
+    [CV] n_estimators=400, min_samples_split=5, min_samples_leaf=5, max_depth=25, criterion=entropy 
+    [CV]  n_estimators=400, min_samples_split=5, min_samples_leaf=5, max_depth=25, criterion=entropy, total=   1.2s
+    [CV] n_estimators=400, min_samples_split=5, min_samples_leaf=5, max_depth=25, criterion=entropy 
+    [CV]  n_estimators=400, min_samples_split=5, min_samples_leaf=5, max_depth=25, criterion=entropy, total=   1.2s
+    [CV] n_estimators=400, min_samples_split=5, min_samples_leaf=5, max_depth=25, criterion=entropy 
+    [CV]  n_estimators=400, min_samples_split=5, min_samples_leaf=5, max_depth=25, criterion=entropy, total=   1.2s
+    [CV] n_estimators=400, min_samples_split=5, min_samples_leaf=5, max_depth=25, criterion=entropy 
+    [CV]  n_estimators=400, min_samples_split=5, min_samples_leaf=5, max_depth=25, criterion=entropy, total=   1.2s
+    [CV] n_estimators=700, min_samples_split=5, min_samples_leaf=10, max_depth=5, criterion=gini 
+    [CV]  n_estimators=700, min_samples_split=5, min_samples_leaf=10, max_depth=5, criterion=gini, total=   1.8s
+    [CV] n_estimators=700, min_samples_split=5, min_samples_leaf=10, max_depth=5, criterion=gini 
+    [CV]  n_estimators=700, min_samples_split=5, min_samples_leaf=10, max_depth=5, criterion=gini, total=   1.8s
+    [CV] n_estimators=700, min_samples_split=5, min_samples_leaf=10, max_depth=5, criterion=gini 
+    [CV]  n_estimators=700, min_samples_split=5, min_samples_leaf=10, max_depth=5, criterion=gini, total=   1.9s
+    [CV] n_estimators=700, min_samples_split=5, min_samples_leaf=10, max_depth=5, criterion=gini 
+    [CV]  n_estimators=700, min_samples_split=5, min_samples_leaf=10, max_depth=5, criterion=gini, total=   1.8s
+    [CV] n_estimators=700, min_samples_split=5, min_samples_leaf=10, max_depth=5, criterion=gini 
+    [CV]  n_estimators=700, min_samples_split=5, min_samples_leaf=10, max_depth=5, criterion=gini, total=   1.8s
+    [CV] n_estimators=1000, min_samples_split=2, min_samples_leaf=1, max_depth=20, criterion=gini 
+    [CV]  n_estimators=1000, min_samples_split=2, min_samples_leaf=1, max_depth=20, criterion=gini, total=   2.8s
+    [CV] n_estimators=1000, min_samples_split=2, min_samples_leaf=1, max_depth=20, criterion=gini 
+    [CV]  n_estimators=1000, min_samples_split=2, min_samples_leaf=1, max_depth=20, criterion=gini, total=   2.8s
+    [CV] n_estimators=1000, min_samples_split=2, min_samples_leaf=1, max_depth=20, criterion=gini 
+    [CV]  n_estimators=1000, min_samples_split=2, min_samples_leaf=1, max_depth=20, criterion=gini, total=   2.8s
+    [CV] n_estimators=1000, min_samples_split=2, min_samples_leaf=1, max_depth=20, criterion=gini 
+    [CV]  n_estimators=1000, min_samples_split=2, min_samples_leaf=1, max_depth=20, criterion=gini, total=   2.9s
+    [CV] n_estimators=1000, min_samples_split=2, min_samples_leaf=1, max_depth=20, criterion=gini 
+    [CV]  n_estimators=1000, min_samples_split=2, min_samples_leaf=1, max_depth=20, criterion=gini, total=   2.8s
+    [CV] n_estimators=1100, min_samples_split=15, min_samples_leaf=10, max_depth=10, criterion=entropy 
+    [CV]  n_estimators=1100, min_samples_split=15, min_samples_leaf=10, max_depth=10, criterion=entropy, total=   3.2s
+    [CV] n_estimators=1100, min_samples_split=15, min_samples_leaf=10, max_depth=10, criterion=entropy 
+    [CV]  n_estimators=1100, min_samples_split=15, min_samples_leaf=10, max_depth=10, criterion=entropy, total=   3.1s
+    [CV] n_estimators=1100, min_samples_split=15, min_samples_leaf=10, max_depth=10, criterion=entropy 
+    [CV]  n_estimators=1100, min_samples_split=15, min_samples_leaf=10, max_depth=10, criterion=entropy, total=   3.1s
+    [CV] n_estimators=1100, min_samples_split=15, min_samples_leaf=10, max_depth=10, criterion=entropy 
+    [CV]  n_estimators=1100, min_samples_split=15, min_samples_leaf=10, max_depth=10, criterion=entropy, total=   3.2s
+    [CV] n_estimators=1100, min_samples_split=15, min_samples_leaf=10, max_depth=10, criterion=entropy 
+    [CV]  n_estimators=1100, min_samples_split=15, min_samples_leaf=10, max_depth=10, criterion=entropy, total=   3.1s
+    [CV] n_estimators=300, min_samples_split=15, min_samples_leaf=1, max_depth=30, criterion=entropy 
+    [CV]  n_estimators=300, min_samples_split=15, min_samples_leaf=1, max_depth=30, criterion=entropy, total=   0.9s
+    [CV] n_estimators=300, min_samples_split=15, min_samples_leaf=1, max_depth=30, criterion=entropy 
+    [CV]  n_estimators=300, min_samples_split=15, min_samples_leaf=1, max_depth=30, criterion=entropy, total=   0.9s
+    [CV] n_estimators=300, min_samples_split=15, min_samples_leaf=1, max_depth=30, criterion=entropy 
+    [CV]  n_estimators=300, min_samples_split=15, min_samples_leaf=1, max_depth=30, criterion=entropy, total=   0.9s
+    [CV] n_estimators=300, min_samples_split=15, min_samples_leaf=1, max_depth=30, criterion=entropy 
+    [CV]  n_estimators=300, min_samples_split=15, min_samples_leaf=1, max_depth=30, criterion=entropy, total=   0.9s
+    [CV] n_estimators=300, min_samples_split=15, min_samples_leaf=1, max_depth=30, criterion=entropy 
+    [CV]  n_estimators=300, min_samples_split=15, min_samples_leaf=1, max_depth=30, criterion=entropy, total=   0.9s
+    [CV] n_estimators=700, min_samples_split=10, min_samples_leaf=2, max_depth=10, criterion=entropy 
+    [CV]  n_estimators=700, min_samples_split=10, min_samples_leaf=2, max_depth=10, criterion=entropy, total=   2.1s
+    [CV] n_estimators=700, min_samples_split=10, min_samples_leaf=2, max_depth=10, criterion=entropy 
+    [CV]  n_estimators=700, min_samples_split=10, min_samples_leaf=2, max_depth=10, criterion=entropy, total=   2.0s
+    [CV] n_estimators=700, min_samples_split=10, min_samples_leaf=2, max_depth=10, criterion=entropy 
+    [CV]  n_estimators=700, min_samples_split=10, min_samples_leaf=2, max_depth=10, criterion=entropy, total=   2.1s
+    [CV] n_estimators=700, min_samples_split=10, min_samples_leaf=2, max_depth=10, criterion=entropy 
+    [CV]  n_estimators=700, min_samples_split=10, min_samples_leaf=2, max_depth=10, criterion=entropy, total=   2.1s
+    [CV] n_estimators=700, min_samples_split=10, min_samples_leaf=2, max_depth=10, criterion=entropy 
+    [CV]  n_estimators=700, min_samples_split=10, min_samples_leaf=2, max_depth=10, criterion=entropy, total=   2.1s
+    [CV] n_estimators=700, min_samples_split=15, min_samples_leaf=1, max_depth=5, criterion=gini 
+    [CV]  n_estimators=700, min_samples_split=15, min_samples_leaf=1, max_depth=5, criterion=gini, total=   1.8s
+    [CV] n_estimators=700, min_samples_split=15, min_samples_leaf=1, max_depth=5, criterion=gini 
+    [CV]  n_estimators=700, min_samples_split=15, min_samples_leaf=1, max_depth=5, criterion=gini, total=   1.8s
+    [CV] n_estimators=700, min_samples_split=15, min_samples_leaf=1, max_depth=5, criterion=gini 
+    [CV]  n_estimators=700, min_samples_split=15, min_samples_leaf=1, max_depth=5, criterion=gini, total=   1.8s
+    [CV] n_estimators=700, min_samples_split=15, min_samples_leaf=1, max_depth=5, criterion=gini 
+    [CV]  n_estimators=700, min_samples_split=15, min_samples_leaf=1, max_depth=5, criterion=gini, total=   1.9s
+    [CV] n_estimators=700, min_samples_split=15, min_samples_leaf=1, max_depth=5, criterion=gini 
+    [CV]  n_estimators=700, min_samples_split=15, min_samples_leaf=1, max_depth=5, criterion=gini, total=   1.8s
+    
+    
+    
+    [Parallel(n_jobs=1)]: Done  50 out of  50 | elapsed:  1.7min finished
+    
+
+Out[23]:
+
+    
+    
+    RandomizedSearchCV(cv=5,
+                       estimator=RandomForestClassifier(criterion='entropy',
+                                                        max_depth=10,
+                                                        max_features='sqrt',
+                                                        min_samples_leaf=5,
+                                                        min_samples_split=5,
+                                                        n_estimators=900),
+                       n_jobs=1,
+                       param_distributions={'criterion': ['entropy', 'gini'],
+                                            'max_depth': [5, 10, 15, 20, 25, 30],
+                                            'min_samples_leaf': [1, 2, 5, 10],
+                                            'min_samples_split': [2, 5, 10, 15,
+                                                                  100],
+                                            'n_estimators': [100, 200, 300, 400,
+                                                             500, 600, 700, 800,
+                                                             900, 1000, 1100,
+                                                             1200]},
+                       random_state=42, scoring='neg_mean_squared_error',
+                       verbose=2)
+
+In [24]:
+
+    
+    
+    rf_random.best_params_
+    
+
+Out[24]:
+
+    
+    
+    {'n_estimators': 1000,
+     'min_samples_split': 2,
+     'min_samples_leaf': 1,
+     'max_depth': 20,
+     'criterion': 'gini'}
+
+In [25]:
+
+    
+    
+    rf_random.best_score_
+    
+
+Out[25]:
+
+    
+    
+    -0.057943925233644854
+
+In [26]:
+
+    
+    
+    predictions=rf_random.predict(X_test)
+    predictions
+    
+
+Out[26]:
+
+    
+    
+    array([1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0,
+           1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1,
+           1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 1,
+           1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1,
+           0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1,
+           0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0,
+           0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0,
+           1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0,
+           0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0,
+           0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 0,
+           0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1,
+           1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0,
+           0, 1, 1, 0])
+
+In [27]:
+
+    
+    
+    print(classification_report(y_test, predictions))
+    
+    
+    
+                  precision    recall  f1-score   support
+    
+               0       0.98      0.98      0.98       123
+               1       0.98      0.98      0.98       145
+    
+        accuracy                           0.98       268
+       macro avg       0.98      0.98      0.98       268
+    weighted avg       0.98      0.98      0.98       268
+    
+    
+
+In [28]:
+
+    
+    
+    import pickle
+    #open a file, where you want to store the data
+    file = open('rf_random_model.pkl','wb')
+    
+    #dupming model to the file
+    pickle.dump(rf_random,file)
+    
+

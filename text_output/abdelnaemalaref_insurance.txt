@@ -1,0 +1,384 @@
+In [1]:
+
+    
+    
+    #importing libraries 
+    import pandas as pd
+    import seaborn as sns
+    
+
+![](http://amshaj-eg.com/wp-content/uploads/2018/10/health-
+insurance-500-aed_iewv4j.jpg)
+
+In [2]:
+
+    
+    
+    df=pd.read_csv("../input/data-insurance/insurance.csv")
+    df.head()
+    
+
+Out[2]:
+
+| age | gender | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | Zero | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | One | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | Three | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | Zero | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | Zero | no | northwest | 3866.85520  
+  
+#### 1\. Data Understanding¶
+
+In [3]:
+
+    
+    
+    df.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 1338 entries, 0 to 1337
+    Data columns (total 7 columns):
+     #   Column    Non-Null Count  Dtype  
+    ---  ------    --------------  -----  
+     0   age       1338 non-null   int64  
+     1   gender    1338 non-null   object 
+     2   bmi       1338 non-null   float64
+     3   children  1338 non-null   object 
+     4   smoker    1338 non-null   object 
+     5   region    1338 non-null   object 
+     6   charges   1338 non-null   float64
+    dtypes: float64(2), int64(1), object(4)
+    memory usage: 73.3+ KB
+    
+
+In [4]:
+
+    
+    
+    df.shape
+    
+
+Out[4]:
+
+    
+    
+    (1338, 7)
+
+In [5]:
+
+    
+    
+    df.describe(include="O")
+    
+
+Out[5]:
+
+| gender | children | smoker | region  
+---|---|---|---|---  
+count | 1338 | 1338 | 1338 | 1338  
+unique | 2 | 6 | 2 | 4  
+top | male | Zero | no | southeast  
+freq | 676 | 574 | 1064 | 364  
+  
+In [6]:
+
+    
+    
+    df["gender"].value_counts()
+    
+
+Out[6]:
+
+    
+    
+    male      676
+    female    662
+    Name: gender, dtype: int64
+
+#### 2\. Data Cleaning¶
+
+In this part of the EDA. We will check ;
+
+Missing Values Duplicated Values
+
+In [7]:
+
+    
+    
+    #check missing data
+    df.isnull().any()
+    
+
+Out[7]:
+
+    
+    
+    age         False
+    gender      False
+    bmi         False
+    children    False
+    smoker      False
+    region      False
+    charges     False
+    dtype: bool
+
+##### no exist missing values¶
+
+In [8]:
+
+    
+    
+    df[df.duplicated()]
+    
+
+Out[8]:
+
+| age | gender | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+581 | 19 | male | 30.59 | Zero | no | northwest | 1639.5631  
+  
+In [9]:
+
+    
+    
+    df.drop_duplicates(inplace=True)
+    
+
+In [10]:
+
+    
+    
+    df.duplicated().sum()
+    
+
+Out[10]:
+
+    
+    
+    0
+
+In [11]:
+
+    
+    
+    df.head()
+    
+
+Out[11]:
+
+| age | gender | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | Zero | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | One | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | Three | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | Zero | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | Zero | no | northwest | 3866.85520  
+  
+#### 3\. Data Visualization¶
+
+In [12]:
+
+    
+    
+    sns.set(rc={'figure.figsize':(10,4)})
+    sns.histplot(data=df["charges"],kde=True,color="red")
+    
+
+Out[12]:
+
+    
+    
+    <AxesSubplot:xlabel='charges', ylabel='Count'>
+
+![](__results___files/__results___16_1.png)
+
+##### We see that our data looks like the right(positive) skewed. Most of the
+charges are between 0 - 10000 dollars.¶
+
+In [13]:
+
+    
+    
+    sns.histplot(data=df["age"],kde=True)
+    
+
+Out[13]:
+
+    
+    
+    <AxesSubplot:xlabel='age', ylabel='Count'>
+
+![](__results___files/__results___18_1.png)
+
+##### We see that most of the customers are 18-19 years old¶
+
+In [14]:
+
+    
+    
+    sns.boxplot(data=df,x=df["charges"],color="yellow")
+    
+
+Out[14]:
+
+    
+    
+    <AxesSubplot:xlabel='charges'>
+
+![](__results___files/__results___20_1.png)
+
+In [15]:
+
+    
+    
+    sns.countplot(x='gender', data=df)
+    
+
+Out[15]:
+
+    
+    
+    <AxesSubplot:xlabel='gender', ylabel='count'>
+
+![](__results___files/__results___21_1.png)
+
+##### Female and Male customers have almost the same number¶
+
+In [16]:
+
+    
+    
+    sns.countplot(data=df,x=df["children"])
+    
+
+Out[16]:
+
+    
+    
+    <AxesSubplot:xlabel='children', ylabel='count'>
+
+![](__results___files/__results___23_1.png)
+
+##### The mostof the people do not have any children.¶
+
+In [17]:
+
+    
+    
+    sns.countplot(data=df,x="gender",hue="smoker").set_title("Smoker by Gender")
+    
+
+Out[17]:
+
+    
+    
+    Text(0.5, 1.0, 'Smoker by Gender')
+
+![](__results___files/__results___25_1.png)
+
+##### most people dont smoke but female more a little not smoking¶
+
+In [18]:
+
+    
+    
+    sns.countplot(data=df,x="region",palette=["blue","orange","yellow","red"])
+    
+
+Out[18]:
+
+    
+    
+    <AxesSubplot:xlabel='region', ylabel='count'>
+
+![](__results___files/__results___27_1.png)
+
+##### All four regions are almost equally distributed. The number of people
+from the southeast is slightly more than others.¶
+
+In [19]:
+
+    
+    
+    sns.scatterplot(data=df,x="age",y="charges",color="red",hue="gender",marker="*",style="gender")
+    
+
+Out[19]:
+
+    
+    
+    <AxesSubplot:xlabel='age', ylabel='charges'>
+
+![](__results___files/__results___29_1.png)
+
+##### We see that there is a weak positive relationship between age and
+charges¶
+
+In [20]:
+
+    
+    
+    sns.boxplot(data=df,x="age",y="region",hue="gender")
+    
+
+Out[20]:
+
+    
+    
+    <AxesSubplot:xlabel='age', ylabel='region'>
+
+![](__results___files/__results___31_1.png)
+
+In [21]:
+
+    
+    
+    sns.boxplot(x='smoker',y='charges',data=df,palette=["blue","red"],linewidth=1.6)
+    
+
+Out[21]:
+
+    
+    
+    <AxesSubplot:xlabel='smoker', ylabel='charges'>
+
+![](__results___files/__results___32_1.png)
+
+##### The boxplot shows us the cost of insurance for smokers is higher than
+for non-smokers.¶
+
+In [22]:
+
+    
+    
+    df.corr()
+    
+
+Out[22]:
+
+| age | bmi | charges  
+---|---|---|---  
+age | 1.000000 | 0.109344 | 0.298308  
+bmi | 0.109344 | 1.000000 | 0.198401  
+charges | 0.298308 | 0.198401 | 1.000000  
+  
+In [23]:
+
+    
+    
+    sns.heatmap(df.corr(),vmin=0,vmax=1,annot=True)
+    
+
+Out[23]:
+
+    
+    
+    <AxesSubplot:>
+
+![](__results___files/__results___35_1.png)
+
+### thank you !¶
+

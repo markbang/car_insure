@@ -1,0 +1,1234 @@
+In [1]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/health-insurance-cost-prediction/insurance.csv
+    
+
+# Impoerting Libraries¶
+
+In [2]:
+
+    
+    
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import plotly.express as px
+    from sklearn import preprocessing 
+    from category_encoders import *
+    from sklearn.preprocessing import LabelEncoder
+    %matplotlib inline
+    from sklearn.model_selection import train_test_split
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.preprocessing import PolynomialFeatures
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import r2_score,mean_squared_error
+    from sklearn import datasets, linear_model, metrics
+    from sklearn.metrics import  confusion_matrix
+    
+
+# Loading DataSet¶
+
+In [3]:
+
+    
+    
+    df = pd.read_csv('../input/health-insurance-cost-prediction/insurance.csv')
+    df
+    
+
+Out[3]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+... | ... | ... | ... | ... | ... | ... | ...  
+1333 | 50 | male | 30.970 | 3 | no | northwest | 10600.54830  
+1334 | 18 | female | 31.920 | 0 | no | northeast | 2205.98080  
+1335 | 18 | female | 36.850 | 0 | no | southeast | 1629.83350  
+1336 | 21 | female | 25.800 | 0 | no | southwest | 2007.94500  
+1337 | 61 | female | 29.070 | 0 | yes | northwest | 29141.36030  
+  
+1338 rows Ã 7 columns
+
+# Exploratory Data Analysis¶
+
+In [4]:
+
+    
+    
+    df.head()
+    
+
+Out[4]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+  
+In [5]:
+
+    
+    
+    df.tail()
+    
+
+Out[5]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+1333 | 50 | male | 30.97 | 3 | no | northwest | 10600.5483  
+1334 | 18 | female | 31.92 | 0 | no | northeast | 2205.9808  
+1335 | 18 | female | 36.85 | 0 | no | southeast | 1629.8335  
+1336 | 21 | female | 25.80 | 0 | no | southwest | 2007.9450  
+1337 | 61 | female | 29.07 | 0 | yes | northwest | 29141.3603  
+  
+In [6]:
+
+    
+    
+    df.shape
+    
+
+Out[6]:
+
+    
+    
+    (1338, 7)
+
+In [7]:
+
+    
+    
+    df.size
+    
+
+Out[7]:
+
+    
+    
+    9366
+
+In [8]:
+
+    
+    
+    df.dtypes
+    
+
+Out[8]:
+
+    
+    
+    age           int64
+    sex          object
+    bmi         float64
+    children      int64
+    smoker       object
+    region       object
+    charges     float64
+    dtype: object
+
+In [9]:
+
+    
+    
+    df.columns
+    
+
+Out[9]:
+
+    
+    
+    Index(['age', 'sex', 'bmi', 'children', 'smoker', 'region', 'charges'], dtype='object')
+
+In [10]:
+
+    
+    
+    df.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 1338 entries, 0 to 1337
+    Data columns (total 7 columns):
+     #   Column    Non-Null Count  Dtype  
+    ---  ------    --------------  -----  
+     0   age       1338 non-null   int64  
+     1   sex       1338 non-null   object 
+     2   bmi       1338 non-null   float64
+     3   children  1338 non-null   int64  
+     4   smoker    1338 non-null   object 
+     5   region    1338 non-null   object 
+     6   charges   1338 non-null   float64
+    dtypes: float64(2), int64(2), object(3)
+    memory usage: 73.3+ KB
+    
+
+In [11]:
+
+    
+    
+    df.describe()
+    
+
+Out[11]:
+
+| age | bmi | children | charges  
+---|---|---|---|---  
+count | 1338.000000 | 1338.000000 | 1338.000000 | 1338.000000  
+mean | 39.207025 | 30.663397 | 1.094918 | 13270.422265  
+std | 14.049960 | 6.098187 | 1.205493 | 12110.011237  
+min | 18.000000 | 15.960000 | 0.000000 | 1121.873900  
+25% | 27.000000 | 26.296250 | 0.000000 | 4740.287150  
+50% | 39.000000 | 30.400000 | 1.000000 | 9382.033000  
+75% | 51.000000 | 34.693750 | 2.000000 | 16639.912515  
+max | 64.000000 | 53.130000 | 5.000000 | 63770.428010  
+  
+In [12]:
+
+    
+    
+    df.duplicated().sum()
+    
+
+Out[12]:
+
+    
+    
+    1
+
+In [13]:
+
+    
+    
+    a = df[df.duplicated().values]
+    a
+    
+
+Out[13]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+581 | 19 | male | 30.59 | 0 | no | northwest | 1639.5631  
+  
+In [14]:
+
+    
+    
+    df.drop([581],axis = 0,inplace = True)
+    df
+    
+
+Out[14]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+... | ... | ... | ... | ... | ... | ... | ...  
+1333 | 50 | male | 30.970 | 3 | no | northwest | 10600.54830  
+1334 | 18 | female | 31.920 | 0 | no | northeast | 2205.98080  
+1335 | 18 | female | 36.850 | 0 | no | southeast | 1629.83350  
+1336 | 21 | female | 25.800 | 0 | no | southwest | 2007.94500  
+1337 | 61 | female | 29.070 | 0 | yes | northwest | 29141.36030  
+  
+1337 rows Ã 7 columns
+
+In [15]:
+
+    
+    
+    df.reset_index(inplace = True,drop=True)
+    
+
+In [16]:
+
+    
+    
+    df.drop(['sex','smoker','region'],axis=1).skew()
+    
+
+Out[16]:
+
+    
+    
+    age         0.054781
+    bmi         0.283914
+    children    0.937421
+    charges     1.515391
+    dtype: float64
+
+In [17]:
+
+    
+    
+    df.drop(['sex','smoker','region'],axis=1).corr()
+    
+
+Out[17]:
+
+| age | bmi | children | charges  
+---|---|---|---|---  
+age | 1.000000 | 0.109344 | 0.041536 | 0.298308  
+bmi | 0.109344 | 1.000000 | 0.012755 | 0.198401  
+children | 0.041536 | 0.012755 | 1.000000 | 0.067389  
+charges | 0.298308 | 0.198401 | 0.067389 | 1.000000  
+  
+In [18]:
+
+    
+    
+    df.isnull().sum()
+    
+
+Out[18]:
+
+    
+    
+    age         0
+    sex         0
+    bmi         0
+    children    0
+    smoker      0
+    region      0
+    charges     0
+    dtype: int64
+
+# Data Visualisation Using Autoviz¶
+
+In [19]:
+
+    
+    
+    ! pip install Autoviz
+    
+    
+    
+    Collecting Autoviz
+    
+      Downloading autoviz-0.0.84-py3-none-any.whl (44 kB)
+    
+         |ââââââââââââââââââââââââââââââââ| 44 kB 1.0 MB/s 
+    
+    Requirement already satisfied: jupyter in /opt/conda/lib/python3.7/site-packages (from Autoviz) (1.0.0)
+    
+    Requirement already satisfied: statsmodels in /opt/conda/lib/python3.7/site-packages (from Autoviz) (0.12.2)
+    
+    Requirement already satisfied: pandas in /opt/conda/lib/python3.7/site-packages (from Autoviz) (1.3.2)
+    
+    Requirement already satisfied: ipython in /opt/conda/lib/python3.7/site-packages (from Autoviz) (7.26.0)
+    
+    Requirement already satisfied: matplotlib in /opt/conda/lib/python3.7/site-packages (from Autoviz) (3.4.3)
+    
+    Requirement already satisfied: xgboost in /opt/conda/lib/python3.7/site-packages (from Autoviz) (1.4.2)
+    
+    Requirement already satisfied: scikit-learn in /opt/conda/lib/python3.7/site-packages (from Autoviz) (0.23.2)
+    
+    Requirement already satisfied: seaborn in /opt/conda/lib/python3.7/site-packages (from Autoviz) (0.11.2)
+    
+    Requirement already satisfied: backcall in /opt/conda/lib/python3.7/site-packages (from ipython->Autoviz) (0.2.0)
+    
+    Requirement already satisfied: pexpect>4.3 in /opt/conda/lib/python3.7/site-packages (from ipython->Autoviz) (4.8.0)
+    
+    Requirement already satisfied: pygments in /opt/conda/lib/python3.7/site-packages (from ipython->Autoviz) (2.10.0)
+    
+    Requirement already satisfied: prompt-toolkit!=3.0.0,!=3.0.1,<3.1.0,>=2.0.0 in /opt/conda/lib/python3.7/site-packages (from ipython->Autoviz) (3.0.19)
+    
+    Requirement already satisfied: decorator in /opt/conda/lib/python3.7/site-packages (from ipython->Autoviz) (5.0.9)
+    
+    Requirement already satisfied: pickleshare in /opt/conda/lib/python3.7/site-packages (from ipython->Autoviz) (0.7.5)
+    
+    Requirement already satisfied: matplotlib-inline in /opt/conda/lib/python3.7/site-packages (from ipython->Autoviz) (0.1.2)
+    
+    Requirement already satisfied: jedi>=0.16 in /opt/conda/lib/python3.7/site-packages (from ipython->Autoviz) (0.18.0)
+    
+    Requirement already satisfied: setuptools>=18.5 in /opt/conda/lib/python3.7/site-packages (from ipython->Autoviz) (57.4.0)
+    
+    Requirement already satisfied: traitlets>=4.2 in /opt/conda/lib/python3.7/site-packages (from ipython->Autoviz) (5.0.5)
+    
+    Requirement already satisfied: parso<0.9.0,>=0.8.0 in /opt/conda/lib/python3.7/site-packages (from jedi>=0.16->ipython->Autoviz) (0.8.2)
+    
+    Requirement already satisfied: ptyprocess>=0.5 in /opt/conda/lib/python3.7/site-packages (from pexpect>4.3->ipython->Autoviz) (0.7.0)
+    
+    Requirement already satisfied: wcwidth in /opt/conda/lib/python3.7/site-packages (from prompt-toolkit!=3.0.0,!=3.0.1,<3.1.0,>=2.0.0->ipython->Autoviz) (0.2.5)
+    
+    Requirement already satisfied: ipython-genutils in /opt/conda/lib/python3.7/site-packages (from traitlets>=4.2->ipython->Autoviz) (0.2.0)
+    
+    Requirement already satisfied: nbconvert in /opt/conda/lib/python3.7/site-packages (from jupyter->Autoviz) (6.1.0)
+    
+    Requirement already satisfied: notebook in /opt/conda/lib/python3.7/site-packages (from jupyter->Autoviz) (6.4.3)
+    
+    Requirement already satisfied: ipywidgets in /opt/conda/lib/python3.7/site-packages (from jupyter->Autoviz) (7.6.3)
+    
+    Requirement already satisfied: ipykernel in /opt/conda/lib/python3.7/site-packages (from jupyter->Autoviz) (6.2.0)
+    
+    Requirement already satisfied: jupyter-console in /opt/conda/lib/python3.7/site-packages (from jupyter->Autoviz) (6.4.0)
+    
+    Requirement already satisfied: qtconsole in /opt/conda/lib/python3.7/site-packages (from jupyter->Autoviz) (5.1.1)
+    
+    Requirement already satisfied: importlib-metadata<5 in /opt/conda/lib/python3.7/site-packages (from ipykernel->jupyter->Autoviz) (3.4.0)
+    
+    Requirement already satisfied: tornado<7.0,>=4.2 in /opt/conda/lib/python3.7/site-packages (from ipykernel->jupyter->Autoviz) (6.1)
+    
+    Requirement already satisfied: jupyter-client<8.0 in /opt/conda/lib/python3.7/site-packages (from ipykernel->jupyter->Autoviz) (6.1.12)
+    
+    Requirement already satisfied: argcomplete>=1.12.3 in /opt/conda/lib/python3.7/site-packages (from ipykernel->jupyter->Autoviz) (1.12.3)
+    
+    Requirement already satisfied: debugpy<2.0,>=1.0.0 in /opt/conda/lib/python3.7/site-packages (from ipykernel->jupyter->Autoviz) (1.4.1)
+    
+    Requirement already satisfied: zipp>=0.5 in /opt/conda/lib/python3.7/site-packages (from importlib-metadata<5->ipykernel->jupyter->Autoviz) (3.5.0)
+    
+    Requirement already satisfied: typing-extensions>=3.6.4 in /opt/conda/lib/python3.7/site-packages (from importlib-metadata<5->ipykernel->jupyter->Autoviz) (3.7.4.3)
+    
+    Requirement already satisfied: python-dateutil>=2.1 in /opt/conda/lib/python3.7/site-packages (from jupyter-client<8.0->ipykernel->jupyter->Autoviz) (2.8.0)
+    
+    Requirement already satisfied: jupyter-core>=4.6.0 in /opt/conda/lib/python3.7/site-packages (from jupyter-client<8.0->ipykernel->jupyter->Autoviz) (4.7.1)
+    
+    Requirement already satisfied: pyzmq>=13 in /opt/conda/lib/python3.7/site-packages (from jupyter-client<8.0->ipykernel->jupyter->Autoviz) (22.2.1)
+    
+    Requirement already satisfied: six>=1.5 in /opt/conda/lib/python3.7/site-packages (from python-dateutil>=2.1->jupyter-client<8.0->ipykernel->jupyter->Autoviz) (1.15.0)
+    
+    Requirement already satisfied: widgetsnbextension~=3.5.0 in /opt/conda/lib/python3.7/site-packages (from ipywidgets->jupyter->Autoviz) (3.5.1)
+    
+    Requirement already satisfied: jupyterlab-widgets>=1.0.0 in /opt/conda/lib/python3.7/site-packages (from ipywidgets->jupyter->Autoviz) (1.0.0)
+    
+    Requirement already satisfied: nbformat>=4.2.0 in /opt/conda/lib/python3.7/site-packages (from ipywidgets->jupyter->Autoviz) (5.1.3)
+    
+    Requirement already satisfied: jsonschema!=2.5.0,>=2.4 in /opt/conda/lib/python3.7/site-packages (from nbformat>=4.2.0->ipywidgets->jupyter->Autoviz) (3.2.0)
+    
+    Requirement already satisfied: attrs>=17.4.0 in /opt/conda/lib/python3.7/site-packages (from jsonschema!=2.5.0,>=2.4->nbformat>=4.2.0->ipywidgets->jupyter->Autoviz) (21.2.0)
+    
+    Requirement already satisfied: pyrsistent>=0.14.0 in /opt/conda/lib/python3.7/site-packages (from jsonschema!=2.5.0,>=2.4->nbformat>=4.2.0->ipywidgets->jupyter->Autoviz) (0.17.3)
+    
+    Requirement already satisfied: jinja2 in /opt/conda/lib/python3.7/site-packages (from notebook->jupyter->Autoviz) (3.0.1)
+    
+    Requirement already satisfied: prometheus-client in /opt/conda/lib/python3.7/site-packages (from notebook->jupyter->Autoviz) (0.11.0)
+    
+    Requirement already satisfied: terminado>=0.8.3 in /opt/conda/lib/python3.7/site-packages (from notebook->jupyter->Autoviz) (0.10.1)
+    
+    Requirement already satisfied: argon2-cffi in /opt/conda/lib/python3.7/site-packages (from notebook->jupyter->Autoviz) (20.1.0)
+    
+    Requirement already satisfied: Send2Trash>=1.5.0 in /opt/conda/lib/python3.7/site-packages (from notebook->jupyter->Autoviz) (1.8.0)
+    
+    Requirement already satisfied: cffi>=1.0.0 in /opt/conda/lib/python3.7/site-packages (from argon2-cffi->notebook->jupyter->Autoviz) (1.14.6)
+    
+    Requirement already satisfied: pycparser in /opt/conda/lib/python3.7/site-packages (from cffi>=1.0.0->argon2-cffi->notebook->jupyter->Autoviz) (2.20)
+    
+    Requirement already satisfied: MarkupSafe>=2.0 in /opt/conda/lib/python3.7/site-packages (from jinja2->notebook->jupyter->Autoviz) (2.0.1)
+    
+    Requirement already satisfied: cycler>=0.10 in /opt/conda/lib/python3.7/site-packages (from matplotlib->Autoviz) (0.10.0)
+    
+    Requirement already satisfied: kiwisolver>=1.0.1 in /opt/conda/lib/python3.7/site-packages (from matplotlib->Autoviz) (1.3.1)
+    
+    Requirement already satisfied: pyparsing>=2.2.1 in /opt/conda/lib/python3.7/site-packages (from matplotlib->Autoviz) (2.4.7)
+    
+    Requirement already satisfied: numpy>=1.16 in /opt/conda/lib/python3.7/site-packages (from matplotlib->Autoviz) (1.19.5)
+    
+    Requirement already satisfied: pillow>=6.2.0 in /opt/conda/lib/python3.7/site-packages (from matplotlib->Autoviz) (8.2.0)
+    
+    Requirement already satisfied: mistune<2,>=0.8.1 in /opt/conda/lib/python3.7/site-packages (from nbconvert->jupyter->Autoviz) (0.8.4)
+    
+    Requirement already satisfied: nbclient<0.6.0,>=0.5.0 in /opt/conda/lib/python3.7/site-packages (from nbconvert->jupyter->Autoviz) (0.5.4)
+    
+    Requirement already satisfied: entrypoints>=0.2.2 in /opt/conda/lib/python3.7/site-packages (from nbconvert->jupyter->Autoviz) (0.3)
+    
+    Requirement already satisfied: jupyterlab-pygments in /opt/conda/lib/python3.7/site-packages (from nbconvert->jupyter->Autoviz) (0.1.2)
+    
+    Requirement already satisfied: pandocfilters>=1.4.1 in /opt/conda/lib/python3.7/site-packages (from nbconvert->jupyter->Autoviz) (1.4.2)
+    
+    Requirement already satisfied: testpath in /opt/conda/lib/python3.7/site-packages (from nbconvert->jupyter->Autoviz) (0.5.0)
+    
+    Requirement already satisfied: defusedxml in /opt/conda/lib/python3.7/site-packages (from nbconvert->jupyter->Autoviz) (0.7.1)
+    
+    Requirement already satisfied: bleach in /opt/conda/lib/python3.7/site-packages (from nbconvert->jupyter->Autoviz) (4.0.0)
+    
+    Requirement already satisfied: nest-asyncio in /opt/conda/lib/python3.7/site-packages (from nbclient<0.6.0,>=0.5.0->nbconvert->jupyter->Autoviz) (1.5.1)
+    
+    Requirement already satisfied: packaging in /opt/conda/lib/python3.7/site-packages (from bleach->nbconvert->jupyter->Autoviz) (21.0)
+    
+    Requirement already satisfied: webencodings in /opt/conda/lib/python3.7/site-packages (from bleach->nbconvert->jupyter->Autoviz) (0.5.1)
+    
+    Requirement already satisfied: pytz>=2017.3 in /opt/conda/lib/python3.7/site-packages (from pandas->Autoviz) (2021.1)
+    
+    Requirement already satisfied: qtpy in /opt/conda/lib/python3.7/site-packages (from qtconsole->jupyter->Autoviz) (1.11.1)
+    
+    Requirement already satisfied: scipy>=0.19.1 in /opt/conda/lib/python3.7/site-packages (from scikit-learn->Autoviz) (1.7.1)
+    
+    Requirement already satisfied: joblib>=0.11 in /opt/conda/lib/python3.7/site-packages (from scikit-learn->Autoviz) (1.0.1)
+    
+    Requirement already satisfied: threadpoolctl>=2.0.0 in /opt/conda/lib/python3.7/site-packages (from scikit-learn->Autoviz) (2.2.0)
+    
+    Requirement already satisfied: patsy>=0.5 in /opt/conda/lib/python3.7/site-packages (from statsmodels->Autoviz) (0.5.1)
+    
+    Installing collected packages: Autoviz
+    
+    Successfully installed Autoviz-0.0.84
+    
+    WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+    
+    
+
+In [20]:
+
+    
+    
+    ! pip install xlrd
+    
+    
+    
+    Collecting xlrd
+    
+      Downloading xlrd-2.0.1-py2.py3-none-any.whl (96 kB)
+    
+         |ââââââââââââââââââââââââââââââââ| 96 kB 939 kB/s 
+    
+    Installing collected packages: xlrd
+    
+    Successfully installed xlrd-2.0.1
+    
+    WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+    
+    
+
+In [21]:
+
+    
+    
+    from autoviz.AutoViz_Class import AutoViz_Class
+    AV = AutoViz_Class()
+    df_av = AV.AutoViz('../input/health-insurance-cost-prediction/insurance.csv')
+    
+    
+    
+    Imported AutoViz_Class version: 0.0.84. Call using:
+        AV = AutoViz_Class()
+        AV.AutoViz(filename, sep=',', depVar='', dfte=None, header=0, verbose=0,
+                                lowess=False,chart_format='svg',max_rows_analyzed=150000,max_cols_analyzed=30)
+    Note: verbose=0 or 1 generates charts and displays them in your local Jupyter notebook.
+          verbose=2 does not show plot but creates them and saves them in AutoViz_Plots directory in your local machine.
+    Shape of your Data Set loaded: (1338, 7)
+    ############## C L A S S I F Y I N G  V A R I A B L E S  ####################
+    Classifying variables in data set...
+        Number of Numeric Columns =  2
+        Number of Integer-Categorical Columns =  2
+        Number of String-Categorical Columns =  1
+        Number of Factor-Categorical Columns =  0
+        Number of String-Boolean Columns =  2
+        Number of Numeric-Boolean Columns =  0
+        Number of Discrete String Columns =  0
+        Number of NLP String Columns =  0
+        Number of Date Time Columns =  0
+        Number of ID Columns =  0
+        Number of Columns to Delete =  0
+        7 Predictors classified...
+            This does not include the Target column(s)
+            No variables removed since no ID or low-information variables found in data set
+    Number of All Scatter Plots = 3
+    
+
+![](__results___files/__results___24_1.png)
+
+![](__results___files/__results___24_2.png)
+
+![](__results___files/__results___24_3.png)
+
+![](__results___files/__results___24_4.png)
+
+![](__results___files/__results___24_5.png)
+
+![](__results___files/__results___24_6.png)
+
+    
+    
+    Time to run AutoViz (in seconds) = 4.800
+    
+     ###################### VISUALIZATION Completed ########################
+    
+
+# Data Visualisation¶
+
+In [22]:
+
+    
+    
+    df['age'].value_counts()
+    
+
+Out[22]:
+
+    
+    
+    18    69
+    19    67
+    50    29
+    51    29
+    47    29
+    46    29
+    45    29
+    20    29
+    48    29
+    52    29
+    22    28
+    49    28
+    54    28
+    53    28
+    21    28
+    26    28
+    24    28
+    25    28
+    28    28
+    27    28
+    23    28
+    43    27
+    29    27
+    30    27
+    41    27
+    42    27
+    44    27
+    31    27
+    40    27
+    32    26
+    33    26
+    56    26
+    34    26
+    55    26
+    57    26
+    37    25
+    59    25
+    58    25
+    36    25
+    38    25
+    35    25
+    39    25
+    61    23
+    60    23
+    63    23
+    62    23
+    64    22
+    Name: age, dtype: int64
+
+In [23]:
+
+    
+    
+    fig = px.histogram(x = df['age'])
+    fig.show()
+    
+
+In [24]:
+
+    
+    
+    df['sex'].value_counts()
+    
+
+Out[24]:
+
+    
+    
+    male      675
+    female    662
+    Name: sex, dtype: int64
+
+In [25]:
+
+    
+    
+    sns.countplot(x = 'sex',data=df)
+    plt.show()
+    
+
+![](__results___files/__results___29_0.png)
+
+In [26]:
+
+    
+    
+    fig = px.histogram(df, 'charges',             
+                       color="sex",
+                       title="<b>Average charges</b>")
+    
+    fig.add_vline(x=df['charges'].mean(), line_width=2, line_dash="dash", line_color="black")
+    
+    fig.show()
+    #AS we can see that in majority of the cases females are paying more charges
+    # majority of the payers were paying lessthan 10k insurance charges
+    
+
+In [27]:
+
+    
+    
+    df['smoker'].value_counts()
+    
+
+Out[27]:
+
+    
+    
+    no     1063
+    yes     274
+    Name: smoker, dtype: int64
+
+In [28]:
+
+    
+    
+    sns.countplot(x = 'smoker',data=df)
+    plt.show()
+    
+
+![](__results___files/__results___32_0.png)
+
+In [29]:
+
+    
+    
+    fig = px.histogram(df, 'charges',             
+                       color="smoker",
+                       title="<b>Average charges</b>")
+    
+    fig.add_vline(x=df['charges'].mean(), line_width=2, line_dash="dash", line_color="black")
+    
+    fig.show()
+    #AS we can see that upto 10k majority of insurance payers were non smokers and after 10k majority of payers were smokers
+    
+
+In [30]:
+
+    
+    
+    df['region'].value_counts()
+    
+
+Out[30]:
+
+    
+    
+    southeast    364
+    southwest    325
+    northwest    324
+    northeast    324
+    Name: region, dtype: int64
+
+In [31]:
+
+    
+    
+    sns.countplot(x = 'region',data=df)
+    plt.show()
+    
+
+![](__results___files/__results___35_0.png)
+
+In [32]:
+
+    
+    
+    fig = px.histogram(df, 'charges',             
+                       color="region",
+                       title="<b>Average charges</b>")
+    
+    fig.add_vline(x=df['charges'].mean(), line_width=2, line_dash="dash", line_color="black")
+    
+    fig.show()
+    #AS we can see that upto 10k majority of insurance payers were non smokers and after 10k majority of payers were smokers
+    
+
+In [33]:
+
+    
+    
+    plt.figure(figsize=(16,9))
+    x = df.drop(['sex','smoker','region'],axis = 1)
+    ax = sns.heatmap(x.corr(),annot = True,cmap = 'viridis')
+    plt.show()
+    
+
+![](__results___files/__results___37_0.png)
+
+In [34]:
+
+    
+    
+    plt.figure(figsize=(6,8))
+    x = df.drop(['sex','smoker','region'],axis = 1)
+    for i in x.columns:
+        sns.histplot(x[i],kde = True)
+        plt.show()
+    
+
+![](__results___files/__results___38_0.png)
+
+![](__results___files/__results___38_1.png)
+
+![](__results___files/__results___38_2.png)
+
+![](__results___files/__results___38_3.png)
+
+In [35]:
+
+    
+    
+    x = df.drop(['sex','smoker','region'],axis = 1)
+    for i in x.columns:
+        sns.boxplot(x = i, data = x,color = 'yellowgreen')
+        plt.xlabel(i)
+        plt.show()
+    
+
+![](__results___files/__results___39_0.png)
+
+![](__results___files/__results___39_1.png)
+
+![](__results___files/__results___39_2.png)
+
+![](__results___files/__results___39_3.png)
+
+In [36]:
+
+    
+    
+    x = df.drop(['sex','smoker','region'],axis = 1)
+    for i in x.columns:
+        sns.violinplot(x = i, data = x)
+        plt.xlabel(i)
+        plt.show()
+    
+
+![](__results___files/__results___40_0.png)
+
+![](__results___files/__results___40_1.png)
+
+![](__results___files/__results___40_2.png)
+
+![](__results___files/__results___40_3.png)
+
+In [37]:
+
+    
+    
+    plt.figure(figsize=(6,8))
+    x = df.drop(['sex','smoker','region'],axis = 1)
+    for i in x.columns[:-1]:
+        sns.scatterplot(x = 'charges' ,y = i, data = df, color = 'red')
+        plt.show()
+    
+
+![](__results___files/__results___41_0.png)
+
+![](__results___files/__results___41_1.png)
+
+![](__results___files/__results___41_2.png)
+
+In [38]:
+
+    
+    
+    sns.pairplot(df)
+    
+
+Out[38]:
+
+    
+    
+    <seaborn.axisgrid.PairGrid at 0x7f5d12bc4c90>
+
+![](__results___files/__results___42_1.png)
+
+# Count of Outliers¶
+
+In [39]:
+
+    
+    
+    def count_outliers(data,col):
+            q1 = data[col].quantile(0.25,interpolation='nearest')
+            q2 = data[col].quantile(0.5,interpolation='nearest')
+            q3 = data[col].quantile(0.75,interpolation='nearest')
+            q4 = data[col].quantile(1,interpolation='nearest')
+            IQR = q3 -q1
+            global LLP
+            global ULP
+            LLP = q1 - 1.5*IQR
+            ULP = q3 + 1.5*IQR
+            if data[col].min() > LLP and data[col].max() < ULP:
+                print("No outliers in",i)
+            else:
+                print("There are outliers in",i)
+                x = data[data[col]<LLP][col].size
+                y = data[data[col]>ULP][col].size
+                a.append(i)
+                print('Count of outliers are:',x+y)
+    global a
+    a = []
+    for i in x.columns:
+        count_outliers(x,i)
+    
+    
+    
+    No outliers in age
+    There are outliers in bmi
+    Count of outliers are: 9
+    There are outliers in children
+    Count of outliers are: 0
+    There are outliers in charges
+    Count of outliers are: 139
+    
+
+# Data Preprocessing¶
+
+In [40]:
+
+    
+    
+    df
+    
+
+Out[40]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+... | ... | ... | ... | ... | ... | ... | ...  
+1332 | 50 | male | 30.970 | 3 | no | northwest | 10600.54830  
+1333 | 18 | female | 31.920 | 0 | no | northeast | 2205.98080  
+1334 | 18 | female | 36.850 | 0 | no | southeast | 1629.83350  
+1335 | 21 | female | 25.800 | 0 | no | southwest | 2007.94500  
+1336 | 61 | female | 29.070 | 0 | yes | northwest | 29141.36030  
+  
+1337 rows Ã 7 columns
+
+In [41]:
+
+    
+    
+    n = 'sex'
+    encoded_method = LabelEncoder.fit_transform(LabelEncoder,df[n])
+    pd.DataFrame(df[n].value_counts().index, pd.Series(encoded_method).value_counts().index)
+    df = df.copy()
+    label_1 = pd.get_dummies(df,columns=[n],drop_first=True)
+    label_1.insert(loc=2, column=n, value=df[n].values)
+    label_1.drop([n],axis = 1,inplace = True)
+    label_1
+    
+
+Out[41]:
+
+| age | bmi | children | smoker | region | charges | sex_male  
+---|---|---|---|---|---|---|---  
+0 | 19 | 27.900 | 0 | yes | southwest | 16884.92400 | 0  
+1 | 18 | 33.770 | 1 | no | southeast | 1725.55230 | 1  
+2 | 28 | 33.000 | 3 | no | southeast | 4449.46200 | 1  
+3 | 33 | 22.705 | 0 | no | northwest | 21984.47061 | 1  
+4 | 32 | 28.880 | 0 | no | northwest | 3866.85520 | 1  
+... | ... | ... | ... | ... | ... | ... | ...  
+1332 | 50 | 30.970 | 3 | no | northwest | 10600.54830 | 1  
+1333 | 18 | 31.920 | 0 | no | northeast | 2205.98080 | 0  
+1334 | 18 | 36.850 | 0 | no | southeast | 1629.83350 | 0  
+1335 | 21 | 25.800 | 0 | no | southwest | 2007.94500 | 0  
+1336 | 61 | 29.070 | 0 | yes | northwest | 29141.36030 | 0  
+  
+1337 rows Ã 7 columns
+
+In [42]:
+
+    
+    
+    n = 'smoker'
+    encoded_method = LabelEncoder.fit_transform(LabelEncoder,df[n])
+    pd.DataFrame(df[n].value_counts().index, pd.Series(encoded_method).value_counts().index)
+    label_1 = label_1.copy()
+    label_2 = pd.get_dummies(label_1,columns=[n],drop_first=True)
+    label_2.insert(loc=4, column=n, value=df[n].values)
+    label_2.drop([n],axis = 1,inplace = True)
+    label_2
+    
+
+Out[42]:
+
+| age | bmi | children | region | charges | sex_male | smoker_yes  
+---|---|---|---|---|---|---|---  
+0 | 19 | 27.900 | 0 | southwest | 16884.92400 | 0 | 1  
+1 | 18 | 33.770 | 1 | southeast | 1725.55230 | 1 | 0  
+2 | 28 | 33.000 | 3 | southeast | 4449.46200 | 1 | 0  
+3 | 33 | 22.705 | 0 | northwest | 21984.47061 | 1 | 0  
+4 | 32 | 28.880 | 0 | northwest | 3866.85520 | 1 | 0  
+... | ... | ... | ... | ... | ... | ... | ...  
+1332 | 50 | 30.970 | 3 | northwest | 10600.54830 | 1 | 0  
+1333 | 18 | 31.920 | 0 | northeast | 2205.98080 | 0 | 0  
+1334 | 18 | 36.850 | 0 | southeast | 1629.83350 | 0 | 0  
+1335 | 21 | 25.800 | 0 | southwest | 2007.94500 | 0 | 0  
+1336 | 61 | 29.070 | 0 | northwest | 29141.36030 | 0 | 1  
+  
+1337 rows Ã 7 columns
+
+In [43]:
+
+    
+    
+    n = 'region'
+    encoded_method = LabelEncoder.fit_transform(LabelEncoder,df[n])
+    pd.DataFrame(df[n].value_counts().index, pd.Series(encoded_method).value_counts().index)
+    label_2 = label_2.copy()
+    label_3 = pd.get_dummies(label_2,columns=[n],drop_first=True)
+    label_3.insert(loc=4, column=n, value=df[n].values)
+    label_3.drop([n],axis = 1,inplace = True)
+    label_3
+    
+
+Out[43]:
+
+| age | bmi | children | charges | sex_male | smoker_yes | region_northwest | region_southeast | region_southwest  
+---|---|---|---|---|---|---|---|---|---  
+0 | 19 | 27.900 | 0 | 16884.92400 | 0 | 1 | 0 | 0 | 1  
+1 | 18 | 33.770 | 1 | 1725.55230 | 1 | 0 | 0 | 1 | 0  
+2 | 28 | 33.000 | 3 | 4449.46200 | 1 | 0 | 0 | 1 | 0  
+3 | 33 | 22.705 | 0 | 21984.47061 | 1 | 0 | 1 | 0 | 0  
+4 | 32 | 28.880 | 0 | 3866.85520 | 1 | 0 | 1 | 0 | 0  
+... | ... | ... | ... | ... | ... | ... | ... | ... | ...  
+1332 | 50 | 30.970 | 3 | 10600.54830 | 1 | 0 | 1 | 0 | 0  
+1333 | 18 | 31.920 | 0 | 2205.98080 | 0 | 0 | 0 | 0 | 0  
+1334 | 18 | 36.850 | 0 | 1629.83350 | 0 | 0 | 0 | 1 | 0  
+1335 | 21 | 25.800 | 0 | 2007.94500 | 0 | 0 | 0 | 0 | 1  
+1336 | 61 | 29.070 | 0 | 29141.36030 | 0 | 1 | 1 | 0 | 0  
+  
+1337 rows Ã 9 columns
+
+# Feature Scaling¶
+
+In [44]:
+
+    
+    
+    scaler = StandardScaler()
+    scaler.fit(label_3.drop(['charges'],axis = 1))
+    
+
+Out[44]:
+
+    
+    
+    StandardScaler()
+
+# Feature Selection¶
+
+In [45]:
+
+    
+    
+    X = label_3.drop(['charges'],axis = 1)
+    Y = label_3['charges']
+    X_train,X_test,Y_train,Y_test = train_test_split(X,Y,test_size = 0.3,random_state=44)
+    
+
+# Prediction using polynomial regression of degree 2¶
+
+In [46]:
+
+    
+    
+    poly = PolynomialFeatures(degree=2)
+    
+
+In [47]:
+
+    
+    
+    X_poly = poly.fit_transform(X_train)
+    
+
+In [48]:
+
+    
+    
+    L1 = LinearRegression()
+    L1.fit(X_poly,Y_train)
+    
+
+Out[48]:
+
+    
+    
+    LinearRegression()
+
+In [49]:
+
+    
+    
+    X_test_poly =poly.fit_transform(X_test)
+    
+
+In [50]:
+
+    
+    
+    Y_pred=L1.predict(X_test_poly)
+    Y_pred
+    
+
+Out[50]:
+
+    
+    
+    array([ 6.69214062e+03,  1.24340000e+04, -4.31140625e+02,  1.11596719e+04,
+            6.67231250e+03,  9.41979688e+03,  1.10399219e+04,  1.08377656e+04,
+            3.60026719e+04,  7.65500000e+03,  1.18751562e+04,  4.77712500e+03,
+            6.42162500e+03,  2.00016719e+04,  5.51435938e+03,  6.97804688e+03,
+            2.79429219e+04,  8.37484375e+03,  2.53604688e+03,  1.91393750e+03,
+            2.08839375e+04,  5.60682812e+03,  8.93621875e+03,  5.94725000e+03,
+            6.15009375e+03,  5.94442188e+03,  3.03689219e+04,  3.54682812e+03,
+            8.57104688e+03,  1.17407656e+04,  5.60481250e+03,  4.43212812e+04,
+            1.16812500e+04,  9.96735938e+03, -4.51250000e+01,  1.36141875e+04,
+            4.47081250e+03,  1.20078125e+04,  4.61476562e+03,  4.72393750e+03,
+           -1.13128125e+03,  3.72673438e+04,  9.66360938e+03,  1.04256406e+04,
+            1.26915781e+04,  3.05878125e+03,  2.99968906e+04,  2.03337812e+04,
+            6.60487500e+03,  3.47236094e+04,  3.71470312e+03,  3.15371406e+04,
+            6.86923438e+03,  2.35986719e+04,  1.96635625e+04,  9.87253125e+03,
+            5.46526562e+03,  3.87104688e+03,  1.66724688e+04,  9.29632812e+03,
+            1.41095938e+04,  8.51184375e+03,  5.36392344e+04,  7.78228125e+03,
+            6.89156250e+03,  2.07331406e+04,  3.66262500e+03,  5.03073438e+03,
+            5.37512500e+03,  7.07746875e+03,  3.88989062e+03,  6.56754688e+03,
+            1.16142500e+04,  9.03701562e+03,  7.46295312e+03,  2.76931250e+04,
+            1.35286875e+04,  9.85353125e+03,  2.78066875e+04,  2.82817188e+03,
+            7.55939062e+03,  3.08968281e+04,  7.86443750e+03,  6.11832812e+03,
+            3.11248906e+04,  7.66782812e+03,  3.10123125e+04,  9.36157812e+03,
+            3.31065469e+04,  3.37184375e+03,  1.49705312e+04,  6.95340625e+03,
+            6.30595312e+03,  4.84115625e+03,  1.21348750e+04,  3.27790625e+03,
+            7.96453125e+03,  4.56335938e+03,  7.82223438e+03,  4.33808906e+04,
+            1.13248281e+04,  6.88168750e+03,  1.25927188e+04,  3.48218281e+04,
+            1.48172812e+04,  3.64278125e+03,  6.19779688e+03,  4.06564062e+04,
+            1.37192344e+04,  5.08292188e+03,  6.55751562e+03,  1.28557344e+04,
+            2.68216250e+04,  1.19449062e+04,  1.13134844e+04,  2.31036875e+04,
+            1.28258125e+04,  1.67365312e+04,  3.90260938e+03,  2.90512500e+03,
+            1.07437656e+04,  5.48150000e+03,  3.29504688e+03,  4.03493438e+04,
+            8.51354688e+03,  4.80484531e+04,  1.27085000e+04,  2.51937188e+04,
+            4.13272344e+04,  1.11496094e+04,  4.47220312e+04,  7.40801562e+03,
+            3.72206562e+04,  6.41646875e+03,  1.20547969e+04,  4.44514062e+03,
+            5.38728125e+03,  6.89909375e+03,  5.14754688e+03,  1.34225625e+04,
+            1.47327656e+04,  1.03506562e+04, -6.05828125e+02,  4.97185938e+03,
+            4.19132812e+03,  1.23561562e+04,  6.21681250e+03,  1.38466250e+04,
+            3.53687969e+04,  1.19700938e+04,  1.15738281e+04,  8.04567188e+03,
+            5.36162969e+04,  9.34465625e+03,  1.14960156e+04,  8.07390625e+03,
+            1.69850156e+04,  2.72453281e+04,  1.90282812e+03,  7.95409375e+03,
+            3.09270312e+03,  2.18040625e+03,  7.22701562e+03,  3.73432812e+03,
+            1.34964219e+04,  1.23687031e+04,  7.72943750e+03,  1.06848906e+04,
+            2.91186094e+04,  9.09857812e+03,  1.55046406e+04,  4.14437500e+03,
+            1.37282656e+04,  3.56992812e+04,  6.08631250e+03,  1.49459219e+04,
+            9.44742188e+03,  1.46360156e+04,  1.12736562e+04,  1.41694219e+04,
+            1.27942500e+04,  4.57243750e+03,  1.02020469e+04,  3.61034531e+04,
+            3.93770312e+03,  7.76868750e+03,  5.10882812e+03,  1.09110156e+04,
+            4.74287500e+03,  7.64339062e+03,  7.00659375e+03,  1.27080938e+04,
+            1.14650938e+04,  1.19464688e+04,  9.20884375e+03,  1.52661250e+04,
+            1.47378594e+04,  5.10482812e+03,  1.10812031e+04,  8.81848438e+03,
+            6.39328125e+03,  3.88264062e+03,  9.40440625e+03,  5.24527656e+04,
+            6.75803125e+03,  3.57684688e+04,  3.85966562e+04,  2.78022656e+04,
+            1.62238750e+04,  7.63465625e+03,  5.53556250e+03,  1.29007500e+04,
+            6.48275000e+03,  1.87082344e+04,  1.18760000e+04,  3.62328750e+04,
+            2.70215625e+03,  6.03321875e+03,  1.09784219e+04,  4.12359062e+04,
+            4.91953125e+03,  7.13190625e+03,  1.41741094e+04,  3.71630781e+04,
+            1.26093750e+04,  1.02110781e+04,  4.05421875e+03,  1.12699219e+04,
+            1.72678125e+04,  4.20637500e+03,  1.20065000e+04,  3.70500000e+03,
+            4.07329688e+04,  5.50839062e+03,  4.59842188e+03,  5.73689062e+03,
+            4.78875000e+03,  1.43494688e+04,  1.55895000e+04,  5.03525938e+04,
+            1.19763906e+04,  1.30545469e+04,  5.72432812e+03,  1.41194375e+04,
+            6.10067188e+03,  5.73562500e+03,  2.75743750e+03,  1.40214531e+04,
+            6.93340625e+03,  2.08657812e+03,  8.83760938e+03,  5.08890156e+04,
+            1.07099844e+04,  3.01140625e+03,  1.20796875e+04,  3.47300000e+03,
+            8.26556250e+03,  1.57822188e+04,  4.14321875e+03,  1.04377188e+04,
+            8.98645312e+03,  1.41128438e+04,  4.26456875e+04,  3.46545312e+03,
+            9.23128125e+03,  1.59088125e+04,  3.81205781e+04,  6.45342188e+03,
+            7.33090625e+03,  8.04112500e+03,  1.94615625e+04,  3.57181250e+03,
+            7.57235938e+03,  1.15310781e+04,  5.36810312e+04,  1.29067500e+04,
+            6.79450000e+03,  1.06546875e+04,  7.68901562e+03,  3.76716406e+04,
+            6.12159375e+03,  6.66646875e+03,  1.34180000e+04,  2.77046875e+03,
+            1.04506406e+04,  2.04132656e+04,  7.26582812e+03,  3.67371875e+03,
+            1.07774062e+04,  2.39281719e+04,  8.97331250e+03,  8.49950000e+03,
+            1.00952812e+04,  2.59793281e+04,  1.28303594e+04,  1.00935938e+04,
+            7.60243750e+03,  4.33487656e+04,  7.35871875e+03,  3.83526406e+04,
+            2.57770781e+04,  1.41841719e+04,  9.94957812e+03,  1.26615000e+04,
+            3.36201406e+04,  1.22853750e+04,  2.96667656e+04,  4.18426875e+04,
+            1.40919688e+04,  1.32240781e+04,  3.63026562e+03,  1.22969062e+04,
+            1.41328906e+04,  1.33710781e+04,  9.77532812e+03,  1.36709219e+04,
+            1.38336250e+04,  4.98615625e+03,  9.12279688e+03,  1.69859375e+03,
+            7.76562500e+03,  8.29425000e+03,  1.13337344e+04,  1.51604062e+04,
+            1.12553125e+03,  1.24317031e+04,  1.14925781e+04,  6.48356250e+03,
+            2.48453281e+04,  1.13822031e+04,  6.56890625e+03,  3.60217344e+04,
+            1.28276562e+03,  8.65428125e+03,  5.95434375e+03,  4.25420312e+03,
+            4.17739062e+03,  7.13159375e+03,  4.22320312e+03,  1.39485312e+04,
+            1.45832031e+04,  4.31544062e+04,  7.50634375e+03,  1.60145312e+03,
+            5.70762500e+03,  6.01287500e+03,  7.81812500e+03,  1.11334062e+04,
+            4.23323125e+04,  6.32232812e+03,  3.99120000e+04,  1.85810938e+04,
+            6.29618750e+03,  2.99403125e+03,  3.12635625e+04,  6.71439062e+03,
+            1.37792812e+04,  5.68962500e+03,  1.40046250e+04,  9.09143750e+03,
+            7.56879688e+03,  1.38142344e+04,  3.62975000e+03,  1.02868594e+04,
+            5.72368750e+03,  3.20331250e+03,  2.49250469e+04,  4.97302188e+04,
+            1.24738438e+04,  9.77532812e+03,  4.03842188e+03,  4.98375000e+03,
+            3.14032812e+03,  1.49260469e+04,  9.58593750e+01,  3.66451094e+04,
+            5.02031094e+04,  8.21279688e+03,  1.09709531e+04,  4.01682812e+03,
+            1.26756562e+04,  1.05841094e+04,  2.49769688e+04,  1.44635000e+04,
+            6.29882812e+03,  1.47988906e+04,  1.19623125e+04,  2.61945938e+04,
+            6.33468750e+03,  4.30201406e+04,  5.42120312e+03,  4.29004688e+03,
+            1.79643594e+04,  1.17336562e+04,  3.33615625e+03,  1.39673281e+04,
+            5.32407344e+04,  9.62495312e+03,  4.68307031e+04,  2.38613125e+04,
+            3.88032812e+03,  3.48160938e+03])
+
+In [51]:
+
+    
+    
+    print("R2 score",r2_score(Y_test,Y_pred))
+    print("MSE",np.sqrt(mean_squared_error(Y_test,Y_pred)))
+    
+    
+    
+    R2 score 0.8719582735565915
+    MSE 4364.054900358376
+    
+
+In [ ]:
+
+    
+    
+     
+    
+

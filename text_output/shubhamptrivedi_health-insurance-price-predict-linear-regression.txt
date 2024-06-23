@@ -1,0 +1,2359 @@
+# Predicting Medical Expenses using Linear Regression¶
+
+## Problem Statement¶
+
+We'll work through a typical machine learning problem step-by-step:
+
+> **QUESTION** : ACME Insurance Inc. offers affordable health insurance to
+> thousands of customer all over the United States. As the lead data scientist
+> at ACME, **you're tasked with creating an automated system to estimate the
+> annual medical expenditure for new customers** , using information such as
+> their age, sex, BMI, children, smoking habits and region of residence.
+>
+> Estimates from your system will be used to determine the annual insurance
+> premium (amount paid every month) offered to the customer. Due to regulatory
+> requirements, you must be able to explain why your system outputs a certain
+> prediction.
+>
+> You're given a [CSV
+> file](https://raw.githubusercontent.com/JovianML/opendatasets/master/data/medical-
+> charges.csv) containing verified historical data, consisting of the
+> aforementioned information and the actual medical charges incurred by over
+> 1300 customers. ![](https://i.imgur.com/87Uw0aG.png)
+
+We are going to create a Pandas dataframe using the Medical.csv file, to view
+and analyze the data.
+
+In [1]:
+
+    
+    
+    import numpy as np 
+    import pandas as pd 
+    
+
+In [2]:
+
+    
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    
+    
+    /kaggle/input/health-insurance-dataset/Health_insurance.csv
+    
+
+In [3]:
+
+    
+    
+    medical_df = pd.read_csv('../input/health-insurance-dataset/Health_insurance.csv')
+    
+
+In [4]:
+
+    
+    
+    medical_df
+    
+
+Out[4]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+... | ... | ... | ... | ... | ... | ... | ...  
+1333 | 50 | male | 30.970 | 3 | no | northwest | 10600.54830  
+1334 | 18 | female | 31.920 | 0 | no | northeast | 2205.98080  
+1335 | 18 | female | 36.850 | 0 | no | southeast | 1629.83350  
+1336 | 21 | female | 25.800 | 0 | no | southwest | 2007.94500  
+1337 | 61 | female | 29.070 | 0 | yes | northwest | 29141.36030  
+  
+1338 rows Ã 7 columns
+
+The dataset contains 1338 rows and 7 columns. Each row of the dataset contains
+information about one customer.
+
+Our objective is to find a way to estimate the value in the "charges" column
+using the values in the other columns. If we can do so for the historical
+data, then we should able to estimate charges for new customers too, simply by
+asking for information like their age, sex, BMI, no. of children, smoking
+habits and region.
+
+In [5]:
+
+    
+    
+    #Exploring the data for higher level information
+    medical_df.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 1338 entries, 0 to 1337
+    Data columns (total 7 columns):
+     #   Column    Non-Null Count  Dtype  
+    ---  ------    --------------  -----  
+     0   age       1338 non-null   int64  
+     1   sex       1338 non-null   object 
+     2   bmi       1338 non-null   float64
+     3   children  1338 non-null   int64  
+     4   smoker    1338 non-null   object 
+     5   region    1338 non-null   object 
+     6   charges   1338 non-null   float64
+    dtypes: float64(2), int64(2), object(3)
+    memory usage: 73.3+ KB
+    
+
+Looks like "age", "children", "bmi" and "charges" are numbers, whereas "sex",
+"smoker" and "region" are strings (possibly categories). None of the columns
+contain any missing values, which saves us a fair bit of work!
+
+Here are some statistics for the numerical columns:
+
+In [6]:
+
+    
+    
+    medical_df.describe()
+    
+
+Out[6]:
+
+| age | bmi | children | charges  
+---|---|---|---|---  
+count | 1338.000000 | 1338.000000 | 1338.000000 | 1338.000000  
+mean | 39.207025 | 30.663397 | 1.094918 | 13270.422265  
+std | 14.049960 | 6.098187 | 1.205493 | 12110.011237  
+min | 18.000000 | 15.960000 | 0.000000 | 1121.873900  
+25% | 27.000000 | 26.296250 | 0.000000 | 4740.287150  
+50% | 39.000000 | 30.400000 | 1.000000 | 9382.033000  
+75% | 51.000000 | 34.693750 | 2.000000 | 16639.912515  
+max | 64.000000 | 53.130000 | 5.000000 | 63770.428010  
+  
+The ranges of values in the numerical columns seem reasonable too, so we may
+not have to do much data cleaning or correction. The "charges" column seems to
+be significantly skewed however, as the median (50 percentile,it is also know
+as 2nd quartile) is much lower than the maximum value.
+
+## Exploratory Analysis and Visualization¶
+
+Let's explore the data by visualizing the distribution of values in some
+columns of the dataset, and the relationships between "charges" and other
+columns.
+
+We'll use libraries Matplotlib, Seaborn and Plotly for visualization.
+
+In [7]:
+
+    
+    
+    !pip install plotly matplotlib seaborn --quiet
+    
+    
+    
+    WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+    
+    
+
+In [8]:
+
+    
+    
+    import plotly.express as px
+    import matplotlib
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    %matplotlib inline
+    
+
+The following settings will improve the default style and font sizes for our
+charts.
+
+In [9]:
+
+    
+    
+    sns.set_style('darkgrid')
+    matplotlib.rcParams['font.size'] = 14
+    matplotlib.rcParams['figure.figsize'] = (10, 6)
+    matplotlib.rcParams['figure.facecolor'] = '#00000000'
+    
+
+### Age¶
+
+Age is a numeric column. The minimum age in the dataset is 18 and the maximum
+age is 64. Thus, we can visualize the distribution of age using a histogram
+with 47 bins (one for each year) and a box plot. We'll use plotly to make the
+chart interactive, but you can create similar charts using Seaborn.
+
+In [10]:
+
+    
+    
+    medical_df.age.describe()
+    
+
+Out[10]:
+
+    
+    
+    count    1338.000000
+    mean       39.207025
+    std        14.049960
+    min        18.000000
+    25%        27.000000
+    50%        39.000000
+    75%        51.000000
+    max        64.000000
+    Name: age, dtype: float64
+
+In [11]:
+
+    
+    
+    fig = px.histogram(medical_df, 
+                       x='age', 
+                       marginal='box', 
+                       nbins=47, 
+                       title='Distribution of Age')
+    fig.update_layout(bargap=0.1)
+    fig.show()
+    
+
+The distribution of ages in the dataset is almost uniform, with 20-30
+customers at every age, except for the ages 18 and 19, which seem to have over
+twice as many customers as other ages.
+
+> **Insight** : why there are over twice as many customers with ages 18 and
+> 19, compared to other ages?
+>
+> Insuarance agency charges more money for same premium as you get older and
+> here is the same case.people who are younger are less prone to getting sick
+> and thus company has to pay them less for their medical bills.otherwise
+> every age group in US has eqvivalent population density.
+
+### Body Mass Index¶
+
+Let's look at the distribution of BMI (Body Mass Index) of customers, using a
+histogram and box plot.
+
+In [12]:
+
+    
+    
+    fig = px.histogram(medical_df, 
+                       x='bmi', 
+                       marginal='box', 
+                       color_discrete_sequence=['red'], 
+                       title='Distribution of BMI (Body Mass Index)')
+    fig.update_layout(bargap=0.1)
+    fig.show()
+    
+
+The measurements of body mass index seem to form a Gaussian distribution
+centered around the value 30, with a few outliers towards the right.
+
+> **Insight** :why the distribution of ages forms a uniform distribution while
+> the distribution of BMIs forms a gaussian distribution?
+>
+> As there are same number of people in age groups the distribution we get is
+> uniform distribution.But, for BMIs distribution we get gaussian distribution
+> as people who are between 20-3- are considered to be healthy relatively and
+> less than or more than this range is considered to be health risk categories
+> and these people are more prone to health issues and thus company will have
+> to pay more medical bills of this kind of customers and thus they provide
+> these type of people same health insuarance at higher prices and which in-
+> turn attracts lesser people with out of healthy range BMI because they have
+> to pay more.
+
+### Charges¶
+
+Let's visualize the distribution of "charges" i.e. the annual medical charges
+for customers. This is the column we're trying to predict. Let's also use the
+categorical column "smoker" to distinguish the charges for smokers and non-
+smokers.
+
+In [13]:
+
+    
+    
+    fig = px.histogram(medical_df, 
+                       x='charges', 
+                       marginal='box', 
+                       color='smoker', 
+                       color_discrete_sequence=['red', 'grey'], 
+                       title='Annual Medical Charges')
+    fig.update_layout(bargap=0.1)
+    fig.show()
+    
+
+We can make the following observations from the above graph:
+
+  * For most customers, the annual medical charges are under \$10,000. Only a small fraction of customer have higher medical expenses, possibly due to accidents, major illnesses and genetic diseases. The distribution follows a "power law"
+  * There is a significant difference in medical expenses between smokers and non-smokers. While the median for non-smokers is \$7300, the median for smokers is close to \\\$35,000.
+
+# Visualization of the distribution of medical charges in connection with
+other factors like "sex" and "region".¶
+
+In [14]:
+
+    
+    
+    fig = px.histogram(medical_df,
+                       x = 'charges',
+                       color = 'sex',
+                       color_discrete_sequence = ["blue","red"],
+                       title = 'Different charges over genders'
+                   
+    )
+    fig.update_layout(bargap=0.1)
+    fig.show()
+    
+
+In [15]:
+
+    
+    
+    fig = px.histogram(medical_df,
+                      x = "charges",
+                      marginal = 'box', 
+                       color="region",
+                      title = "charges over different regions of U.S.A")
+    fig.update_layout(bargap=0.1)
+    fig.show()
+    
+
+Here in the distribution of charges over gender we see that males are
+substancially charged more because by subconsious behaviour males are
+exploratory and they are more likely to take risks and that keeps them in
+danger more than their counterpart.It is also evident that males of U.S are
+more inclined to get health insuarrance then female. And, in second
+distribution we see that southeaster part of U.S is leading in charges but
+majority of all customers from all parts of US are charged between 0-20k only.
+
+### Smoker¶
+
+Let's visualize the distribution of the "smoker" column (containing values
+"yes" and "no") using a histogram.
+
+In [16]:
+
+    
+    
+    medical_df.smoker.value_counts()
+    
+
+Out[16]:
+
+    
+    
+    no     1064
+    yes     274
+    Name: smoker, dtype: int64
+
+In [17]:
+
+    
+    
+    px.histogram(medical_df, x='smoker', color='sex', title='Smoker')
+    
+
+It appears that 20% of customers have reported that they smoke.We can also see
+that smoking appears a more common habit among males. This is true for the
+given dataset only and so we should always verify if these results of analysis
+also matches the general population which we are going to use our model on
+otherwise the model will assume that in general population also 20 % people
+are smokers but in reality it was only 10 % so we would get incorrect
+predictions.So it is best to check if our primary data analysis matches the
+results of the general public.
+
+# Visualization of the distributions of the "sex", "region" and "children"
+columns¶
+
+In [18]:
+
+    
+    
+    fig = px.histogram(medical_df,
+                      x = 'charges',
+                       marginal ="box",
+                      color = 'children',
+                      title = 'charges incurred by children')
+    fig.update_layout(bargap=0.1)
+    fig.show()
+    
+
+It seems that majority of our customers have 0 or 1 child and median charges
+vary between 8.5k to 11k dollars
+
+We can also conclude that people who have more children are given less
+priority in terms of pricing discounts.
+
+Having looked at individual columns, we can now visualize the relationship
+between "charges" (the value we wish to predict) and other columns.
+
+### Age and Charges¶
+
+Let's visualize the relationship between "age" and "charges" using a scatter
+plot. Each point in the scatter plot represents one customer. We'll also use
+values in the "smoker" column to color the points.
+
+In [19]:
+
+    
+    
+    fig = px.scatter(medical_df, 
+                     x='age', 
+                     y='charges', 
+                     color='smoker', 
+                     opacity=0.8, 
+                     hover_data=['sex'], 
+                     title='Age vs. Charges')
+    fig.update_traces(marker_size=5)
+    fig.show()
+    
+
+We can make the following observations from the above chart:
+
+  * The general trend seems to be that medical charges increase with age, as we might expect. However, there is significant variation at every age, and it's clear that age alone cannot be used to accurately determine medical charges.
+
+  * We can see three "clusters" of points, each of which seems to form a line with an increasing slope:
+
+    1. The first and the largest cluster consists primary of presumably "healthy non-smokers" who have relatively low medical charges compared to others
+
+    2. The second cluster contains a mix of smokers and non-smokers. It's possible that these are actually two distinct but overlapping clusters: "non-smokers with medical issues" and "smokers without major medical issues".
+
+    3. The final cluster consists exclusively of smokers, presumably smokers with major medical issues that are possibly related to or worsened by smoking.
+
+> **Insight** : What other inferences can we draw from the above chart?
+>
+> even if you have ailment or not people who are smokers for majority of the
+> cases incurred more charges in medical bills than non-smokers and this
+> difference is not small it is in the range of 5000 to 1000 $
+
+### BMI and Charges¶
+
+Let's visualize the relationship between BMI (body mass index) and charges
+using another scatter plot. Once again, we'll use the values from the "smoker"
+column to color the points.
+
+In [20]:
+
+    
+    
+    fig = px.scatter(medical_df, 
+                     x='bmi', 
+                     y='charges', 
+                     color='smoker', 
+                     opacity=0.8, 
+                     hover_data=['sex'], 
+                     title='BMI vs. Charges')
+    fig.update_traces(marker_size=5)
+    fig.show()
+    
+
+It appears that for non-smokers, an increase in BMI doesn't seem to be related
+to an increase in medical charges. However, medical charges seem to be
+significantly higher for smokers with a BMI greater than 30.
+
+## Visualizing how the "charges" column is related to other columns
+("children", "sex", "region" and "smoker").¶
+
+In [21]:
+
+    
+    
+    px.violin(medical_df,x = 'children',y = 'charges')
+    
+
+There doesn't seem to have a strong trend among this variables but we can see
+that customer having 5 children have charges incurred in a very specific range
+of 0 to 20,000$ and majority of customers having any number of children or no
+children altogether have charges in range of 0-20,000 dollars
+
+In [22]:
+
+    
+    
+    sns.barplot(data = medical_df,x = 'sex',y = 'charges',hue = "smoker")
+    
+
+Out[22]:
+
+    
+    
+    <AxesSubplot:xlabel='sex', ylabel='charges'>
+
+![](__results___files/__results___48_1.png)
+
+In [23]:
+
+    
+    
+    px.histogram(medical_df,x='sex',y = 'charges',color = 'region')
+    
+
+We can infer that from every region our customer base which has males are
+incurring more bills but interestingly females of northwest region are having
+more medical bills why is this happening that needs more in dept research
+
+### Correlation¶
+
+As you can tell from the analysis, the values in some columns are more closely
+related to the values in "charges" compared to other columns. E.g. "age" and
+"charges" seem to grow together, whereas "bmi" and "charges" don't.
+
+This relationship is often expressed numerically using a measure called the
+_correlation coefficient_ , which can be computed using the .corr method of a
+Pandas series.
+
+In [24]:
+
+    
+    
+    medical_df.charges.corr(medical_df.age)
+    
+
+Out[24]:
+
+    
+    
+    0.2990081933306476
+
+In [25]:
+
+    
+    
+    medical_df.charges.corr(medical_df.bmi)
+    
+
+Out[25]:
+
+    
+    
+    0.19834096883362895
+
+In [26]:
+
+    
+    
+    medical_df.children.corr(medical_df.charges)
+    
+
+Out[26]:
+
+    
+    
+    0.0679982268479048
+
+To compute the correlation for categorical columns, they must first be
+converted into numeric columns.
+
+In [27]:
+
+    
+    
+    smoker_values = {'no': 0, 'yes': 1}
+    smoker_numeric = medical_df.smoker.map(smoker_values)
+    medical_df.charges.corr(smoker_numeric)
+    
+
+Out[27]:
+
+    
+    
+    0.787251430498478
+
+Here's how correlation coefficients can be interpreted
+
+  * **Strength** : The greater the absolute value of the correlation coefficient, the stronger the relationship.
+
+    * The extreme values of -1 and 1 indicate a perfectly linear relationship where a change in one variable is accompanied by a perfectly consistent change in the other. For these relationships, all of the data points fall on a line. In practice, you wonât see either type of perfect relationship.
+
+    * A coefficient of zero represents no linear relationship. As one variable increases, there is no tendency in the other variable to either increase or decrease.
+
+    * When the value is in-between 0 and +1/-1, there is a relationship, but the points donât all fall on a line. As r approaches -1 or 1, the strength of the relationship increases and the data points tend to fall closer to a line.
+
+  * **Direction** : The sign of the correlation coefficient represents the direction of the relationship.
+
+    * Positive coefficients indicate that when the value of one variable increases, the value of the other variable also tends to increase. Positive relationships produce an upward slope on a scatterplot.
+
+    * Negative coefficients represent cases when the value of one variable increases, the value of the other variable tends to decrease. Negative relationships produce a downward slope.
+
+Pandas dataframes also provide a `.corr` method to compute the correlation
+coefficients between all pairs of numeric columns.
+
+In [28]:
+
+    
+    
+    medical_df.corr()
+    
+
+Out[28]:
+
+| age | bmi | children | charges  
+---|---|---|---|---  
+age | 1.000000 | 0.109272 | 0.042469 | 0.299008  
+bmi | 0.109272 | 1.000000 | 0.012759 | 0.198341  
+children | 0.042469 | 0.012759 | 1.000000 | 0.067998  
+charges | 0.299008 | 0.198341 | 0.067998 | 1.000000  
+  
+The result of .corr is called a correlation matrix and is often visualized
+using a heatmap.
+
+In [29]:
+
+    
+    
+    sns.heatmap(medical_df.corr(), cmap='Blues', annot=True)
+    plt.title('Correlation Matrix');
+    
+
+![](__results___files/__results___60_0.png)
+
+## Linear Regression using a Single Feature¶
+
+We now know that the "smoker" and "age" columns have the strongest correlation
+with "charges". Let's try to find a way of estimating the value of "charges"
+using the value of "age" for non-smokers. First, let's create a data frame
+containing just the data for non-smokers.
+
+In [30]:
+
+    
+    
+    non_smoker_df = medical_df[medical_df.smoker == 'no']
+    
+
+Next, let's visualize the relationship between "age" and "charges"
+
+In [31]:
+
+    
+    
+    plt.title('Age vs. Charges')
+    sns.scatterplot(data=non_smoker_df, x='age', y='charges', alpha=0.7, s=15);
+    
+
+![](__results___files/__results___64_0.png)
+
+Apart from a few exceptions, the points seem to form a line. We'll try and
+"fit" a line using this points, and use the line to predict charges for a
+given age. A line on the X&Y coordinates has the following formula:
+
+$y = wx + b$
+
+The line is characterized two numbers: $w$ (called "slope") and $b$ (called
+"intercept").
+
+### Model¶
+
+In the above case, the x axis shows "age" and the y axis shows "charges".
+Thus, we're assume the following relationship between the two:
+
+$charges = w \times age + b$
+
+We'll try determine $w$ and $b$ for the line that best fits the data.
+
+  * This technique is called _linear regression_ , and we call the above equation a _linear regression model_ , because it models the relationship between "age" and "charges" as a straight line.
+
+  * The numbers $w$ and $b$ are called the _parameters_ or _weights_ of the model.
+
+  * The values in the "age" column of the dataset are called the _inputs_ to the model and the values in the charges column are called "targets".
+
+Let define a helper function estimate_charges, to compute $charges$, given
+$age$, $w$ and $b$.
+
+In [32]:
+
+    
+    
+    def estimate_charges(age, w, b):
+        return w * age + b
+    
+
+The `estimate_charges` function is our very first _model_.
+
+Let's try some values of $w$ and $b$
+
+In [33]:
+
+    
+    
+    w = 50
+    b = 100
+    
+
+In [34]:
+
+    
+    
+    estimate_charges(30,w,b)
+    
+
+Out[34]:
+
+    
+    
+    1600
+
+In [35]:
+
+    
+    
+    ages = non_smoker_df.age
+    estimated_charges = estimate_charges(ages, w, b)
+    estimated_charges
+    
+
+Out[35]:
+
+    
+    
+    1       1000
+    2       1500
+    3       1750
+    4       1700
+    5       1650
+            ... 
+    1332    2700
+    1333    2600
+    1334    1000
+    1335    1000
+    1336    1150
+    Name: age, Length: 1064, dtype: int64
+
+In [36]:
+
+    
+    
+    non_smoker_df.charges
+    
+
+Out[36]:
+
+    
+    
+    1        1725.55230
+    2        4449.46200
+    3       21984.47061
+    4        3866.85520
+    5        3756.62160
+               ...     
+    1332    11411.68500
+    1333    10600.54830
+    1334     2205.98080
+    1335     1629.83350
+    1336     2007.94500
+    Name: charges, Length: 1064, dtype: float64
+
+We can plot the estimated charges using a line graph.
+
+In [37]:
+
+    
+    
+    plt.scatter(ages, estimated_charges);
+    plt.plot(ages,estimated_charges,'r-o')
+    plt.xlabel('Age');
+    plt.ylabel('Estimated Charges');
+    
+
+![](__results___files/__results___73_0.png)
+
+As expected, the points lie on a straight line.
+
+We can overlay this line on the actual data, so see how well our _model_ fits
+the _data_.
+
+In [38]:
+
+    
+    
+    target = non_smoker_df.charges
+    
+    plt.plot(ages, estimated_charges, 'r', alpha=0.9);
+    plt.scatter(ages, target, s=8,alpha=0.8);
+    plt.xlabel('Age');
+    plt.ylabel('Charges')
+    plt.legend(['Estimate', 'Actual']);
+    
+
+![](__results___files/__results___75_0.png)
+
+Clearly, the our estimates are quite poor and the line does not "fit" the
+data. However, we can try different values of $w$ and $b$ to move the line
+around. Let's define a helper function try_parameters which takes w and b as
+inputs and creates the above plot.
+
+In [39]:
+
+    
+    
+    def try_parameters(w, b):
+        ages = non_smoker_df.age
+        target = non_smoker_df.charges
+        
+        estimated_charges = estimate_charges(ages, w, b)
+        
+        plt.plot(ages, estimated_charges, 'r', alpha=0.9);
+        plt.scatter(ages, target, s=8,alpha=0.8);
+        plt.xlabel('Age');
+        plt.ylabel('Charges')
+        plt.legend(['Estimate', 'Actual']);
+    
+
+In [40]:
+
+    
+    
+    try_parameters(60, 200)
+    
+
+![](__results___files/__results___78_0.png)
+
+In [41]:
+
+    
+    
+    try_parameters(400, 5000)
+    
+
+![](__results___files/__results___79_0.png)
+
+In [42]:
+
+    
+    
+    try_parameters(350,-700)
+    
+
+![](__results___files/__results___80_0.png)
+
+In [43]:
+
+    
+    
+    try_parameters(300,-700)
+    
+
+![](__results___files/__results___81_0.png)
+
+In [44]:
+
+    
+    
+    try_parameters(350,-750)
+    
+
+![](__results___files/__results___82_0.png)
+
+In [45]:
+
+    
+    
+    try_parameters(250,-1000)
+    
+
+![](__results___files/__results___83_0.png)
+
+So,as we decreased the value of b line started coming down and value of w
+needed to be calibrated as slope was demonstrating wrongful predictions, if we
+increase the value of w slope of the line increases and vice versa.
+
+As we change the values, of $w$ and $b$ manually, trying to move the line
+visually closer to the points, we are _learning_ the approximate relationship
+between "age" and "charges".
+
+Now we need to make our computer do the above task by itself and To do this,
+we need to solve a couple of problems:
+
+  1. We need a way to measure numerically how well the line fits the points.
+
+  2. Once the "measure of fit" has been computed, we need a way to modify w and b to improve the the fit.
+
+### Loss/Cost Function¶
+
+We can compare our model's predictions with the actual targets using the
+following method:
+
+For a Loss function we can use root-mean-squared-method which first calculate
+the difference between tagets and predictions made by model after that,square
+of the obtained value is carried out to eliminate the possibility of negative
+numbers.next comes the mean of the elements and finally to balance out the
+squaring we square root the results obtained in previous step and thus by this
+we get our Loss function eligent and very useful.
+
+Let's define a function to compute the RMSE.
+
+In [46]:
+
+    
+    
+    !pip install numpy --quiet
+    
+    
+    
+    WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+    
+    
+
+In [47]:
+
+    
+    
+    import numpy as np
+    
+
+In [48]:
+
+    
+    
+    def rmse(targets, predictions):
+        return np.sqrt(np.mean(np.square(targets - predictions)))
+    
+
+Let's compute the RMSE for our model with a sample set of weights
+
+In [49]:
+
+    
+    
+    w = 50
+    b = 100
+    
+
+In [50]:
+
+    
+    
+    try_parameters(w, b)
+    
+
+![](__results___files/__results___92_0.png)
+
+In [51]:
+
+    
+    
+    targets = non_smoker_df['charges']
+    predicted = estimate_charges(non_smoker_df.age, w, b)
+    
+
+In [52]:
+
+    
+    
+    rmse(targets, predicted)
+    
+
+Out[52]:
+
+    
+    
+    8461.949562575488
+
+The result is called the _loss_ because it indicates how bad the model is at
+predicting the target variables. It represents information loss in the model:
+the lower the loss, the better the model.
+
+Let's modify the try_parameters functions to also display the loss.
+
+In [53]:
+
+    
+    
+    def try_parameters(w, b):
+        ages = non_smoker_df.age
+        target = non_smoker_df.charges
+        predictions = estimate_charges(ages, w, b)
+        
+        plt.plot(ages, predictions, 'r', alpha=0.9);
+        plt.scatter(ages, target, s=8,alpha=0.8);
+        plt.xlabel('Age');
+        plt.ylabel('Charges')
+        plt.legend(['Prediction', 'Actual']);
+        
+        loss = rmse(target, predictions)
+        print("RMSE Loss: ", loss)
+    
+
+In [54]:
+
+    
+    
+    try_parameters(50, 100)
+    
+    
+    
+    RMSE Loss:  8461.949562575488
+    
+
+![](__results___files/__results___97_1.png)
+
+In [55]:
+
+    
+    
+    try_parameters(250,-1000)
+    
+    
+    
+    RMSE Loss:  4686.972905878285
+    
+
+![](__results___files/__results___98_1.png)
+
+In [56]:
+
+    
+    
+    try_parameters(250,-1200)
+    
+    
+    
+    RMSE Loss:  4673.637609506454
+    
+
+![](__results___files/__results___99_1.png)
+
+In [57]:
+
+    
+    
+    try_parameters(259,-1700)
+    
+    
+    
+    RMSE Loss:  4664.426039892947
+    
+
+![](__results___files/__results___100_1.png)
+
+for the value w = 259 and b = -1700 i got the RMSE value of 4664$ which was
+the lowest i could get after trying many values.for trial and error you should
+try by increasing values of parameter by high differences and if try some
+smaller difference values and incline to choose value of both upper and lower
+limit which present lower rmse.it's like binary sort algorithm and if you
+combine this strategy with gradient decent strategy you get a accurate
+parameters with faster execution
+
+### Optimizer¶
+
+Next, we need a strategy to modify weights w and b to reduce the loss and
+improve the "fit" of the line to the data.
+
+### Linear Regression using Scikit-learn¶
+
+above methods are created by us manually but in practice we are periodically
+be using Scikit-learn as it contains all the necessary ML functions and
+libraries
+
+In [58]:
+
+    
+    
+    !pip install scikit-learn --quiet
+    
+    
+    
+    WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+    
+    
+
+In [59]:
+
+    
+    
+    from sklearn.linear_model import LinearRegression
+    from sklearn.linear_model import SGDRegressor
+    
+
+In [60]:
+
+    
+    
+    model = LinearRegression()
+    
+
+Note:- that the input X must be a 2-d array, so we'll need to pass a
+dataframe, instead of a single column.
+
+In [61]:
+
+    
+    
+    inputs = non_smoker_df[['age']]
+    targets = non_smoker_df.charges
+    print('inputs.shape :', inputs.shape)
+    print('targes.shape :', targets.shape)
+    
+    
+    
+    inputs.shape : (1064, 1)
+    targes.shape : (1064,)
+    
+
+Let's fit the model to the data.
+
+In [62]:
+
+    
+    
+    model.fit(inputs, targets)
+    
+
+Out[62]:
+
+    
+    
+    LinearRegression()
+
+In [63]:
+
+    
+    
+    predictions = model.predict(inputs)
+    
+
+In [64]:
+
+    
+    
+    predictions
+    
+
+Out[64]:
+
+    
+    
+    array([2719.0598744 , 5391.54900271, 6727.79356686, ..., 2719.0598744 ,
+           2719.0598744 , 3520.80661289])
+
+Let's compute the RMSE loss to evaluate the model.
+
+In [65]:
+
+    
+    
+    rmse(targets, predictions)
+    
+
+Out[65]:
+
+    
+    
+    4662.505766636391
+
+Seems like our prediction is off by $4000 on average, which is not too bad.
+
+The parameters of the model are stored in the coef _and intercept_ properties.
+
+In [66]:
+
+    
+    
+    # w
+    model.coef_
+    
+
+Out[66]:
+
+    
+    
+    array([267.24891283])
+
+In [67]:
+
+    
+    
+    # b
+    model.intercept_
+    
+
+Out[67]:
+
+    
+    
+    -2091.4205565650864
+
+> **Optionally** : Use the SGDRegressor class from scikit-learn to train a
+> model using the stochastic gradient descent technique.
+
+In [68]:
+
+    
+    
+    model1 = SGDRegressor()
+    
+
+In [69]:
+
+    
+    
+    model1.fit(inputs,targets)
+    
+
+Out[69]:
+
+    
+    
+    SGDRegressor()
+
+In [70]:
+
+    
+    
+    predictions = model1.predict(inputs)
+    rmse(targets, predictions)
+    
+
+Out[70]:
+
+    
+    
+    4800.529407217996
+
+> # Model creation for Smokers in the dataset¶
+
+In [71]:
+
+    
+    
+    smoker_df = medical_df[medical_df.smoker == 'yes']
+    smoker_df
+    
+
+Out[71]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+11 | 62 | female | 26.290 | 0 | yes | southeast | 27808.72510  
+14 | 27 | male | 42.130 | 0 | yes | southeast | 39611.75770  
+19 | 30 | male | 35.300 | 0 | yes | southwest | 36837.46700  
+23 | 34 | female | 31.920 | 1 | yes | northeast | 37701.87680  
+... | ... | ... | ... | ... | ... | ... | ...  
+1313 | 19 | female | 34.700 | 2 | yes | southwest | 36397.57600  
+1314 | 30 | female | 23.655 | 3 | yes | northwest | 18765.87545  
+1321 | 62 | male | 26.695 | 0 | yes | northeast | 28101.33305  
+1323 | 42 | female | 40.370 | 2 | yes | southeast | 43896.37630  
+1337 | 61 | female | 29.070 | 0 | yes | northwest | 29141.36030  
+  
+274 rows Ã 7 columns
+
+In [72]:
+
+    
+    
+    inputs = smoker_df[['age']]
+    targets = smoker_df.charges
+    print('',inputs.shape)
+    print('',targets.shape)
+    
+    
+    
+     (274, 1)
+     (274,)
+    
+
+In [73]:
+
+    
+    
+    model.fit(inputs,targets)
+    
+
+Out[73]:
+
+    
+    
+    LinearRegression()
+
+In [74]:
+
+    
+    
+    predicted = model.predict(inputs)
+    print('RMSE:',)
+    rmse(targets,predicted)
+    
+    
+    
+    RMSE:
+    
+
+Out[74]:
+
+    
+    
+    10711.00334810241
+
+### Machine Learning¶
+
+Every machine learning problem has three components:
+
+  1. **Model**
+
+  2. **Cost Function**
+
+  3. **Optimizer**
+
+In [75]:
+
+    
+    
+    # Create inputs and targets
+    inputs, targets = non_smoker_df[['age']], non_smoker_df['charges']
+    
+    # Create and train the model
+    model = LinearRegression().fit(inputs, targets)
+    
+    # Generate predictions
+    predictions = model.predict(inputs)
+    
+    # Compute loss to evalute the model
+    loss = rmse(targets, predictions)
+    print('Loss:', loss)
+    
+    
+    
+    Loss: 4662.505766636391
+    
+
+## Linear Regression using Multiple Features¶
+
+So far, we've used on the "age" feature to estimate "charges". Adding another
+feature like "bmi" is fairly straightforward. We simply assume the following
+relationship:
+
+$charges = w_1 \times age + w_2 \times bmi + b$
+
+We need to change just one line of code to include the BMI.
+
+In [76]:
+
+    
+    
+    # Create inputs and targets
+    inputs, targets = non_smoker_df[['age', 'bmi']], non_smoker_df['charges']
+    
+    # Create and train the model
+    model = LinearRegression().fit(inputs, targets)
+    
+    # Generate predictions
+    predictions = model.predict(inputs)
+    
+    # Compute loss to evalute the model
+    loss = rmse(targets, predictions)
+    print('Loss:', loss)
+    
+    
+    
+    Loss: 4662.312835461297
+    
+
+As you can see, adding the BMI doesn't seem to reduce the loss by much, as the
+BMI has a very weak correlation with charges, especially for non smokers.
+
+In [77]:
+
+    
+    
+    non_smoker_df.charges.corr(non_smoker_df.bmi)
+    
+
+Out[77]:
+
+    
+    
+    0.0840365431283327
+
+In [78]:
+
+    
+    
+    fig = px.scatter(non_smoker_df, x='bmi', y='charges', title='BMI vs. Charges')
+    fig.update_traces(marker_size=5)
+    fig.show()
+    
+
+We can also visualize the relationship between all 3 variables "age", "bmi"
+and "charges" using a 3D scatter plot.
+
+In [79]:
+
+    
+    
+    fig = px.scatter_3d(non_smoker_df, x='age', y='bmi', z='charges')
+    fig.update_traces(marker_size=3, marker_opacity=0.5)
+    fig.show()
+    
+
+You can see that it's harder to interpret a 3D scatter plot compared to a 2D
+scatter plot. As we add more features, it becomes impossible to visualize all
+feature at once, which is why we use measures like correlation and loss.
+
+This is an important thing to keep in mind: you can't find a relationship that
+doesn't exist, no matter what machine learning technique or optimization
+algorithm you apply.
+
+### Training a linear regression model to estimate charges using BMI alone¶
+
+In [80]:
+
+    
+    
+    inputs,targets = non_smoker_df[['bmi']],non_smoker_df['charges']
+    
+
+In [81]:
+
+    
+    
+    model = LinearRegression().fit(inputs, targets)
+    
+
+In [82]:
+
+    
+    
+    predictions=model.predict(inputs)
+    loss = rmse(targets,predictions)
+    print('Loss:',loss)
+    
+    
+    
+    Loss: 5969.772531913288
+    
+
+As BMI has very less correlation with charges we get a higher loss on a model
+which predicts charges on the basis of BMI as a independent variable as seen
+above loss value is increased which is a degradtion in our model
+
+### Let's go one step further, and add the final numeric column: "children",
+which seems to have some correlation with "charges".¶
+
+$charges = w_1 \times age + w_2 \times bmi + w_3 \times children + b$
+
+In [83]:
+
+    
+    
+    non_smoker_df.charges.corr(non_smoker_df.children)
+    
+
+Out[83]:
+
+    
+    
+    0.13892870453542192
+
+In [84]:
+
+    
+    
+    fig = px.strip(non_smoker_df, x='children', y='charges', title= "Children vs. Charges")
+    fig.update_traces(marker_size=4, marker_opacity=0.7)
+    fig.show()
+    
+
+In [85]:
+
+    
+    
+    # Create inputs and targets
+    inputs, targets = non_smoker_df[['age', 'bmi', 'children']], non_smoker_df['charges']
+    
+    # Create and train the model
+    model = LinearRegression().fit(inputs, targets)
+    
+    # Generate predictions
+    predictions = model.predict(inputs)
+    
+    # Compute loss to evalute the model
+    loss = rmse(targets, predictions)
+    print('Loss:', loss)
+    
+    
+    
+    Loss: 4608.470405038245
+    
+
+Once again, we don't see a big reduction in the loss, even though it's greater
+than in the case of BMI.
+
+Repeating the steps in this section to train a linear regression model to
+estimate medical charges for smokers.
+
+In [86]:
+
+    
+    
+    inputs,targets = smoker_df[['age','children','bmi']],smoker_df['charges']
+    
+
+In [87]:
+
+    
+    
+    model = LinearRegression().fit(inputs, targets)
+    prediction = model.predict(inputs)
+    
+
+In [88]:
+
+    
+    
+    loss = rmse(targets,prediction)
+    print('Loss',loss)
+    
+    
+    
+    Loss 5718.2024805241535
+    
+
+Repeating the steps in this section to train a linear regression model to
+estimate medical charges for all customers.
+
+In [89]:
+
+    
+    
+    # Create inputs and targets
+    inputs, targets = medical_df[['age', 'bmi', 'children']], medical_df['charges']
+    
+    # Create and train the model
+    model = LinearRegression().fit(inputs, targets)
+    
+    # Generate predictions
+    predictions = model.predict(inputs)
+    
+    # Compute loss to evalute the model
+    loss = rmse(targets, predictions)
+    print('Loss:', loss)
+    
+    
+    
+    Loss: 11355.317901125969
+    
+
+In [90]:
+
+    
+    
+    px.scatter(medical_df,x="age",y="charges",color='smoker')
+    
+
+Loss is very high compared to earlier. This is because it is easier to fit a
+line for model when it is grouped for non-smokers and there would be some
+outliers as shown in above viz.
+
+## Using Categorical Features for Machine Learning¶
+
+So far we've been using only numeric columns, since we can only perform
+computations with numbers. If we could use categorical columns like "smoker",
+we can train a single model for the entire dataset.
+
+To use the categorical columns, we simply need to convert them to numbers.
+There are three common techniques for doing this:
+
+  1. If a categorical column has just two categories (it's called a binary category), then we can replace their values with 0 and 1.
+  2. If a categorical column has more than 2 categories, we can perform one-hot encoding i.e. create a new column for each category with 1s and 0s.
+  3. If the categories have a natural order (e.g. cold, neutral, warm, hot), then they can be converted to numbers (e.g. 1, 2, 3, 4) preserving the order. These are called ordinals
+
+## Binary Categories¶
+
+The "smoker" category has just two values "yes" and "no". Let's create a new
+column "smoker_code" containing 0 for "no" and 1 for "yes".
+
+In [91]:
+
+    
+    
+    sns.barplot(data=medical_df, x='smoker', y='charges');
+    
+
+![](__results___files/__results___159_0.png)
+
+In [92]:
+
+    
+    
+    smoker_codes = {'no': 0, 'yes': 1}
+    medical_df['smoker_code'] = medical_df.smoker.map(smoker_codes)
+    
+
+In [93]:
+
+    
+    
+    medical_df.charges.corr(medical_df.smoker_code)
+    
+
+Out[93]:
+
+    
+    
+    0.787251430498478
+
+In [94]:
+
+    
+    
+    medical_df
+    
+
+Out[94]:
+
+| age | sex | bmi | children | smoker | region | charges | smoker_code  
+---|---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400 | 1  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230 | 0  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200 | 0  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061 | 0  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520 | 0  
+... | ... | ... | ... | ... | ... | ... | ... | ...  
+1333 | 50 | male | 30.970 | 3 | no | northwest | 10600.54830 | 0  
+1334 | 18 | female | 31.920 | 0 | no | northeast | 2205.98080 | 0  
+1335 | 18 | female | 36.850 | 0 | no | southeast | 1629.83350 | 0  
+1336 | 21 | female | 25.800 | 0 | no | southwest | 2007.94500 | 0  
+1337 | 61 | female | 29.070 | 0 | yes | northwest | 29141.36030 | 1  
+  
+1338 rows Ã 8 columns
+
+We can now use the smoker_df column for linear regression.
+
+$charges = w_1 \times age + w_2 \times bmi + w_3 \times children + w_4 \times
+smoker + b$
+
+In [95]:
+
+    
+    
+    # Create inputs and targets
+    inputs, targets = medical_df[['age', 'bmi', 'children', 'smoker_code']], medical_df['charges']
+    
+    # Create and train the model
+    model = LinearRegression().fit(inputs, targets)
+    
+    # Generate predictions
+    predictions = model.predict(inputs)
+    
+    # Compute loss to evalute the model
+    loss = rmse(targets, predictions)
+    print('Loss:', loss)
+    
+    
+    
+    Loss: 6056.439217188077
+    
+
+The loss reduces from 11355 to 6056, almost by 50%! This is an important
+lesson: never ignore categorical data.
+
+adding the "sex" column to the mix.
+
+$charges = w_1 \times age + w_2 \times bmi + w_3 \times children + w_4 \times
+smoker + w_5 \times sex + b$
+
+In [96]:
+
+    
+    
+    sns.barplot(data=medical_df, x='sex', y='charges')
+    
+
+Out[96]:
+
+    
+    
+    <AxesSubplot:xlabel='sex', ylabel='charges'>
+
+![](__results___files/__results___166_1.png)
+
+In [97]:
+
+    
+    
+    sex_codes = {'female': 0, 'male': 1}
+    
+
+In [98]:
+
+    
+    
+    medical_df['sex_code'] = medical_df.sex.map(sex_codes)
+    
+
+In [99]:
+
+    
+    
+    medical_df
+    
+
+Out[99]:
+
+| age | sex | bmi | children | smoker | region | charges | smoker_code | sex_code  
+---|---|---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400 | 1 | 0  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230 | 0 | 1  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200 | 0 | 1  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061 | 0 | 1  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520 | 0 | 1  
+... | ... | ... | ... | ... | ... | ... | ... | ... | ...  
+1333 | 50 | male | 30.970 | 3 | no | northwest | 10600.54830 | 0 | 1  
+1334 | 18 | female | 31.920 | 0 | no | northeast | 2205.98080 | 0 | 0  
+1335 | 18 | female | 36.850 | 0 | no | southeast | 1629.83350 | 0 | 0  
+1336 | 21 | female | 25.800 | 0 | no | southwest | 2007.94500 | 0 | 0  
+1337 | 61 | female | 29.070 | 0 | yes | northwest | 29141.36030 | 1 | 0  
+  
+1338 rows Ã 9 columns
+
+In [100]:
+
+    
+    
+    medical_df.charges.corr(medical_df.sex_code)
+    
+
+Out[100]:
+
+    
+    
+    0.057292062202025484
+
+In [101]:
+
+    
+    
+    # Create inputs and targets
+    inputs, targets = medical_df[['age', 'bmi', 'children', 'smoker_code', 'sex_code']], medical_df['charges']
+    
+    # Create and train the model
+    model = LinearRegression().fit(inputs, targets)
+    
+    # Generate predictions
+    predictions = model.predict(inputs)
+    
+    # Compute loss to evalute the model
+    loss = rmse(targets, predictions)
+    print('Loss:', loss)
+    
+    
+    
+    Loss: 6056.100708754539
+    
+
+### One-hot Encoding¶
+
+The "region" column contains 4 values, so we'll need to use hot encoding and
+create a new column for each region.
+
+In [102]:
+
+    
+    
+    sns.barplot(data=medical_df, x='region', y='charges');
+    
+
+![](__results___files/__results___173_0.png)
+
+In [103]:
+
+    
+    
+    from sklearn import preprocessing
+    enc = preprocessing.OneHotEncoder()
+    enc.fit(medical_df[['region']])
+    enc.categories_
+    
+
+Out[103]:
+
+    
+    
+    [array(['northeast', 'northwest', 'southeast', 'southwest'], dtype=object)]
+
+In [104]:
+
+    
+    
+    enc.transform([['northeast']]).toarray()
+    
+
+Out[104]:
+
+    
+    
+    array([[1., 0., 0., 0.]])
+
+In [105]:
+
+    
+    
+    one_hot = enc.transform(medical_df[['region']]).toarray()
+    one_hot
+    
+
+Out[105]:
+
+    
+    
+    array([[0., 0., 0., 1.],
+           [0., 0., 1., 0.],
+           [0., 0., 1., 0.],
+           ...,
+           [0., 0., 1., 0.],
+           [0., 0., 0., 1.],
+           [0., 1., 0., 0.]])
+
+In [106]:
+
+    
+    
+    medical_df[['northeast', 'northwest', 'southeast', 'southwest']] = one_hot
+    
+
+In [107]:
+
+    
+    
+    medical_df
+    
+
+Out[107]:
+
+| age | sex | bmi | children | smoker | region | charges | smoker_code | sex_code | northeast | northwest | southeast | southwest  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400 | 1 | 0 | 0.0 | 0.0 | 0.0 | 1.0  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230 | 0 | 1 | 0.0 | 0.0 | 1.0 | 0.0  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200 | 0 | 1 | 0.0 | 0.0 | 1.0 | 0.0  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061 | 0 | 1 | 0.0 | 1.0 | 0.0 | 0.0  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520 | 0 | 1 | 0.0 | 1.0 | 0.0 | 0.0  
+... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ...  
+1333 | 50 | male | 30.970 | 3 | no | northwest | 10600.54830 | 0 | 1 | 0.0 | 1.0 | 0.0 | 0.0  
+1334 | 18 | female | 31.920 | 0 | no | northeast | 2205.98080 | 0 | 0 | 1.0 | 0.0 | 0.0 | 0.0  
+1335 | 18 | female | 36.850 | 0 | no | southeast | 1629.83350 | 0 | 0 | 0.0 | 0.0 | 1.0 | 0.0  
+1336 | 21 | female | 25.800 | 0 | no | southwest | 2007.94500 | 0 | 0 | 0.0 | 0.0 | 0.0 | 1.0  
+1337 | 61 | female | 29.070 | 0 | yes | northwest | 29141.36030 | 1 | 0 | 0.0 | 1.0 | 0.0 | 0.0  
+  
+1338 rows Ã 13 columns
+
+Let's include the region columns into our linear regression model.
+
+$charges = w_1 \times age + w_2 \times bmi + w_3 \times children + w_4 \times
+smoker + w_5 \times sex + w_6 \times northeast + w_7 \times northwest + w_8
+\times southeast
+
+  * w_9 \times southwest + b$
+
+In [108]:
+
+    
+    
+    # Create inputs and targets
+    input_cols = ['age', 'bmi', 'children', 'smoker_code', 'sex_code', 'northeast', 'northwest', 'southeast', 'southwest']
+    inputs, targets = medical_df[input_cols], medical_df['charges']
+    
+    # Create and train the model
+    model = LinearRegression().fit(inputs, targets)
+    
+    # Generate predictions
+    predictions = model.predict(inputs)
+    
+    # Compute loss to evalute the model
+    loss = rmse(targets, predictions)
+    print('Loss:', loss)
+    
+    
+    
+    Loss: 6041.679651174453
+    
+
+Once again, this leads to a fairly small reduction in the loss.
+
+> **Insightful question** : Are two separate linear regression models, one for
+> smokers and one of non-smokers, better than a single linear regression
+> model?
+
+In [109]:
+
+    
+    
+    #encoding for sex column in smoker_df
+    sex_codes = {'female': 0, 'male': 1}
+    smoker_df['sex_code'] = smoker_df.sex.map(sex_codes) 
+    
+    #one-hot coding for smoker_df
+    enc.fit(smoker_df[['region']])
+    one_hot = enc.transform(smoker_df[['region']]).toarray()
+    one_hot
+    smoker_df[['northeast', 'northwest', 'southeast', 'southwest']] = one_hot
+    
+    # Create inputs and targets
+    input_cols = ['age', 'bmi', 'children', 'sex_code', 'northeast', 'northwest', 'southeast', 'southwest']
+    inputs, targets = smoker_df[input_cols], smoker_df['charges']
+    
+    # Create and train the model
+    model_smoker = LinearRegression().fit(inputs, targets)
+    
+    # Generate predictions
+    prediction = model_smoker.predict(inputs)
+    
+    # Compute loss to evalute the model
+    loss = rmse(targets, prediction)
+    print('Loss:', loss)
+    
+    
+    
+    Loss: 5668.467882112152
+    
+    
+    
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:3: SettingWithCopyWarning:
+    
+    
+    A value is trying to be set on a copy of a slice from a DataFrame.
+    Try using .loc[row_indexer,col_indexer] = value instead
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+    
+    /opt/conda/lib/python3.7/site-packages/pandas/core/frame.py:3678: SettingWithCopyWarning:
+    
+    
+    A value is trying to be set on a copy of a slice from a DataFrame.
+    Try using .loc[row_indexer,col_indexer] = value instead
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+    
+    
+
+In [110]:
+
+    
+    
+    #encoding for sex column in smoker_df
+    sex_codes = {'female': 0, 'male': 1}
+    non_smoker_df['sex_code'] = non_smoker_df.sex.map(sex_codes) 
+    
+    #one-hot coding for smoker_df
+    enc.fit(non_smoker_df[['region']])
+    one_hot = enc.transform(non_smoker_df[['region']]).toarray()
+    one_hot
+    non_smoker_df[['northeast', 'northwest', 'southeast', 'southwest']] = one_hot
+    
+    # Create inputs and targets
+    input_cols = ['age', 'bmi', 'children', 'sex_code', 'northeast', 'northwest', 'southeast', 'southwest']
+    inputs, targets = non_smoker_df[input_cols], non_smoker_df['charges']
+    
+    # Create and train the model
+    model_non_smoker= LinearRegression().fit(inputs, targets)
+    
+    # Generate predictions
+    predictions = model_non_smoker.predict(inputs)
+    
+    # Compute loss to evalute the model
+    loss = rmse(targets, predictions)
+    print('Loss:', loss)
+    
+    
+    
+    Loss: 4573.074988795491
+    
+    
+    
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:3: SettingWithCopyWarning:
+    
+    
+    A value is trying to be set on a copy of a slice from a DataFrame.
+    Try using .loc[row_indexer,col_indexer] = value instead
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+    
+    /opt/conda/lib/python3.7/site-packages/pandas/core/frame.py:3678: SettingWithCopyWarning:
+    
+    
+    A value is trying to be set on a copy of a slice from a DataFrame.
+    Try using .loc[row_indexer,col_indexer] = value instead
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+    
+    
+
+From above results it is evident that we should be using different model for
+smoker and non-smoker customers as loss from combined dataframe was around
+6000 but,on the other hand we got loss of around 5000 for smokers and 4500 for
+non-smokers which is better than using only one model for whole customer base.
+
+## Model Improvements¶
+
+### Feature Scaling¶
+
+Recall that due to regulatory requirements, we also need to explain the
+rationale behind the predictions our model.
+
+$charges = w_1 \times age + w_2 \times bmi + w_3 \times children + w_4 \times
+smoker + w_5 \times sex + w_6 \times region + b$
+
+To compare the importance of each feature in the model, our first instinct
+might be to compare their weights.
+
+In [111]:
+
+    
+    
+    model.coef_
+    
+
+Out[111]:
+
+    
+    
+    array([  256.85635254,   339.19345361,   475.50054515, 23848.53454191,
+            -131.3143594 ,   587.00923503,   234.0453356 ,  -448.01281436,
+            -373.04175627])
+
+In [112]:
+
+    
+    
+    model.intercept_
+    
+
+Out[112]:
+
+    
+    
+    -12525.547811195444
+
+In [113]:
+
+    
+    
+    input_cols = ['age', 'bmi', 'children', 'smoker_code', 'sex_code', 'northeast', 'northwest', 'southeast', 'southwest']
+    
+    weights_df = pd.DataFrame({
+        'feature': np.append(input_cols, 1),
+        'weight': np.append(model.coef_ , model.intercept_)
+    })
+    weights_df
+    
+
+Out[113]:
+
+| feature | weight  
+---|---|---  
+0 | age | 256.856353  
+1 | bmi | 339.193454  
+2 | children | 475.500545  
+3 | smoker_code | 23848.534542  
+4 | sex_code | -131.314359  
+5 | northeast | 587.009235  
+6 | northwest | 234.045336  
+7 | southeast | -448.012814  
+8 | southwest | -373.041756  
+9 | 1 | -12525.547811  
+  
+While it seems like BMI and the "northeast" have a higher weight than age,
+keep in mind that the range of values for BMI is limited (15 to 40) and the
+"northeast" column only takes the values 0 and 1.
+
+Because different columns have different ranges, we run into two issues:
+
+  1. We can't compare the weights of different column to identify which features are important
+  2. A column with a larger range of inputs may disproportionately affect the loss and dominate the optimization process.
+
+For this reason, it's common practice to scale (or standardize) the values in
+numeric column by subtracting the mean and dividing by the standard deviation.
+
+We can apply scaling using the StandardScaler class from scikit-learn.
+
+In [114]:
+
+    
+    
+    medical_df
+    
+
+Out[114]:
+
+| age | sex | bmi | children | smoker | region | charges | smoker_code | sex_code | northeast | northwest | southeast | southwest  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400 | 1 | 0 | 0.0 | 0.0 | 0.0 | 1.0  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230 | 0 | 1 | 0.0 | 0.0 | 1.0 | 0.0  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200 | 0 | 1 | 0.0 | 0.0 | 1.0 | 0.0  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061 | 0 | 1 | 0.0 | 1.0 | 0.0 | 0.0  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520 | 0 | 1 | 0.0 | 1.0 | 0.0 | 0.0  
+... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ...  
+1333 | 50 | male | 30.970 | 3 | no | northwest | 10600.54830 | 0 | 1 | 0.0 | 1.0 | 0.0 | 0.0  
+1334 | 18 | female | 31.920 | 0 | no | northeast | 2205.98080 | 0 | 0 | 1.0 | 0.0 | 0.0 | 0.0  
+1335 | 18 | female | 36.850 | 0 | no | southeast | 1629.83350 | 0 | 0 | 0.0 | 0.0 | 1.0 | 0.0  
+1336 | 21 | female | 25.800 | 0 | no | southwest | 2007.94500 | 0 | 0 | 0.0 | 0.0 | 0.0 | 1.0  
+1337 | 61 | female | 29.070 | 0 | yes | northwest | 29141.36030 | 1 | 0 | 0.0 | 1.0 | 0.0 | 0.0  
+  
+1338 rows Ã 13 columns
+
+In [115]:
+
+    
+    
+    from sklearn.preprocessing import StandardScaler
+    
+
+In [116]:
+
+    
+    
+    numeric_cols = ['age', 'bmi', 'children'] 
+    scaler = StandardScaler()
+    scaler.fit(medical_df[numeric_cols])
+    
+
+Out[116]:
+
+    
+    
+    StandardScaler()
+
+In [117]:
+
+    
+    
+    scaler.mean_
+    
+
+Out[117]:
+
+    
+    
+    array([39.20702541, 30.66339686,  1.09491779])
+
+In [118]:
+
+    
+    
+    scaler.var_
+    
+
+Out[118]:
+
+    
+    
+    array([197.25385199,  37.16008997,   1.45212664])
+
+We can now scale data as follows:
+
+In [119]:
+
+    
+    
+    medical_df[numeric_cols]
+    
+
+Out[119]:
+
+| age | bmi | children  
+---|---|---|---  
+0 | 19 | 27.900 | 0  
+1 | 18 | 33.770 | 1  
+2 | 28 | 33.000 | 3  
+3 | 33 | 22.705 | 0  
+4 | 32 | 28.880 | 0  
+... | ... | ... | ...  
+1333 | 50 | 30.970 | 3  
+1334 | 18 | 31.920 | 0  
+1335 | 18 | 36.850 | 0  
+1336 | 21 | 25.800 | 0  
+1337 | 61 | 29.070 | 0  
+  
+1338 rows Ã 3 columns
+
+In [120]:
+
+    
+    
+    scaled_inputs = scaler.transform(medical_df[numeric_cols])
+    scaled_inputs
+    
+
+Out[120]:
+
+    
+    
+    array([[-1.43876426, -0.45332   , -0.90861367],
+           [-1.50996545,  0.5096211 , -0.07876719],
+           [-0.79795355,  0.38330685,  1.58092576],
+           ...,
+           [-1.50996545,  1.0148781 , -0.90861367],
+           [-1.29636188, -0.79781341, -0.90861367],
+           [ 1.55168573, -0.26138796, -0.90861367]])
+
+These can now we combined with the categorical data
+
+In [121]:
+
+    
+    
+    cat_cols = ['smoker_code', 'sex_code', 'northeast', 'northwest', 'southeast', 'southwest']
+    categorical_data = medical_df[cat_cols].values
+    
+
+In [122]:
+
+    
+    
+    inputs = np.concatenate((scaled_inputs, categorical_data), axis=1)
+    targets = medical_df.charges
+    
+    # Create and train the model
+    model = LinearRegression().fit(inputs, targets)
+    
+    # Generate predictions
+    predictions = model.predict(inputs)
+    
+    # Compute loss to evalute the model
+    loss = rmse(targets, predictions)
+    print('Loss:', loss)
+    
+    
+    
+    Loss: 6041.679651174454
+    
+
+We can now compare the weights in the formula:
+
+$charges = w_1 \times age + w_2 \times bmi + w_3 \times children + w_4 \times
+smoker + w_5 \times sex + w_6 \times region + b$
+
+In [123]:
+
+    
+    
+    weights_df = pd.DataFrame({
+        'feature': np.append(numeric_cols + cat_cols, 1),
+        'weight': np.append(model.coef_, model.intercept_)
+    })
+    weights_df.sort_values('weight', ascending=False)
+    
+
+Out[123]:
+
+| feature | weight  
+---|---|---  
+3 | smoker_code | 23848.534542  
+9 | 1 | 8466.483215  
+0 | age | 3607.472736  
+1 | bmi | 2067.691966  
+5 | northeast | 587.009235  
+2 | children | 572.998210  
+6 | northwest | 234.045336  
+4 | sex_code | -131.314359  
+8 | southwest | -373.041756  
+7 | southeast | -448.012814  
+  
+As you can see now, the most important feature are:
+
+  1. Smoker
+  2. Age
+  3. BMI
+
+In [124]:
+
+    
+    
+    new_customers = [[28,30,2,1,0,0,1,0,0.]]
+    scaler.transform([[28,30,2]])
+    
+
+Out[124]:
+
+    
+    
+    array([[-0.79795355, -0.10882659,  0.75107928]])
+
+In [125]:
+
+    
+    
+    model.predict([[-0.79795355, -0.10882659,  0.75107928,1,0,0,1,0,0.]])
+    
+
+Out[125]:
+
+    
+    
+    array([29875.81463371])
+
+### Creating a Test Set¶
+
+In [126]:
+
+    
+    
+    from sklearn.model_selection import train_test_split
+    
+
+In [127]:
+
+    
+    
+    inputs_train, inputs_test, targets_train, targets_test = train_test_split(inputs, targets, test_size=0.2,random_state=0)
+    
+
+In [128]:
+
+    
+    
+    # Create and train the model
+    model = LinearRegression().fit(inputs_train, targets_train)
+    
+    # Generate predictions
+    predictions_test = model.predict(inputs_test)
+    
+    # Compute loss to evalute the model
+    loss = rmse(targets_test, predictions_test)
+    print('Test Loss:', loss)
+    
+    
+    
+    Test Loss: 5641.626558850189
+    
+
+Let's compare this with the training loss.
+
+In [129]:
+
+    
+    
+    # Generate predictions
+    predictions_train = model.predict(inputs_train)
+    
+    # Compute loss to evalute the model
+    loss = rmse(targets_train, predictions_train)
+    print('Training Loss:', loss)
+    
+    
+    
+    Training Loss: 6140.157418880165
+    
+
+### Workflow of Machine Learning Problem¶
+
+  1. Explore the data and find correlations between inputs and targets
+  2. Pick the right model, loss functions and optimizer for the problem at hand
+  3. Scale numeric variables and one-hot encode categorical data
+  4. Set aside a test set (using a fraction of the training set)
+  5. Train the model
+  6. Make predictions on the test set and compute the loss
+

@@ -1,0 +1,1824 @@
+![](http://www.homecredit.net/~/media/Images/H/Home-Credit-Group/image-
+gallery/full/image-gallery-01-11-2016-b.png)
+
+  * 1\. Introduction
+  * 2\. Retrieving the Data
+  * 3\. Glimpse of Data
+  * 4\. Check for missing data
+  * 5\. Data Exploration
+    * 5.1 Distribution of AMT_CREDIT
+    * 5.2 Distribution of AMT_INCOME_TOTAL
+    * 5.3 Distribution of AMT_GOODS_PRICE
+    * 5.4 Distribution of Name of type of the Suite
+    * 5.5 Data is balanced or imbalanced
+    * 5.6 Types of loan
+    * 5.7 Purpose of loan
+    * 5.8 Income sources of Applicant's who applied for loan
+    * 5.9 Family Status of Applicant's who applied for loan
+    * 5.10 Occupation of Applicant's who applied for loan
+    * 5.11 Education of Applicant's who applied for loan
+    * 5.12 For which types of house higher applicant's applied for loan ?
+    * 5.13 Types of Organizations who applied for loan 
+    * 5.14 Exploration in terms of loan is repayed or not
+      * 5.14.1 Income sources of Applicant's in terms of loan is repayed or not
+      * 5.14.2 Family Status of Applicant's in terms of loan is repayed or not
+      * 5.14.3 Occupation of Applicant's in terms of loan is repayed or not
+      * 5.14.4 Education of Applicant's in terms of loan is repayed or not
+      * 5.14.5 For which types of house higher applicant's applied for loan in terms of loan is repayed or not
+      * 5.14.6 Types of Organizations in terms of loan is repayed or not
+      * 5.14.7 Distribution of Name of type of the Suite in terms of loan is repayed or not
+    * 5.15 Exploartion of previous application data
+      * 5.15.1 Contract product type of previous application
+      * 5.15.2 On which day highest number of clients applied in prevoies application
+      * 5.15.3 Purpose of cash loan in previous application
+      * 5.15.4 Contract was approved or not in previous application
+      * 5.15.5 Payment method that client choose to pay for the previous application
+      * 5.15.6 Why was the previous application rejected ?
+      * 5.15.7 Who accompanied client when applying for the previous application
+      * 5.15.8 Was the client old or new client when applying for the previous application
+      * 5.15.9 What kind of goods did the client apply for in the previous application
+      * 5.15.10 Was the previous application for CASH, POS, CAR, â¦
+      * 5.15.11 Was the previous application x-sell or walk-in ?
+      * 5.15.12 Top channels through which they acquired the client on the previous application
+      * 5.15.13 Top industry of the seller
+      * 5.15.14 Grouped interest rate into small medium and high of the previous application
+      * 5.15.15 Top Detailed product combination of the previous application
+      * 5.15.16 Did the client requested insurance during the previous application
+  * 6\. Pearson Correlation of features
+  * 7\. Feature Importance using Random forest
+
+# 1\. Introduction¶
+
+Home Credit strives to broaden financial inclusion for the unbanked population
+by providing a positive and safe borrowing experience. In order to make sure
+this underserved population has a positive loan experience, Home Credit makes
+use of a variety of alternative data--including telco and transactional
+information--to predict their clients' repayment abilities.
+
+While Home Credit is currently using various statistical and machine learning
+methods to make these predictions, they're challenging Kagglers to help them
+unlock the full potential of their data. Doing so will ensure that clients
+capable of repayment are not rejected and that loans are given with a
+principal, maturity, and repayment calendar that will empower their clients to
+be successful.
+
+# 2\. Retrieving the Data¶
+
+In [1]:
+
+    
+    
+    import pandas as pd # package for high-performance, easy-to-use data structures and data analysis
+    import numpy as np # fundamental package for scientific computing with Python
+    import matplotlib
+    import matplotlib.pyplot as plt # for plotting
+    import seaborn as sns # for making plots with seaborn
+    color = sns.color_palette()
+    import plotly.offline as py
+    py.init_notebook_mode(connected=True)
+    from plotly.offline import init_notebook_mode, iplot
+    init_notebook_mode(connected=True)
+    import plotly.graph_objs as go
+    import plotly.offline as offline
+    offline.init_notebook_mode()
+    # from plotly import tools
+    # import plotly.tools as tls
+    # import squarify
+    # from mpl_toolkits.basemap import Basemap
+    # from numpy import array
+    # from matplotlib import cm
+    
+    # import cufflinks and offline mode
+    import cufflinks as cf
+    cf.go_offline()
+    
+    # from sklearn import preprocessing
+    # # Supress unnecessary warnings so that presentation looks clean
+    # import warnings
+    # warnings.filterwarnings("ignore")
+    
+    # # Print all rows and columns
+    # pd.set_option('display.max_columns', None)
+    # pd.set_option('display.max_rows', None)
+    
+
+In [2]:
+
+    
+    
+    import os
+    print(os.listdir("../input"))
+    
+    
+    
+    ['POS_CASH_balance.csv', 'bureau_balance.csv', 'application_train.csv', 'previous_application.csv', 'installments_payments.csv', 'credit_card_balance.csv', 'sample_submission.csv', 'application_test.csv', 'bureau.csv']
+    
+
+In [3]:
+
+    
+    
+    application_train = pd.read_csv('../input/application_train.csv')
+    POS_CASH_balance = pd.read_csv('../input/POS_CASH_balance.csv')
+    bureau_balance = pd.read_csv('../input/bureau_balance.csv')
+    previous_application = pd.read_csv('../input/previous_application.csv')
+    installments_payments = pd.read_csv('../input/installments_payments.csv')
+    credit_card_balance = pd.read_csv('../input/credit_card_balance.csv')
+    bureau = pd.read_csv('../input/bureau.csv')
+    application_test = pd.read_csv('../input/application_test.csv')
+    
+
+In [4]:
+
+    
+    
+    print('Size of application_train data', application_train.shape)
+    print('Size of POS_CASH_balance data', POS_CASH_balance.shape)
+    print('Size of bureau_balance data', bureau_balance.shape)
+    print('Size of previous_application data', previous_application.shape)
+    print('Size of installments_payments data', installments_payments.shape)
+    print('Size of credit_card_balance data', credit_card_balance.shape)
+    print('Size of bureau data', bureau.shape)
+    
+    
+    
+    Size of application_train data (307511, 122)
+    Size of POS_CASH_balance data (10001358, 8)
+    Size of bureau_balance data (27299925, 3)
+    Size of previous_application data (1670214, 37)
+    Size of installments_payments data (13605401, 8)
+    Size of credit_card_balance data (3840312, 23)
+    Size of bureau data (1716428, 17)
+    
+
+# 3\. Glimpse of Data¶
+
+**application_train data**
+
+In [5]:
+
+    
+    
+    application_train.head()
+    
+
+Out[5]:
+
+| SK_ID_CURR | TARGET | NAME_CONTRACT_TYPE | CODE_GENDER | FLAG_OWN_CAR | FLAG_OWN_REALTY | CNT_CHILDREN | AMT_INCOME_TOTAL | AMT_CREDIT | AMT_ANNUITY | AMT_GOODS_PRICE | NAME_TYPE_SUITE | NAME_INCOME_TYPE | NAME_EDUCATION_TYPE | NAME_FAMILY_STATUS | NAME_HOUSING_TYPE | REGION_POPULATION_RELATIVE | DAYS_BIRTH | DAYS_EMPLOYED | DAYS_REGISTRATION | DAYS_ID_PUBLISH | OWN_CAR_AGE | FLAG_MOBIL | FLAG_EMP_PHONE | FLAG_WORK_PHONE | FLAG_CONT_MOBILE | FLAG_PHONE | FLAG_EMAIL | OCCUPATION_TYPE | CNT_FAM_MEMBERS | REGION_RATING_CLIENT | REGION_RATING_CLIENT_W_CITY | WEEKDAY_APPR_PROCESS_START | HOUR_APPR_PROCESS_START | REG_REGION_NOT_LIVE_REGION | REG_REGION_NOT_WORK_REGION | LIVE_REGION_NOT_WORK_REGION | REG_CITY_NOT_LIVE_CITY | REG_CITY_NOT_WORK_CITY | LIVE_CITY_NOT_WORK_CITY | ... | LIVINGAPARTMENTS_MEDI | LIVINGAREA_MEDI | NONLIVINGAPARTMENTS_MEDI | NONLIVINGAREA_MEDI | FONDKAPREMONT_MODE | HOUSETYPE_MODE | TOTALAREA_MODE | WALLSMATERIAL_MODE | EMERGENCYSTATE_MODE | OBS_30_CNT_SOCIAL_CIRCLE | DEF_30_CNT_SOCIAL_CIRCLE | OBS_60_CNT_SOCIAL_CIRCLE | DEF_60_CNT_SOCIAL_CIRCLE | DAYS_LAST_PHONE_CHANGE | FLAG_DOCUMENT_2 | FLAG_DOCUMENT_3 | FLAG_DOCUMENT_4 | FLAG_DOCUMENT_5 | FLAG_DOCUMENT_6 | FLAG_DOCUMENT_7 | FLAG_DOCUMENT_8 | FLAG_DOCUMENT_9 | FLAG_DOCUMENT_10 | FLAG_DOCUMENT_11 | FLAG_DOCUMENT_12 | FLAG_DOCUMENT_13 | FLAG_DOCUMENT_14 | FLAG_DOCUMENT_15 | FLAG_DOCUMENT_16 | FLAG_DOCUMENT_17 | FLAG_DOCUMENT_18 | FLAG_DOCUMENT_19 | FLAG_DOCUMENT_20 | FLAG_DOCUMENT_21 | AMT_REQ_CREDIT_BUREAU_HOUR | AMT_REQ_CREDIT_BUREAU_DAY | AMT_REQ_CREDIT_BUREAU_WEEK | AMT_REQ_CREDIT_BUREAU_MON | AMT_REQ_CREDIT_BUREAU_QRT | AMT_REQ_CREDIT_BUREAU_YEAR  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 100002 | 1 | Cash loans | M | N | Y | 0 | 202500.0 | 406597.5 | 24700.5 | 351000.0 | Unaccompanied | Working | Secondary / secondary special | Single / not married | House / apartment | 0.018801 | -9461 | -637 | -3648.0 | -2120 | NaN | 1 | 1 | 0 | 1 | 1 | 0 | Laborers | 1.0 | 2 | 2 | WEDNESDAY | 10 | 0 | 0 | 0 | 0 | 0 | 0 | ... | 0.0205 | 0.0193 | 0.0000 | 0.00 | reg oper account | block of flats | 0.0149 | Stone, brick | No | 2.0 | 2.0 | 2.0 | 2.0 | -1134.0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 1.0  
+1 | 100003 | 0 | Cash loans | F | N | N | 0 | 270000.0 | 1293502.5 | 35698.5 | 1129500.0 | Family | State servant | Higher education | Married | House / apartment | 0.003541 | -16765 | -1188 | -1186.0 | -291 | NaN | 1 | 1 | 0 | 1 | 1 | 0 | Core staff | 2.0 | 1 | 1 | MONDAY | 11 | 0 | 0 | 0 | 0 | 0 | 0 | ... | 0.0787 | 0.0558 | 0.0039 | 0.01 | reg oper account | block of flats | 0.0714 | Block | No | 1.0 | 0.0 | 1.0 | 0.0 | -828.0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0  
+2 | 100004 | 0 | Revolving loans | M | Y | Y | 0 | 67500.0 | 135000.0 | 6750.0 | 135000.0 | Unaccompanied | Working | Secondary / secondary special | Single / not married | House / apartment | 0.010032 | -19046 | -225 | -4260.0 | -2531 | 26.0 | 1 | 1 | 1 | 1 | 1 | 0 | Laborers | 1.0 | 2 | 2 | MONDAY | 9 | 0 | 0 | 0 | 0 | 0 | 0 | ... | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | 0.0 | 0.0 | 0.0 | 0.0 | -815.0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0  
+3 | 100006 | 0 | Cash loans | F | N | Y | 0 | 135000.0 | 312682.5 | 29686.5 | 297000.0 | Unaccompanied | Working | Secondary / secondary special | Civil marriage | House / apartment | 0.008019 | -19005 | -3039 | -9833.0 | -2437 | NaN | 1 | 1 | 0 | 1 | 0 | 0 | Laborers | 2.0 | 2 | 2 | WEDNESDAY | 17 | 0 | 0 | 0 | 0 | 0 | 0 | ... | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | 2.0 | 0.0 | 2.0 | 0.0 | -617.0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | NaN | NaN | NaN | NaN | NaN  
+4 | 100007 | 0 | Cash loans | M | N | Y | 0 | 121500.0 | 513000.0 | 21865.5 | 513000.0 | Unaccompanied | Working | Secondary / secondary special | Single / not married | House / apartment | 0.028663 | -19932 | -3038 | -4311.0 | -3458 | NaN | 1 | 1 | 0 | 1 | 0 | 0 | Core staff | 1.0 | 2 | 2 | THURSDAY | 11 | 0 | 0 | 0 | 0 | 1 | 1 | ... | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | NaN | 0.0 | 0.0 | 0.0 | 0.0 | -1106.0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0  
+  
+In [6]:
+
+    
+    
+    application_train.columns.values
+    
+
+Out[6]:
+
+    
+    
+    array(['SK_ID_CURR', 'TARGET', 'NAME_CONTRACT_TYPE', 'CODE_GENDER',
+           'FLAG_OWN_CAR', 'FLAG_OWN_REALTY', 'CNT_CHILDREN',
+           'AMT_INCOME_TOTAL', 'AMT_CREDIT', 'AMT_ANNUITY', 'AMT_GOODS_PRICE',
+           'NAME_TYPE_SUITE', 'NAME_INCOME_TYPE', 'NAME_EDUCATION_TYPE',
+           'NAME_FAMILY_STATUS', 'NAME_HOUSING_TYPE',
+           'REGION_POPULATION_RELATIVE', 'DAYS_BIRTH', 'DAYS_EMPLOYED',
+           'DAYS_REGISTRATION', 'DAYS_ID_PUBLISH', 'OWN_CAR_AGE', 'FLAG_MOBIL',
+           'FLAG_EMP_PHONE', 'FLAG_WORK_PHONE', 'FLAG_CONT_MOBILE',
+           'FLAG_PHONE', 'FLAG_EMAIL', 'OCCUPATION_TYPE', 'CNT_FAM_MEMBERS',
+           'REGION_RATING_CLIENT', 'REGION_RATING_CLIENT_W_CITY',
+           'WEEKDAY_APPR_PROCESS_START', 'HOUR_APPR_PROCESS_START',
+           'REG_REGION_NOT_LIVE_REGION', 'REG_REGION_NOT_WORK_REGION',
+           'LIVE_REGION_NOT_WORK_REGION', 'REG_CITY_NOT_LIVE_CITY',
+           'REG_CITY_NOT_WORK_CITY', 'LIVE_CITY_NOT_WORK_CITY',
+           'ORGANIZATION_TYPE', 'EXT_SOURCE_1', 'EXT_SOURCE_2', 'EXT_SOURCE_3',
+           'APARTMENTS_AVG', 'BASEMENTAREA_AVG', 'YEARS_BEGINEXPLUATATION_AVG',
+           'YEARS_BUILD_AVG', 'COMMONAREA_AVG', 'ELEVATORS_AVG',
+           'ENTRANCES_AVG', 'FLOORSMAX_AVG', 'FLOORSMIN_AVG', 'LANDAREA_AVG',
+           'LIVINGAPARTMENTS_AVG', 'LIVINGAREA_AVG', 'NONLIVINGAPARTMENTS_AVG',
+           'NONLIVINGAREA_AVG', 'APARTMENTS_MODE', 'BASEMENTAREA_MODE',
+           'YEARS_BEGINEXPLUATATION_MODE', 'YEARS_BUILD_MODE',
+           'COMMONAREA_MODE', 'ELEVATORS_MODE', 'ENTRANCES_MODE',
+           'FLOORSMAX_MODE', 'FLOORSMIN_MODE', 'LANDAREA_MODE',
+           'LIVINGAPARTMENTS_MODE', 'LIVINGAREA_MODE',
+           'NONLIVINGAPARTMENTS_MODE', 'NONLIVINGAREA_MODE', 'APARTMENTS_MEDI',
+           'BASEMENTAREA_MEDI', 'YEARS_BEGINEXPLUATATION_MEDI',
+           'YEARS_BUILD_MEDI', 'COMMONAREA_MEDI', 'ELEVATORS_MEDI',
+           'ENTRANCES_MEDI', 'FLOORSMAX_MEDI', 'FLOORSMIN_MEDI',
+           'LANDAREA_MEDI', 'LIVINGAPARTMENTS_MEDI', 'LIVINGAREA_MEDI',
+           'NONLIVINGAPARTMENTS_MEDI', 'NONLIVINGAREA_MEDI',
+           'FONDKAPREMONT_MODE', 'HOUSETYPE_MODE', 'TOTALAREA_MODE',
+           'WALLSMATERIAL_MODE', 'EMERGENCYSTATE_MODE',
+           'OBS_30_CNT_SOCIAL_CIRCLE', 'DEF_30_CNT_SOCIAL_CIRCLE',
+           'OBS_60_CNT_SOCIAL_CIRCLE', 'DEF_60_CNT_SOCIAL_CIRCLE',
+           'DAYS_LAST_PHONE_CHANGE', 'FLAG_DOCUMENT_2', 'FLAG_DOCUMENT_3',
+           'FLAG_DOCUMENT_4', 'FLAG_DOCUMENT_5', 'FLAG_DOCUMENT_6',
+           'FLAG_DOCUMENT_7', 'FLAG_DOCUMENT_8', 'FLAG_DOCUMENT_9',
+           'FLAG_DOCUMENT_10', 'FLAG_DOCUMENT_11', 'FLAG_DOCUMENT_12',
+           'FLAG_DOCUMENT_13', 'FLAG_DOCUMENT_14', 'FLAG_DOCUMENT_15',
+           'FLAG_DOCUMENT_16', 'FLAG_DOCUMENT_17', 'FLAG_DOCUMENT_18',
+           'FLAG_DOCUMENT_19', 'FLAG_DOCUMENT_20', 'FLAG_DOCUMENT_21',
+           'AMT_REQ_CREDIT_BUREAU_HOUR', 'AMT_REQ_CREDIT_BUREAU_DAY',
+           'AMT_REQ_CREDIT_BUREAU_WEEK', 'AMT_REQ_CREDIT_BUREAU_MON',
+           'AMT_REQ_CREDIT_BUREAU_QRT', 'AMT_REQ_CREDIT_BUREAU_YEAR'], dtype=object)
+
+**POS_CASH_balance data**
+
+In [7]:
+
+    
+    
+    POS_CASH_balance.head()
+    
+
+Out[7]:
+
+| SK_ID_PREV | SK_ID_CURR | MONTHS_BALANCE | CNT_INSTALMENT | CNT_INSTALMENT_FUTURE | NAME_CONTRACT_STATUS | SK_DPD | SK_DPD_DEF  
+---|---|---|---|---|---|---|---|---  
+0 | 1803195 | 182943 | -31 | 48.0 | 45.0 | Active | 0 | 0  
+1 | 1715348 | 367990 | -33 | 36.0 | 35.0 | Active | 0 | 0  
+2 | 1784872 | 397406 | -32 | 12.0 | 9.0 | Active | 0 | 0  
+3 | 1903291 | 269225 | -35 | 48.0 | 42.0 | Active | 0 | 0  
+4 | 2341044 | 334279 | -35 | 36.0 | 35.0 | Active | 0 | 0  
+  
+**bureau_balance data**
+
+In [8]:
+
+    
+    
+    bureau_balance.head()
+    
+
+Out[8]:
+
+| SK_ID_BUREAU | MONTHS_BALANCE | STATUS  
+---|---|---|---  
+0 | 5715448 | 0 | C  
+1 | 5715448 | -1 | C  
+2 | 5715448 | -2 | C  
+3 | 5715448 | -3 | C  
+4 | 5715448 | -4 | C  
+  
+**previous_application data**
+
+In [9]:
+
+    
+    
+    previous_application.head()
+    
+
+Out[9]:
+
+| SK_ID_PREV | SK_ID_CURR | NAME_CONTRACT_TYPE | AMT_ANNUITY | AMT_APPLICATION | AMT_CREDIT | AMT_DOWN_PAYMENT | AMT_GOODS_PRICE | WEEKDAY_APPR_PROCESS_START | HOUR_APPR_PROCESS_START | FLAG_LAST_APPL_PER_CONTRACT | NFLAG_LAST_APPL_IN_DAY | RATE_DOWN_PAYMENT | RATE_INTEREST_PRIMARY | RATE_INTEREST_PRIVILEGED | NAME_CASH_LOAN_PURPOSE | NAME_CONTRACT_STATUS | DAYS_DECISION | NAME_PAYMENT_TYPE | CODE_REJECT_REASON | NAME_TYPE_SUITE | NAME_CLIENT_TYPE | NAME_GOODS_CATEGORY | NAME_PORTFOLIO | NAME_PRODUCT_TYPE | CHANNEL_TYPE | SELLERPLACE_AREA | NAME_SELLER_INDUSTRY | CNT_PAYMENT | NAME_YIELD_GROUP | PRODUCT_COMBINATION | DAYS_FIRST_DRAWING | DAYS_FIRST_DUE | DAYS_LAST_DUE_1ST_VERSION | DAYS_LAST_DUE | DAYS_TERMINATION | NFLAG_INSURED_ON_APPROVAL  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 2030495 | 271877 | Consumer loans | 1730.430 | 17145.0 | 17145.0 | 0.0 | 17145.0 | SATURDAY | 15 | Y | 1 | 0.0 | 0.182832 | 0.867336 | XAP | Approved | -73 | Cash through the bank | XAP | NaN | Repeater | Mobile | POS | XNA | Country-wide | 35 | Connectivity | 12.0 | middle | POS mobile with interest | 365243.0 | -42.0 | 300.0 | -42.0 | -37.0 | 0.0  
+1 | 2802425 | 108129 | Cash loans | 25188.615 | 607500.0 | 679671.0 | NaN | 607500.0 | THURSDAY | 11 | Y | 1 | NaN | NaN | NaN | XNA | Approved | -164 | XNA | XAP | Unaccompanied | Repeater | XNA | Cash | x-sell | Contact center | -1 | XNA | 36.0 | low_action | Cash X-Sell: low | 365243.0 | -134.0 | 916.0 | 365243.0 | 365243.0 | 1.0  
+2 | 2523466 | 122040 | Cash loans | 15060.735 | 112500.0 | 136444.5 | NaN | 112500.0 | TUESDAY | 11 | Y | 1 | NaN | NaN | NaN | XNA | Approved | -301 | Cash through the bank | XAP | Spouse, partner | Repeater | XNA | Cash | x-sell | Credit and cash offices | -1 | XNA | 12.0 | high | Cash X-Sell: high | 365243.0 | -271.0 | 59.0 | 365243.0 | 365243.0 | 1.0  
+3 | 2819243 | 176158 | Cash loans | 47041.335 | 450000.0 | 470790.0 | NaN | 450000.0 | MONDAY | 7 | Y | 1 | NaN | NaN | NaN | XNA | Approved | -512 | Cash through the bank | XAP | NaN | Repeater | XNA | Cash | x-sell | Credit and cash offices | -1 | XNA | 12.0 | middle | Cash X-Sell: middle | 365243.0 | -482.0 | -152.0 | -182.0 | -177.0 | 1.0  
+4 | 1784265 | 202054 | Cash loans | 31924.395 | 337500.0 | 404055.0 | NaN | 337500.0 | THURSDAY | 9 | Y | 1 | NaN | NaN | NaN | Repairs | Refused | -781 | Cash through the bank | HC | NaN | Repeater | XNA | Cash | walk-in | Credit and cash offices | -1 | XNA | 24.0 | high | Cash Street: high | NaN | NaN | NaN | NaN | NaN | NaN  
+  
+In [10]:
+
+    
+    
+    previous_application.columns.values
+    
+
+Out[10]:
+
+    
+    
+    array(['SK_ID_PREV', 'SK_ID_CURR', 'NAME_CONTRACT_TYPE', 'AMT_ANNUITY',
+           'AMT_APPLICATION', 'AMT_CREDIT', 'AMT_DOWN_PAYMENT',
+           'AMT_GOODS_PRICE', 'WEEKDAY_APPR_PROCESS_START',
+           'HOUR_APPR_PROCESS_START', 'FLAG_LAST_APPL_PER_CONTRACT',
+           'NFLAG_LAST_APPL_IN_DAY', 'RATE_DOWN_PAYMENT',
+           'RATE_INTEREST_PRIMARY', 'RATE_INTEREST_PRIVILEGED',
+           'NAME_CASH_LOAN_PURPOSE', 'NAME_CONTRACT_STATUS', 'DAYS_DECISION',
+           'NAME_PAYMENT_TYPE', 'CODE_REJECT_REASON', 'NAME_TYPE_SUITE',
+           'NAME_CLIENT_TYPE', 'NAME_GOODS_CATEGORY', 'NAME_PORTFOLIO',
+           'NAME_PRODUCT_TYPE', 'CHANNEL_TYPE', 'SELLERPLACE_AREA',
+           'NAME_SELLER_INDUSTRY', 'CNT_PAYMENT', 'NAME_YIELD_GROUP',
+           'PRODUCT_COMBINATION', 'DAYS_FIRST_DRAWING', 'DAYS_FIRST_DUE',
+           'DAYS_LAST_DUE_1ST_VERSION', 'DAYS_LAST_DUE', 'DAYS_TERMINATION',
+           'NFLAG_INSURED_ON_APPROVAL'], dtype=object)
+
+**installments_payments data**
+
+In [11]:
+
+    
+    
+    installments_payments.head()
+    
+
+Out[11]:
+
+| SK_ID_PREV | SK_ID_CURR | NUM_INSTALMENT_VERSION | NUM_INSTALMENT_NUMBER | DAYS_INSTALMENT | DAYS_ENTRY_PAYMENT | AMT_INSTALMENT | AMT_PAYMENT  
+---|---|---|---|---|---|---|---|---  
+0 | 1054186 | 161674 | 1.0 | 6 | -1180.0 | -1187.0 | 6948.360 | 6948.360  
+1 | 1330831 | 151639 | 0.0 | 34 | -2156.0 | -2156.0 | 1716.525 | 1716.525  
+2 | 2085231 | 193053 | 2.0 | 1 | -63.0 | -63.0 | 25425.000 | 25425.000  
+3 | 2452527 | 199697 | 1.0 | 3 | -2418.0 | -2426.0 | 24350.130 | 24350.130  
+4 | 2714724 | 167756 | 1.0 | 2 | -1383.0 | -1366.0 | 2165.040 | 2160.585  
+  
+**credit_card_balance data**
+
+In [12]:
+
+    
+    
+    credit_card_balance.head()
+    
+
+Out[12]:
+
+| SK_ID_PREV | SK_ID_CURR | MONTHS_BALANCE | AMT_BALANCE | AMT_CREDIT_LIMIT_ACTUAL | AMT_DRAWINGS_ATM_CURRENT | AMT_DRAWINGS_CURRENT | AMT_DRAWINGS_OTHER_CURRENT | AMT_DRAWINGS_POS_CURRENT | AMT_INST_MIN_REGULARITY | AMT_PAYMENT_CURRENT | AMT_PAYMENT_TOTAL_CURRENT | AMT_RECEIVABLE_PRINCIPAL | AMT_RECIVABLE | AMT_TOTAL_RECEIVABLE | CNT_DRAWINGS_ATM_CURRENT | CNT_DRAWINGS_CURRENT | CNT_DRAWINGS_OTHER_CURRENT | CNT_DRAWINGS_POS_CURRENT | CNT_INSTALMENT_MATURE_CUM | NAME_CONTRACT_STATUS | SK_DPD | SK_DPD_DEF  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 2562384 | 378907 | -6 | 56.970 | 135000 | 0.0 | 877.5 | 0.0 | 877.5 | 1700.325 | 1800.0 | 1800.0 | 0.000 | 0.000 | 0.000 | 0.0 | 1 | 0.0 | 1.0 | 35.0 | Active | 0 | 0  
+1 | 2582071 | 363914 | -1 | 63975.555 | 45000 | 2250.0 | 2250.0 | 0.0 | 0.0 | 2250.000 | 2250.0 | 2250.0 | 60175.080 | 64875.555 | 64875.555 | 1.0 | 1 | 0.0 | 0.0 | 69.0 | Active | 0 | 0  
+2 | 1740877 | 371185 | -7 | 31815.225 | 450000 | 0.0 | 0.0 | 0.0 | 0.0 | 2250.000 | 2250.0 | 2250.0 | 26926.425 | 31460.085 | 31460.085 | 0.0 | 0 | 0.0 | 0.0 | 30.0 | Active | 0 | 0  
+3 | 1389973 | 337855 | -4 | 236572.110 | 225000 | 2250.0 | 2250.0 | 0.0 | 0.0 | 11795.760 | 11925.0 | 11925.0 | 224949.285 | 233048.970 | 233048.970 | 1.0 | 1 | 0.0 | 0.0 | 10.0 | Active | 0 | 0  
+4 | 1891521 | 126868 | -1 | 453919.455 | 450000 | 0.0 | 11547.0 | 0.0 | 11547.0 | 22924.890 | 27000.0 | 27000.0 | 443044.395 | 453919.455 | 453919.455 | 0.0 | 1 | 0.0 | 1.0 | 101.0 | Active | 0 | 0  
+  
+In [13]:
+
+    
+    
+    credit_card_balance.columns.values
+    
+
+Out[13]:
+
+    
+    
+    array(['SK_ID_PREV', 'SK_ID_CURR', 'MONTHS_BALANCE', 'AMT_BALANCE',
+           'AMT_CREDIT_LIMIT_ACTUAL', 'AMT_DRAWINGS_ATM_CURRENT',
+           'AMT_DRAWINGS_CURRENT', 'AMT_DRAWINGS_OTHER_CURRENT',
+           'AMT_DRAWINGS_POS_CURRENT', 'AMT_INST_MIN_REGULARITY',
+           'AMT_PAYMENT_CURRENT', 'AMT_PAYMENT_TOTAL_CURRENT',
+           'AMT_RECEIVABLE_PRINCIPAL', 'AMT_RECIVABLE', 'AMT_TOTAL_RECEIVABLE',
+           'CNT_DRAWINGS_ATM_CURRENT', 'CNT_DRAWINGS_CURRENT',
+           'CNT_DRAWINGS_OTHER_CURRENT', 'CNT_DRAWINGS_POS_CURRENT',
+           'CNT_INSTALMENT_MATURE_CUM', 'NAME_CONTRACT_STATUS', 'SK_DPD',
+           'SK_DPD_DEF'], dtype=object)
+
+**bureau data**
+
+In [14]:
+
+    
+    
+    bureau.head()
+    
+
+Out[14]:
+
+| SK_ID_CURR | SK_ID_BUREAU | CREDIT_ACTIVE | CREDIT_CURRENCY | DAYS_CREDIT | CREDIT_DAY_OVERDUE | DAYS_CREDIT_ENDDATE | DAYS_ENDDATE_FACT | AMT_CREDIT_MAX_OVERDUE | CNT_CREDIT_PROLONG | AMT_CREDIT_SUM | AMT_CREDIT_SUM_DEBT | AMT_CREDIT_SUM_LIMIT | AMT_CREDIT_SUM_OVERDUE | CREDIT_TYPE | DAYS_CREDIT_UPDATE | AMT_ANNUITY  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 215354 | 5714462 | Closed | currency 1 | -497 | 0 | -153.0 | -153.0 | NaN | 0 | 91323.0 | 0.0 | NaN | 0.0 | Consumer credit | -131 | NaN  
+1 | 215354 | 5714463 | Active | currency 1 | -208 | 0 | 1075.0 | NaN | NaN | 0 | 225000.0 | 171342.0 | NaN | 0.0 | Credit card | -20 | NaN  
+2 | 215354 | 5714464 | Active | currency 1 | -203 | 0 | 528.0 | NaN | NaN | 0 | 464323.5 | NaN | NaN | 0.0 | Consumer credit | -16 | NaN  
+3 | 215354 | 5714465 | Active | currency 1 | -203 | 0 | NaN | NaN | NaN | 0 | 90000.0 | NaN | NaN | 0.0 | Credit card | -16 | NaN  
+4 | 215354 | 5714466 | Active | currency 1 | -629 | 0 | 1197.0 | NaN | 77674.5 | 0 | 2700000.0 | NaN | NaN | 0.0 | Consumer credit | -21 | NaN  
+  
+#  4 Check for missing data¶
+
+**checking missing data in application_train**
+
+In [15]:
+
+    
+    
+    # checking missing data
+    total = application_train.isnull().sum().sort_values(ascending = False)
+    percent = (application_train.isnull().sum()/application_train.isnull().count()*100).sort_values(ascending = False)
+    missing_application_train_data  = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
+    missing_application_train_data.head(20)
+    
+
+Out[15]:
+
+| Total | Percent  
+---|---|---  
+COMMONAREA_MEDI | 214865 | 69.872297  
+COMMONAREA_AVG | 214865 | 69.872297  
+COMMONAREA_MODE | 214865 | 69.872297  
+NONLIVINGAPARTMENTS_MODE | 213514 | 69.432963  
+NONLIVINGAPARTMENTS_MEDI | 213514 | 69.432963  
+NONLIVINGAPARTMENTS_AVG | 213514 | 69.432963  
+FONDKAPREMONT_MODE | 210295 | 68.386172  
+LIVINGAPARTMENTS_MEDI | 210199 | 68.354953  
+LIVINGAPARTMENTS_MODE | 210199 | 68.354953  
+LIVINGAPARTMENTS_AVG | 210199 | 68.354953  
+FLOORSMIN_MEDI | 208642 | 67.848630  
+FLOORSMIN_MODE | 208642 | 67.848630  
+FLOORSMIN_AVG | 208642 | 67.848630  
+YEARS_BUILD_MEDI | 204488 | 66.497784  
+YEARS_BUILD_AVG | 204488 | 66.497784  
+YEARS_BUILD_MODE | 204488 | 66.497784  
+OWN_CAR_AGE | 202929 | 65.990810  
+LANDAREA_MODE | 182590 | 59.376738  
+LANDAREA_AVG | 182590 | 59.376738  
+LANDAREA_MEDI | 182590 | 59.376738  
+  
+**checking missing data in POS_CASH_balance**
+
+In [16]:
+
+    
+    
+    # checking missing data
+    total = POS_CASH_balance.isnull().sum().sort_values(ascending = False)
+    percent = (POS_CASH_balance.isnull().sum()/POS_CASH_balance.isnull().count()*100).sort_values(ascending = False)
+    missing_POS_CASH_balance_data  = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
+    missing_POS_CASH_balance_data.head(3)
+    
+
+Out[16]:
+
+| Total | Percent  
+---|---|---  
+CNT_INSTALMENT_FUTURE | 26087 | 0.260835  
+CNT_INSTALMENT | 26071 | 0.260675  
+SK_DPD_DEF | 0 | 0.000000  
+  
+**checking missing data in bureau_balance**
+
+In [17]:
+
+    
+    
+    # checking missing data
+    total = bureau_balance.isnull().sum().sort_values(ascending = False)
+    percent = (bureau_balance.isnull().sum()/bureau_balance.isnull().count()*100).sort_values(ascending = False)
+    missing_bureau_balance_data  = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
+    missing_bureau_balance_data.head(3)
+    
+
+Out[17]:
+
+| Total | Percent  
+---|---|---  
+STATUS | 0 | 0.0  
+MONTHS_BALANCE | 0 | 0.0  
+SK_ID_BUREAU | 0 | 0.0  
+  
+**checking missing data in previous_application**
+
+In [18]:
+
+    
+    
+    # checking missing data
+    total = previous_application.isnull().sum().sort_values(ascending = False)
+    percent = (previous_application.isnull().sum()/previous_application.isnull().count()*100).sort_values(ascending = False)
+    missing_previous_application_data  = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
+    missing_previous_application_data.head(15)
+    
+
+Out[18]:
+
+| Total | Percent  
+---|---|---  
+RATE_INTEREST_PRIVILEGED | 1664263 | 99.643698  
+RATE_INTEREST_PRIMARY | 1664263 | 99.643698  
+RATE_DOWN_PAYMENT | 895844 | 53.636480  
+AMT_DOWN_PAYMENT | 895844 | 53.636480  
+NAME_TYPE_SUITE | 820405 | 49.119754  
+DAYS_TERMINATION | 673065 | 40.298129  
+NFLAG_INSURED_ON_APPROVAL | 673065 | 40.298129  
+DAYS_FIRST_DRAWING | 673065 | 40.298129  
+DAYS_FIRST_DUE | 673065 | 40.298129  
+DAYS_LAST_DUE_1ST_VERSION | 673065 | 40.298129  
+DAYS_LAST_DUE | 673065 | 40.298129  
+AMT_GOODS_PRICE | 385515 | 23.081773  
+AMT_ANNUITY | 372235 | 22.286665  
+CNT_PAYMENT | 372230 | 22.286366  
+PRODUCT_COMBINATION | 346 | 0.020716  
+  
+**checking missing data in installments_payments**
+
+In [19]:
+
+    
+    
+    # checking missing data
+    total = installments_payments.isnull().sum().sort_values(ascending = False)
+    percent = (installments_payments.isnull().sum()/installments_payments.isnull().count()*100).sort_values(ascending = False)
+    missing_installments_payments_data  = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
+    missing_installments_payments_data.head(3)
+    
+
+Out[19]:
+
+| Total | Percent  
+---|---|---  
+AMT_PAYMENT | 2905 | 0.021352  
+DAYS_ENTRY_PAYMENT | 2905 | 0.021352  
+AMT_INSTALMENT | 0 | 0.000000  
+  
+**checking missing data in credit_card_balance**
+
+In [20]:
+
+    
+    
+    # checking missing data
+    total = credit_card_balance.isnull().sum().sort_values(ascending = False)
+    percent = (credit_card_balance.isnull().sum()/credit_card_balance.isnull().count()*100).sort_values(ascending = False)
+    missing_credit_card_balance_data  = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
+    missing_credit_card_balance_data.head(10)
+    
+
+Out[20]:
+
+| Total | Percent  
+---|---|---  
+AMT_PAYMENT_CURRENT | 767988 | 19.998063  
+AMT_DRAWINGS_OTHER_CURRENT | 749816 | 19.524872  
+CNT_DRAWINGS_POS_CURRENT | 749816 | 19.524872  
+CNT_DRAWINGS_OTHER_CURRENT | 749816 | 19.524872  
+CNT_DRAWINGS_ATM_CURRENT | 749816 | 19.524872  
+AMT_DRAWINGS_ATM_CURRENT | 749816 | 19.524872  
+AMT_DRAWINGS_POS_CURRENT | 749816 | 19.524872  
+CNT_INSTALMENT_MATURE_CUM | 305236 | 7.948208  
+AMT_INST_MIN_REGULARITY | 305236 | 7.948208  
+SK_DPD_DEF | 0 | 0.000000  
+  
+**checking missing data in bureau**
+
+In [21]:
+
+    
+    
+    # checking missing data
+    total = bureau.isnull().sum().sort_values(ascending = False)
+    percent = (bureau.isnull().sum()/bureau.isnull().count()*100).sort_values(ascending = False)
+    missing_bureau_data  = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
+    missing_bureau_data.head(8)
+    
+
+Out[21]:
+
+| Total | Percent  
+---|---|---  
+AMT_ANNUITY | 1226791 | 71.473490  
+AMT_CREDIT_MAX_OVERDUE | 1124488 | 65.513264  
+DAYS_ENDDATE_FACT | 633653 | 36.916958  
+AMT_CREDIT_SUM_LIMIT | 591780 | 34.477415  
+AMT_CREDIT_SUM_DEBT | 257669 | 15.011932  
+DAYS_CREDIT_ENDDATE | 105553 | 6.149573  
+AMT_CREDIT_SUM | 13 | 0.000757  
+CREDIT_TYPE | 0 | 0.000000  
+  
+# 5\. Data Exploration¶
+
+## 5.1 Distribution of AMT_CREDIT¶
+
+In [22]:
+
+    
+    
+    plt.figure(figsize=(12,5))
+    plt.title("Distribution of AMT_CREDIT")
+    ax = sns.distplot(application_train["AMT_CREDIT"])
+    
+
+![](__results___files/__results___44_0.png)
+
+## 5.2 Distribution of AMT_INCOME_TOTAL¶
+
+In [23]:
+
+    
+    
+    plt.figure(figsize=(12,5))
+    plt.title("Distribution of AMT_INCOME_TOTAL")
+    ax = sns.distplot(application_train["AMT_INCOME_TOTAL"].dropna())
+    
+
+![](__results___files/__results___46_0.png)
+
+## 5.3 Distribution of AMT_GOODS_PRICE¶
+
+In [24]:
+
+    
+    
+    plt.figure(figsize=(12,5))
+    plt.title("Distribution of AMT_GOODS_PRICE")
+    ax = sns.distplot(application_train["AMT_GOODS_PRICE"].dropna())
+    
+
+![](__results___files/__results___48_0.png)
+
+## 5.4 Who accompanied client when applying for the application¶
+
+In [25]:
+
+    
+    
+    temp = application_train["NAME_TYPE_SUITE"].value_counts()
+    #print("Total number of states : ",len(temp))
+    trace = go.Bar(
+        x = temp.index,
+        y = (temp / temp.sum())*100,
+    )
+    data = [trace]
+    layout = go.Layout(
+        title = "Who accompanied client when applying for the  application in % ",
+        xaxis=dict(
+            title='Name of type of the Suite',
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count of Name of type of the Suite in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    fig = go.Figure(data=data, layout=layout)
+    py.iplot(fig, filename='schoolStateNames')
+    
+
+## 5.5 Data is balanced or imbalanced¶
+
+In [26]:
+
+    
+    
+    temp = application_train["TARGET"].value_counts()
+    df = pd.DataFrame({'labels': temp.index,
+                       'values': temp.values
+                      })
+    df.iplot(kind='pie',labels='labels',values='values', title='Loan Repayed or not')
+    
+
+  * As we can see data is highly imbalanced.
+
+## 5.6 Types of loan¶
+
+  * **Rovolving loans :** Arrangement which allows for the loan amount to be withdrawn, repaid, and redrawn again in any manner and any number of times, until the arrangement expires. Credit card loans and overdrafts are revolving loans. Also called evergreen loan
+
+In [27]:
+
+    
+    
+    temp = application_train["NAME_CONTRACT_TYPE"].value_counts()
+    fig = {
+      "data": [
+        {
+          "values": temp.values,
+          "labels": temp.index,
+          "domain": {"x": [0, .48]},
+          #"name": "Types of Loans",
+          #"hoverinfo":"label+percent+name",
+          "hole": .7,
+          "type": "pie"
+        },
+        
+        ],
+      "layout": {
+            "title":"Types of loan",
+            "annotations": [
+                {
+                    "font": {
+                        "size": 20
+                    },
+                    "showarrow": False,
+                    "text": "Loan Types",
+                    "x": 0.17,
+                    "y": 0.5
+                }
+                
+            ]
+        }
+    }
+    iplot(fig, filename='donut')
+    
+
+  * Most of the loans are Cash loans which were taken by applicants. **90.5 %** loans are Cash loans.
+
+## 5.7 Purpose of loan¶
+
+In [28]:
+
+    
+    
+    temp1 = application_train["FLAG_OWN_CAR"].value_counts()
+    temp2 = application_train["FLAG_OWN_REALTY"].value_counts()
+    
+    fig = {
+      "data": [
+        {
+          "values": temp1.values,
+          "labels": temp1.index,
+          "domain": {"x": [0, .48]},
+          "name": "Own Car",
+          "hoverinfo":"label+percent+name",
+          "hole": .6,
+          "type": "pie"
+        },
+        {
+          "values": temp2.values,
+          "labels": temp2.index,
+          "text":"Own Realty",
+          "textposition":"inside",
+          "domain": {"x": [.52, 1]},
+          "name": "Own Reality",
+          "hoverinfo":"label+percent+name",
+          "hole": .6,
+          "type": "pie"
+        }],
+      "layout": {
+            "title":"Purpose of loan",
+            "annotations": [
+                {
+                    "font": {
+                        "size": 20
+                    },
+                    "showarrow": False,
+                    "text": "Own Car",
+                    "x": 0.20,
+                    "y": 0.5
+                },
+                {
+                    "font": {
+                        "size": 20
+                    },
+                    "showarrow": False,
+                    "text": "Own Realty",
+                    "x": 0.8,
+                    "y": 0.5
+                }
+            ]
+        }
+    }
+    iplot(fig, filename='donut')
+    
+
+## 5.8 Income sources of Applicant's who applied for loan¶
+
+In [29]:
+
+    
+    
+    temp = application_train["NAME_INCOME_TYPE"].value_counts()
+    df = pd.DataFrame({'labels': temp.index,
+                       'values': temp.values
+                      })
+    df.iplot(kind='pie',labels='labels',values='values', title='Income sources of Applicant\'s', hole = 0.5)
+    
+
+  * 51.6 % Applicants mentioned that they are working. 23.3 % are Commercial Associate and 18 % are Pensioner etc. 
+
+## 5.9 Family Status of Applicant's who applied for loan¶
+
+In [30]:
+
+    
+    
+    temp = application_train["NAME_FAMILY_STATUS"].value_counts()
+    df = pd.DataFrame({'labels': temp.index,
+                       'values': temp.values
+                      })
+    df.iplot(kind='pie',labels='labels',values='values', title='Family Status of Applicant\'s', hole = 0.5)
+    
+
+  * 63.9 % applicants are married. 14.8 % are single etc.
+
+## 5.10 Occupation of Applicant's who applied for loan¶
+
+In [31]:
+
+    
+    
+    temp = application_train["OCCUPATION_TYPE"].value_counts()
+    temp.iplot(kind='bar', xTitle = 'Occupation', yTitle = "Count", title = 'Occupation of Applicant\'s who applied for loan', color = 'green')
+    
+
+  * **Top Applicant's who applied for loan :**
+    * Laborers - Apprx. 55 K
+    * Sales Staff - Approx. 32 K
+    * Core staff - Approx. 28 K
+    * Managers - Approx. 21 K
+    * Drivers - Approx. 19 K
+
+## 5.11 Education of Applicant's who applied for loan¶
+
+In [32]:
+
+    
+    
+    temp = application_train["NAME_EDUCATION_TYPE"].value_counts()
+    df = pd.DataFrame({'labels': temp.index,
+                       'values': temp.values
+                      })
+    df.iplot(kind='pie',labels='labels',values='values', title='Education of Applicant\'s', hole = 0.5)
+    
+
+  * 71 % applicants have secondary and 24.3 % having higher education.
+
+## 5.12 For which types of house higher applicant's applied for loan ?¶
+
+In [33]:
+
+    
+    
+    temp = application_train["NAME_HOUSING_TYPE"].value_counts()
+    df = pd.DataFrame({'labels': temp.index,
+                       'values': temp.values
+                      })
+    df.iplot(kind='pie',labels='labels',values='values', title='Type of House', hole = 0.5)
+    
+
+  * Approx. 89 % peoples applied for loan, they mentioned type of house is **House / Appartment**.
+
+## 5.13 Types of Organizations who applied for loan ¶
+
+In [34]:
+
+    
+    
+    temp = application_train["ORGANIZATION_TYPE"].value_counts()
+    temp.iplot(kind='bar', xTitle = 'Organization Name', yTitle = "Count", title = 'Types of Organizations who applied for loan ', color = 'red')
+    
+
+  * **Types of Organizations who applied for loan :**
+    * Business Entity Type 3 - Approx. 68 K
+    * XNA - Approx. 55 K
+    * Self employed - Approx. 38 K
+    * Others - Approx. 17 K
+    * Medicine - Approx. 11 K
+
+## 5.14 Exploration in terms of loan is repayed or not¶
+
+## 5.14.1 Income sources of Applicant's in terms of loan is repayed or not in
+%¶
+
+In [35]:
+
+    
+    
+    temp = application_train["NAME_INCOME_TYPE"].value_counts()
+    #print(temp.values)
+    temp_y0 = []
+    temp_y1 = []
+    for val in temp.index:
+        temp_y1.append(np.sum(application_train["TARGET"][application_train["NAME_INCOME_TYPE"]==val] == 1))
+        temp_y0.append(np.sum(application_train["TARGET"][application_train["NAME_INCOME_TYPE"]==val] == 0))    
+    trace1 = go.Bar(
+        x = temp.index,
+        y = (temp_y1 / temp.sum()) * 100,
+        name='YES'
+    )
+    trace2 = go.Bar(
+        x = temp.index,
+        y = (temp_y0 / temp.sum()) * 100, 
+        name='NO'
+    )
+    
+    data = [trace1, trace2]
+    layout = go.Layout(
+        title = "Income sources of Applicant's in terms of loan is repayed or not  in %",
+        #barmode='stack',
+        width = 1000,
+        xaxis=dict(
+            title='Income source',
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    
+    fig = go.Figure(data=data, layout=layout)
+    iplot(fig)
+    
+
+## 5.14.2 Family Status of Applicant's in terms of loan is repayed or not in
+%¶
+
+In [36]:
+
+    
+    
+    temp = application_train["NAME_FAMILY_STATUS"].value_counts()
+    #print(temp.values)
+    temp_y0 = []
+    temp_y1 = []
+    for val in temp.index:
+        temp_y1.append(np.sum(application_train["TARGET"][application_train["NAME_FAMILY_STATUS"]==val] == 1))
+        temp_y0.append(np.sum(application_train["TARGET"][application_train["NAME_FAMILY_STATUS"]==val] == 0))    
+    trace1 = go.Bar(
+        x = temp.index,
+        y = (temp_y1 / temp.sum()) * 100,
+        name='YES'
+    )
+    trace2 = go.Bar(
+        x = temp.index,
+        y = (temp_y0 / temp.sum()) * 100, 
+        name='NO'
+    )
+    
+    data = [trace1, trace2]
+    layout = go.Layout(
+        title = "Family Status of Applicant's in terms of loan is repayed or not in %",
+        #barmode='stack',
+        width = 1000,
+        xaxis=dict(
+            title='Family Status',
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    
+    fig = go.Figure(data=data, layout=layout)
+    iplot(fig)
+    
+
+## 5.14.3 Occupation of Applicant's in terms of loan is repayed or not in %¶
+
+In [37]:
+
+    
+    
+    temp = application_train["OCCUPATION_TYPE"].value_counts()
+    #print(temp.values)
+    temp_y0 = []
+    temp_y1 = []
+    for val in temp.index:
+        temp_y1.append(np.sum(application_train["TARGET"][application_train["OCCUPATION_TYPE"]==val] == 1))
+        temp_y0.append(np.sum(application_train["TARGET"][application_train["OCCUPATION_TYPE"]==val] == 0))    
+    trace1 = go.Bar(
+        x = temp.index,
+        y = (temp_y1 / temp.sum()) * 100,
+        name='YES'
+    )
+    trace2 = go.Bar(
+        x = temp.index,
+        y = (temp_y0 / temp.sum()) * 100, 
+        name='NO'
+    )
+    
+    data = [trace1, trace2]
+    layout = go.Layout(
+        title = "Occupation of Applicant's in terms of loan is repayed or not in %",
+        #barmode='stack',
+        width = 1000,
+        xaxis=dict(
+            title='Occupation of Applicant\'s',
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    
+    fig = go.Figure(data=data, layout=layout)
+    iplot(fig)
+    
+
+## 5.14.4 Education of Applicant's in terms of loan is repayed or not in %¶
+
+In [38]:
+
+    
+    
+    temp = application_train["NAME_EDUCATION_TYPE"].value_counts()
+    #print(temp.values)
+    temp_y0 = []
+    temp_y1 = []
+    for val in temp.index:
+        temp_y1.append(np.sum(application_train["TARGET"][application_train["NAME_EDUCATION_TYPE"]==val] == 1))
+        temp_y0.append(np.sum(application_train["TARGET"][application_train["NAME_EDUCATION_TYPE"]==val] == 0))    
+    trace1 = go.Bar(
+        x = temp.index,
+        y = (temp_y1 / temp.sum()) * 100,
+        name='YES'
+    )
+    trace2 = go.Bar(
+        x = temp.index,
+        y = (temp_y0 / temp.sum()) * 100, 
+        name='NO'
+    )
+    
+    data = [trace1, trace2]
+    layout = go.Layout(
+        title = "Education of Applicant's in terms of loan is repayed or not in %",
+        #barmode='stack',
+        width = 1000,
+        xaxis=dict(
+            title='Education of Applicant\'s',
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    
+    fig = go.Figure(data=data, layout=layout)
+    iplot(fig)
+    
+
+## 5.14.5 For which types of house higher applicant's applied for loan in
+terms of loan is repayed or not in %¶
+
+In [39]:
+
+    
+    
+    temp = application_train["NAME_HOUSING_TYPE"].value_counts()
+    #print(temp.values)
+    temp_y0 = []
+    temp_y1 = []
+    for val in temp.index:
+        temp_y1.append(np.sum(application_train["TARGET"][application_train["NAME_HOUSING_TYPE"]==val] == 1))
+        temp_y0.append(np.sum(application_train["TARGET"][application_train["NAME_HOUSING_TYPE"]==val] == 0))    
+    trace1 = go.Bar(
+        x = temp.index,
+        y = (temp_y1 / temp.sum()) * 100,
+        name='YES'
+    )
+    trace2 = go.Bar(
+        x = temp.index,
+        y = (temp_y0 / temp.sum()) * 100, 
+        name='NO'
+    )
+    
+    data = [trace1, trace2]
+    layout = go.Layout(
+        title = "For which types of house higher applicant's applied for loan in terms of loan is repayed or not in %",
+        #barmode='stack',
+        width = 1000,
+        xaxis=dict(
+            title='types of house',
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    
+    fig = go.Figure(data=data, layout=layout)
+    iplot(fig)
+    
+
+## 5.14.6 Types of Organizations in terms of loan is repayed or not in %¶
+
+In [40]:
+
+    
+    
+    temp = application_train["ORGANIZATION_TYPE"].value_counts()
+    #print(temp.values)
+    temp_y0 = []
+    temp_y1 = []
+    for val in temp.index:
+        temp_y1.append(np.sum(application_train["TARGET"][application_train["ORGANIZATION_TYPE"]==val] == 1))
+        temp_y0.append(np.sum(application_train["TARGET"][application_train["ORGANIZATION_TYPE"]==val] == 0))    
+    trace1 = go.Bar(
+        x = temp.index,
+        y = (temp_y1 / temp.sum()) * 100,
+        name='YES'
+    )
+    trace2 = go.Bar(
+        x = temp.index,
+        y = (temp_y0 / temp.sum()) * 100, 
+        name='NO'
+    )
+    
+    data = [trace1, trace2]
+    layout = go.Layout(
+        title = "Types of Organizations in terms of loan is repayed or not in %",
+        #barmode='stack',
+        width = 1000,
+        xaxis=dict(
+            title='Types of Organizations',
+            tickfont=dict(
+                size=10,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    
+    fig = go.Figure(data=data, layout=layout)
+    iplot(fig)
+    
+
+## 5.14.7 Distribution of Name of type of the Suite in terms of loan is
+repayed or not in %¶
+
+In [41]:
+
+    
+    
+    temp = application_train["NAME_TYPE_SUITE"].value_counts()
+    #print(temp.values)
+    temp_y0 = []
+    temp_y1 = []
+    for val in temp.index:
+        temp_y1.append(np.sum(application_train["TARGET"][application_train["NAME_TYPE_SUITE"]==val] == 1))
+        temp_y0.append(np.sum(application_train["TARGET"][application_train["NAME_TYPE_SUITE"]==val] == 0))    
+    trace1 = go.Bar(
+        x = temp.index,
+        y = (temp_y1 / temp.sum()) * 100,
+        name='YES'
+    )
+    trace2 = go.Bar(
+        x = temp.index,
+        y = (temp_y0 / temp.sum()) * 100, 
+        name='NO'
+    )
+    
+    data = [trace1, trace2]
+    layout = go.Layout(
+        title = "Distribution of Name of type of the Suite in terms of loan is repayed or not in %",
+        #barmode='stack',
+        width = 1000,
+        xaxis=dict(
+            title='Name of type of the Suite',
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    
+    fig = go.Figure(data=data, layout=layout)
+    iplot(fig)
+    
+
+# 5.15 Exploartion of previous application data¶
+
+## 5.15.1 Contract product type of previous application¶
+
+In [42]:
+
+    
+    
+    temp = previous_application["NAME_CONTRACT_TYPE"].value_counts()
+    fig = {
+      "data": [
+        {
+          "values": temp.values,
+          "labels": temp.index,
+          "domain": {"x": [0, .48]},
+          #"name": "Types of Loans",
+          #"hoverinfo":"label+percent+name",
+          "hole": .7,
+          "type": "pie"
+        },
+        
+        ],
+      "layout": {
+            "title":"Contract product type of previous application",
+            "annotations": [
+                {
+                    "font": {
+                        "size": 20
+                    },
+                    "showarrow": False,
+                    "text": "Contract product type",
+                    "x": 0.12,
+                    "y": 0.5
+                }
+                
+            ]
+        }
+    }
+    iplot(fig, filename='donut')
+    
+
+  * **Contract product type of previous application :**
+    * Cash loans - 44.8 %
+    * Consumer loans - 43.7 %
+    * Rovolving loan - 11.6 %
+    * XNA - 0.0207 %
+
+## 5.15.2 On which day highest number of clients applied in prevoies
+application¶
+
+In [43]:
+
+    
+    
+    temp = previous_application["WEEKDAY_APPR_PROCESS_START"].value_counts()
+    #print("Total number of states : ",len(temp))
+    trace = go.Bar(
+        x = temp.index,
+        y = (temp / temp.sum())*100,
+    )
+    data = [trace]
+    layout = go.Layout(
+        title = "On which day highest number of clients applied in prevoies application in % ",
+        xaxis=dict(
+            title='Day of the Week',
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count of Day of Week in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    fig = go.Figure(data=data, layout=layout)
+    py.iplot(fig, filename='schoolStateNames')
+    
+
+  * What a coincedence, Approximately 15 % clients applied in each 5 days a week i.e, Tuesday, Wednesday, Monday, Friday and Thrusday. 
+
+## 5.15.3 Purpose of cash loan in previous application¶
+
+In [44]:
+
+    
+    
+    temp = previous_application["NAME_CASH_LOAN_PURPOSE"].value_counts()
+    #print("Total number of states : ",len(temp))
+    trace = go.Bar(
+        x = temp.index,
+        y = (temp / temp.sum())*100,
+        marker=dict(
+            color=(temp / temp.sum())*100,
+            colorscale = 'Blues',
+            reversescale = True
+        ),
+    )
+    data = [trace]
+    layout = go.Layout(
+        title = "Purpose of cash loan in previous application in % ",
+        xaxis=dict(
+            title='Purpose of cash loan',
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    fig = go.Figure(data=data, layout=layout)
+    py.iplot(fig)
+    
+
+  * **Main purpose of the cash loan was :**
+    * XAP - 55 %
+    * XNA - 41 %
+
+## 5.15.4 Contract was approved or not in previous application¶
+
+In [45]:
+
+    
+    
+    temp = previous_application["NAME_CONTRACT_STATUS"].value_counts()
+    df = pd.DataFrame({'labels': temp.index,
+                       'values': temp.values
+                      })
+    df.iplot(kind='pie',labels='labels',values='values', title='Contract approved or not', hole = 0.5)
+    
+
+  * **Contract was approved or not in previous application :**
+    * Approved : 62.1 % times
+    * Cancelled : 18.9 % times
+    * Refused : 17.4 % times 
+    * Unused offer : 1.58 % times
+
+## 5.15.5 Payment method that client choose to pay for the previous
+application¶
+
+In [46]:
+
+    
+    
+    temp = previous_application["NAME_PAYMENT_TYPE"].value_counts()
+    df = pd.DataFrame({'labels': temp.index,
+                       'values': temp.values
+                      })
+    df.iplot(kind='pie',labels='labels',values='values', title='Payment method that client choose to pay for the previous application', hole = 0.7,colors=['#75e575', '#ea7c96',])
+    
+
+  * As we can most of the payment(61.9 %) has done thorugh cash only. 
+
+## 5.15.6 Why was the previous application rejected ?¶
+
+In [47]:
+
+    
+    
+    temp = previous_application["CODE_REJECT_REASON"].value_counts()
+    temp.iplot(kind='bar', xTitle = 'Reason', yTitle = "Count", title = 'Top reasons of previous application rejection(Wriiten in some codes)', colors=['#75e575'])
+    
+
+## 5.15.7 Who accompanied client when applying for the previous application¶
+
+In [48]:
+
+    
+    
+    temp = previous_application["NAME_TYPE_SUITE"].value_counts()
+    trace = go.Bar(
+        x = temp.index,
+        y = (temp / temp.sum())*100,
+        marker=dict(
+            color=(temp / temp.sum())*100,
+            colorscale = '#ea7c96',
+            #reversescale = True
+        ),
+    )
+    data = [trace]
+    layout = go.Layout(
+        title = "Who accompanied client when applying for the previous application in % ",
+        xaxis=dict(
+            title='Name of type of the Suite',
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count of Name of type of the Suite in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    fig = go.Figure(data=data, layout=layout)
+    py.iplot(fig)
+    
+
+  * **Who accompanied client when applying for the previous application :**
+    * Unaccompanied : Approx. 60 % times
+    * Family : Approx. 25 % times
+    * Spouse, Partner : Approx. 8 %
+    * Childrens : Approx. 4 %
+
+## 5.15.8 Was the client old or new client when applying for the previous
+application¶
+
+In [49]:
+
+    
+    
+    temp = previous_application["NAME_CLIENT_TYPE"].value_counts()
+    df = pd.DataFrame({'labels': temp.index,
+                       'values': temp.values
+                      })
+    df.iplot(kind='pie',labels='labels',values='values', title='Was the client old or new client when applying for the previous application', hole = 0.7,colors=['#ea7c96','#75e575',])
+    
+
+  * Approximately 74 % was repeater clients who applied for previous application.
+
+## 5.15.9 What kind of goods did the client apply for in the previous
+application¶
+
+In [50]:
+
+    
+    
+    temp = previous_application["NAME_GOODS_CATEGORY"].value_counts()
+    trace = go.Bar(
+        x = temp.index,
+        y = (temp / temp.sum())*100,
+        marker=dict(
+            color=(temp / temp.sum())*100,
+            colorscale = 'Greens',
+            reversescale = True
+        ),
+    )
+    data = [trace]
+    layout = go.Layout(
+        title = "What kind of goods did the client apply for in the previous application in % ",
+        xaxis=dict(
+            title='Name of the goods',
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    fig = go.Figure(data=data, layout=layout)
+    py.iplot(fig)
+    
+
+## 5.15.10 Was the previous application for CASH, POS, CAR, …¶
+
+In [51]:
+
+    
+    
+    temp = previous_application["NAME_PORTFOLIO"].value_counts()
+    df = pd.DataFrame({'labels': temp.index,
+                       'values': temp.values
+                      })
+    df.iplot(kind='pie',labels='labels',values='values', title='Was the previous application for CASH, POS, CAR, â¦', hole = 0.7,colors=['#ea7c96','#75e575',])
+    
+
+## 5.15.11 Was the previous application x-sell or walk-in ?¶
+
+In [52]:
+
+    
+    
+    temp = previous_application["NAME_PRODUCT_TYPE"].value_counts()
+    df = pd.DataFrame({'labels': temp.index,
+                       'values': temp.values
+                      })
+    df.iplot(kind='pie',labels='labels',values='values', title='Was the previous application x-sell or walk-in', hole = 0.7)
+    
+
+## 5.15.12 Top channels through which they acquired the client on the previous
+application¶
+
+In [53]:
+
+    
+    
+    temp = previous_application["CHANNEL_TYPE"].value_counts()
+    trace = go.Bar(
+        x = temp.index,
+        y = (temp / temp.sum())*100,
+        marker=dict(
+            color=(temp / temp.sum())*100,
+    #         colorscale = 'Violet',
+    #         reversescale = True
+        ),
+    )
+    data = [trace]
+    layout = go.Layout(
+        title = "Top channels  through which they acquired the client on the previous application in % ",
+        xaxis=dict(
+            title='Name of the Channel',
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    fig = go.Figure(data=data, layout=layout)
+    py.iplot(fig)
+    
+
+  * **Top channels through which they acquired the client on the previous application :**
+    * Credidit and cash offices : 43 % times
+    * Country_wide : 30 % times
+    * Stone : 13 % times
+
+## 5.15.13 Top industry of the seller¶
+
+In [54]:
+
+    
+    
+    temp = previous_application["NAME_SELLER_INDUSTRY"].value_counts()
+    trace = go.Bar(
+        x = temp.index,
+        y = (temp / temp.sum())*100,
+        marker=dict(
+            color=(temp / temp.sum())*100,
+            colorscale = 'Greens',
+            reversescale = True
+        ),
+    )
+    data = [trace]
+    layout = go.Layout(
+        title = "Top industry of the seller in % ",
+        xaxis=dict(
+            title='Industry Name',
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    fig = go.Figure(data=data, layout=layout)
+    py.iplot(fig)
+    
+
+## 5.15.14 Grouped interest rate into small medium and high of the previous
+application¶
+
+In [55]:
+
+    
+    
+    temp = previous_application["NAME_YIELD_GROUP"].value_counts()
+    trace = go.Bar(
+        x = temp.index,
+        y = (temp / temp.sum())*100,
+        marker=dict(
+            color=(temp / temp.sum())*100,
+            colorscale = 'Greens',
+            reversescale = True
+        ),
+    )
+    data = [trace]
+    layout = go.Layout(
+        title = "Grouped interest rate into small medium and high of the previous application in % ",
+        xaxis=dict(
+            title='Grouped Interest rate',
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+        ),
+        yaxis=dict(
+            title='Count in %',
+            titlefont=dict(
+                size=16,
+                color='rgb(107, 107, 107)'
+            ),
+            tickfont=dict(
+                size=14,
+                color='rgb(107, 107, 107)'
+            )
+    )
+    )
+    fig = go.Figure(data=data, layout=layout)
+    py.iplot(fig)
+    
+
+## 5.15.15 Top Detailed product combination of the previous application¶
+
+In [56]:
+
+    
+    
+    temp = previous_application["PRODUCT_COMBINATION"].value_counts()
+    df = pd.DataFrame({'labels': temp.index,
+                       'values': temp.values
+                      })
+    df.iplot(kind='pie',labels='labels',values='values', title='Top Detailed product combination of the previous application', hole = 0.7)
+    
+
+## 5.15.16 Did the client requested insurance during the previous application¶
+
+In [57]:
+
+    
+    
+    temp = previous_application["NFLAG_INSURED_ON_APPROVAL"].value_counts()
+    df = pd.DataFrame({'labels': temp.index,
+                       'values': temp.values
+                      })
+    df.iplot(kind='pie',labels='labels',values='values', title='Did the client requested insurance during the previous application(YES : 1, NO : 0)', hole = 0.7, colors=['#ea7c96','#75e575',])
+    
+
+# 6\. Pearson Correlation of features¶
+
+In [58]:
+
+    
+    
+    data = [
+        go.Heatmap(
+            z= application_train.corr().values,
+            x=application_train.columns.values,
+            y=application_train.columns.values,
+            colorscale='Viridis',
+            reversescale = False,
+            text = True ,
+            opacity = 1.0 )
+    ]
+    
+    layout = go.Layout(
+        title='Pearson Correlation of features',
+        xaxis = dict(ticks='', nticks=36),
+        yaxis = dict(ticks='' ),
+        width = 900, height = 700,
+    margin=dict(
+        l=240,
+    ),)
+    
+    fig = go.Figure(data=data, layout=layout)
+    py.iplot(fig, filename='labelled-heatmap')
+    
+
+# 7\. Feature Importance using Random forest¶
+
+In [59]:
+
+    
+    
+    from sklearn import preprocessing
+    categorical_feats = [
+        f for f in application_train.columns if application_train[f].dtype == 'object'
+    ]
+    
+    for col in categorical_feats:
+        lb = preprocessing.LabelEncoder()
+        lb.fit(list(application_train[col].values.astype('str')) + list(application_test[col].values.astype('str')))
+        application_train[col] = lb.transform(list(application_train[col].values.astype('str')))
+        application_test[col] = lb.transform(list(application_test[col].values.astype('str')))
+    
+
+In [60]:
+
+    
+    
+    application_train.fillna(-999, inplace = True)
+    
+
+In [61]:
+
+    
+    
+    from sklearn.ensemble import RandomForestClassifier
+    rf = RandomForestClassifier(n_estimators=50, max_depth=8, min_samples_leaf=4, max_features=0.5, random_state=2018)
+    rf.fit(application_train.drop(['SK_ID_CURR', 'TARGET'],axis=1), application_train.TARGET)
+    features = application_train.drop(['SK_ID_CURR', 'TARGET'],axis=1).columns.values
+    
+
+In [62]:
+
+    
+    
+    x, y = (list(x) for x in zip(*sorted(zip(rf.feature_importances_, features), 
+                                                                reverse = False)))
+    trace2 = go.Bar(
+        x=x ,
+        y=y,
+        marker=dict(
+            color=x,
+            colorscale = 'Viridis',
+            reversescale = True
+        ),
+        name='Random Forest Feature importance',
+        orientation='h',
+    )
+    
+    layout = dict(
+        title='Barplot of Feature importances',
+         width = 900, height = 2000,
+        yaxis=dict(
+            showgrid=False,
+            showline=False,
+            showticklabels=True,
+    #         domain=[0, 0.85],
+        ),
+        margin=dict(
+        l=300,
+    ),
+    )
+    
+    fig1 = go.Figure(data=[trace2])
+    fig1['layout'].update(layout)
+    py.iplot(fig1, filename='plots')
+    
+
+# More To Come. Stayed Tuned¶
+

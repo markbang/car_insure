@@ -1,0 +1,1656 @@
+# Introduction & motivations¶
+
+  * Background & context
+
+> Traditionally, pricing actuaries have utilised statistical/mathematical
+> methods based on well-founded theories in order to predict the severity and
+> likelihood of claims on policies that have been underwritten; these
+> predictions would then iteratively feed into the
+> underwriting/actuarial/claims feedback cycle that underpins insurance as we
+> know it today. However, in recent years actuarial methods have evolved to
+> incorporate more modern/state-of-the-art techniques through the application
+> of data science (DS) and machine learning (ML), in order to develop a much
+> more sophisticated approach to reserving and pricing across a variety of
+> lines of business.
+>
+> Modern-day actuarial pricing is typically performed via the industry-
+> standard use of generalised linear models (GLMs) in order to produce a
+> predictive mapping between the risk factors of each policyholder and their
+> predicted loss cost - this can be achieved via the categorical encoding of
+> these risk factors in order to produce predictions of both claim severities
+> and frequencies, which can be easily translated into interpretable insurance
+> tariff plans.
+>
+> More information on implementing GLMs for insurance pricing (predicting the
+> likelihood/severity of insurance claims) can be found at the following
+> websites: [Poisson regression and non-normal loss](https://scikit-
+> learn.org/stable/auto_examples/linear_model/plot_poisson_regression_non_normal_loss.html#)
+> and [Tweedie regression on insurance claims](https://scikit-
+> learn.org/stable/auto_examples/linear_model/plot_tweedie_regression_insurance_claims.html).
+>
+> However, within the last decade a number of ML methods (e.g. decision trees)
+> have also shown great promise and versatility in this area, approaching the
+> common actuarial challenges of predicting claim likelihoods/severities (and
+> many others) with both computational efficiency and accuracy. For more
+> information, see here: [Boosting insights in insurance tariff plans with
+> tree-based machine
+> learning](https://www.researchgate.net/publication/332631030_Boosting_insights_in_insurance_tariff_plans_with_tree-
+> based_machine_learning).
+
+  * What is this project about?
+
+> The aim of this project is to provide a practical overview of the general
+> DS/ML workflow, which is becoming an increasingly popular framework upon
+> which modern-day actuarial pricing methods are being built. Accurate pricing
+> is currently one of the most crucial challenges that businesses across the
+> insurance industry are facing, where providing accurate estimates of loss
+> costs is vital to ensuring prudent insurance portfolio management and
+> maintaining successful financial performance, especially as the sector is
+> currently experiencing a swelling volume of claims - for example, regarding
+> business interruption - as one of the major consequences of COVID-19.
+>
+> As a case study, we will introduce some supervised ML techniques for
+> predicting claim severities on a French motor third-party liability (MTPL)
+> insurance dataset. Whilst this case study may not necessarily be entirely
+> relevant to the most pressing of present-day actuarial pricing challenges,
+> the aim is for this project to serve as an advocate for adopting the wider
+> use of advanced analytical/computational approaches within the insurance
+> industry, such that more effort can be devoted to preparing it for the
+> future ahead.
+
+  * What will be discussed/shown in the project?
+
+> In this project, we will consider how to pre-process and encode an MTPL
+> insurance dataset, how to select important risk features from the dataset,
+> and how to train/test a range of ML regressors to predict claim severities
+> based on these selected risk features.
+
+# Code initialisation¶
+
+In [1]:
+
+    
+    
+    # Import key modules that will be used throughout the project.
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    import matplotlib.pyplot as plt # graphs/plotting
+    import seaborn as sns
+    
+    # Check to ensure that both CSV files are held in the correct (input) directory.
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+
+# Step 1: Import the datasets into dataframes, and perform a merge to join
+them together¶
+
+In [2]:
+
+    
+    
+    ## Load the CSV data files into Pandas dataframes.
+    
+    MTPL_filepath = "/kaggle/input/fremtpl-french-motor-tpl-insurance-claims/"
+    
+    print("Now loading MTPLfreq.")
+    MTPLfreq = pd.read_csv(MTPL_filepath+"freMTPLfreq.csv")
+    print("MTPLfreq was loaded.\n")
+    
+    print("Now loading MTPLsev.")
+    MTPLsev = pd.read_csv(MTPL_filepath+"freMTPLsev.csv")
+    print("MTPLsev was loaded.\n")
+    
+    
+    
+    Now loading MTPLfreq.
+    MTPLfreq was loaded.
+    
+    Now loading MTPLsev.
+    MTPLsev was loaded.
+    
+    
+
+In [3]:
+
+    
+    
+    # Check for total amount of claims paid in original DataFrame, prior to merging MTPLfreq with MTPLsev.
+    
+    print(sum(MTPLsev['ClaimAmount']))
+    
+    # Aggregate the claim amounts by PolicyID, prior to merging MTPLfreq with MTPLsev.
+    
+    MTPLsev_grp = MTPLsev.groupby(['PolicyID'])[['ClaimAmount']].agg('sum').reset_index()
+    
+    # Perform an outer merge between MTPLfreq/MTPLsev, based on PolicyID, then reset the index back to PolicyID (this is dropped during merging).
+    
+    df_merged = pd.merge(MTPLfreq, MTPLsev_grp, how='outer', on='PolicyID').fillna(0).set_index('PolicyID')
+    
+    # Check for the total amount of claims paid in new DataFrame, after merging MTPLfreq with MTPLsev.
+    
+    print(sum(df_merged['ClaimAmount']))
+    
+    
+    
+    34465077
+    34465077.0
+    
+
+# Step 2: Review and understand the meaning of the data (columns), then assign
+the features/targets to their own dataframes¶
+
+**Understanding the columns and their datatypes**
+
+In [4]:
+
+    
+    
+    print(df_merged.columns)
+    print('\n')
+    print(df_merged.dtypes)
+    print('\n')
+    
+    
+    
+    Index(['ClaimNb', 'Exposure', 'Power', 'CarAge', 'DriverAge', 'Brand', 'Gas',
+           'Region', 'Density', 'ClaimAmount'],
+          dtype='object')
+    
+    
+    ClaimNb          int64
+    Exposure       float64
+    Power           object
+    CarAge           int64
+    DriverAge        int64
+    Brand           object
+    Gas             object
+    Region          object
+    Density          int64
+    ClaimAmount    float64
+    dtype: object
+    
+    
+    
+
+From the code above, we can see that we have a variety of datatypes within our
+dataframe - the columns with `object` dtype contain non-numerical (character)
+data, which will need to be pre-processed in order for these to be machine-
+interpretable.
+
+This will be explained in further detail later on.
+
+**First 5 rows of the MTPL dataset**
+
+In [5]:
+
+    
+    
+    print(df_merged.head())
+    print('\n')
+    
+    
+    
+              ClaimNb  Exposure Power  CarAge  DriverAge  \
+    PolicyID                                               
+    1               0      0.09     g       0         46   
+    2               0      0.84     g       0         46   
+    3               0      0.52     f       2         38   
+    4               0      0.45     f       2         38   
+    5               0      0.15     g       0         41   
+    
+                                           Brand      Gas              Region  \
+    PolicyID                                                                    
+    1         Japanese (except Nissan) or Korean   Diesel           Aquitaine   
+    2         Japanese (except Nissan) or Korean   Diesel           Aquitaine   
+    3         Japanese (except Nissan) or Korean  Regular  Nord-Pas-de-Calais   
+    4         Japanese (except Nissan) or Korean  Regular  Nord-Pas-de-Calais   
+    5         Japanese (except Nissan) or Korean   Diesel    Pays-de-la-Loire   
+    
+              Density  ClaimAmount  
+    PolicyID                        
+    1              76          0.0  
+    2              76          0.0  
+    3            3003          0.0  
+    4            3003          0.0  
+    5              60          0.0  
+    
+    
+    
+
+From the code above, we can see a list of the first few rows within the merged
+dataframe - here, the PolicyID is set as the index, and each row lists out the
+values of each column (risk feature) for the first 5 policyholders within the
+dataset.
+
+More information on the nature/meaning of these rows/columns can be found at
+the following pages: [freMTPL - French Motor TPL Insurance Claims
+Data](https://www.kaggle.com/karansarpal/fremtpl-french-motor-tpl-insurance-
+claims).
+
+**How many policyholders have made zero claims? How will this affect the
+choice of model that we use to estimate claim severity?**
+
+In [6]:
+
+    
+    
+    policies_no_claims = len(df_merged.loc[df_merged['ClaimNb'] == 0].index)
+    all_policies = len(df_merged.index)
+    
+    pct_pols_no_clm = round((policies_no_claims/all_policies)*100, 2) 
+    
+    print(str(pct_pols_no_clm)+"% of policyholders have not made any claims.")
+    
+    
+    
+    96.28% of policyholders have not made any claims.
+    
+
+As a vast majority of the policyholders have not made any claims whatsoever,
+this implies that `ClaimAmount` will have a distribution that peaks at zero,
+but also features right-skewness/tailing to account for positive (total) claim
+amounts with exponentially decaying probability.
+
+Hence, the linear regression model that we use/choose will need to be able to
+sufficiently account for both of these characteristics of the distribution of
+`ClaimAmount`.
+
+# Step 3: Generate additional features based on interactions/transformations
+of existing variables¶
+
+Here, we create two new variables based on existing features - these are
+`ClaimFreq` and `ClaimSev`, which represent the frequency and severity of a
+policyholder's claim/s, respectively, in units of policy exposure. However,
+one of these features is not appropriate for use in model training - we will
+discuss this further in Step 4 below.
+
+In [7]:
+
+    
+    
+    df_merged['ClaimFreq'] = df_merged['ClaimNb'] / df_merged['Exposure']
+    
+    df_merged['ClaimSev'] = df_merged['ClaimAmount'] / df_merged['Exposure']
+    
+
+# Step 4: Review and consider any sources of data leakage¶
+
+Next, we will consider where data leakage may be likely to creep into the
+model fitting process, by reviewing the features/columns to confirm their
+meanings and evaluate whether any of them can introduce bias into the model
+training process. In this project, the following two factors are considered to
+be relevant:
+
+  * Target leakage
+
+> This can occur when the predictors/features include or refer to
+> data/information that will not be available at the time of making
+> predictions. In this project, any features that are derived from the target
+> that we wish to predict (e.g. `ClaimSev`) are not suitable - this is because
+> `ClaimSev` itself depends on `ClaimAmount`, which we will not know at the
+> time of prediction.
+>
+> Therefore, in order to avoid target leakage, we will drop the `ClaimSev`
+> column when assigning the features to their own dataframe in Step 5.
+>
+> On a separate note, while using the `ClaimNb`/`ClaimFreq` column/s could
+> also be considered as leaking data into the model training process (as we
+> will not know how many claims a policyholder will make), it is worth
+> mentioning that these can be and are, in practice, provided as predictions
+> instead (i.e. how many claims a policyholder is _expected_ to make) in order
+> to later determine the pure risk premium for each policyholder/insured. In
+> this project, for the sake of simplicity we assume that the
+> `ClaimNb`/`ClaimFreq` values in the test dataset are predictions that have
+> been generated in a prior exercise - we are aiming to predict the total loss
+> for each policyholder, rather than the loss amount per individual claim.
+
+  * Train-test contamination
+
+> This can occur when data that are used to train the model/s are subsequently
+> used to make predictions, which will lead to the introduction of bias in the
+> model evaluation process; once trained, the model will appear to perform
+> extremely well against the (in-sample) test dataset, but will be worse at
+> generalising to unseen/out-of-sample data.
+>
+> Hence, using `train_test_split()` to split our dataset into training/test
+> samples is vital for avoiding train-test contamination of the model training
+> process.
+
+# Step 5: Perform a train-test split of the dataset¶
+
+Next - we will create separate DataFrames that will store the features and
+target variables. These are then supplied to the `sklearn` function
+`train_test_split()` in order to split the data into training/test subsets,
+for the reason outlined above.
+
+In [8]:
+
+    
+    
+    # Assign the target variable to its own dataframe.
+    y_full = df_merged.ClaimAmount
+    
+    # Assign the features to their own dataframe. Also, remove ClaimSev, to prevent data leakage when predicting ClaimAmount.
+    X_full = df_merged.drop(['ClaimAmount', 'ClaimSev'], axis=1)
+    
+    print(y_full.head())
+    
+    print(X_full.head())
+    
+    # Perform a train-test split to obtain the training and test data as separate dataframes.
+    from sklearn.model_selection import train_test_split
+    
+    # We will set the size of the X/y training datasets to be 80% of the original (full) X/y datasets, via the train_size/test_size parameters
+    X_train, X_valid, y_train, y_valid = train_test_split(X_full, y_full, train_size=0.8, test_size=0.2, random_state=1)
+    
+    
+    
+    PolicyID
+    1    0.0
+    2    0.0
+    3    0.0
+    4    0.0
+    5    0.0
+    Name: ClaimAmount, dtype: float64
+              ClaimNb  Exposure Power  CarAge  DriverAge  \
+    PolicyID                                               
+    1               0      0.09     g       0         46   
+    2               0      0.84     g       0         46   
+    3               0      0.52     f       2         38   
+    4               0      0.45     f       2         38   
+    5               0      0.15     g       0         41   
+    
+                                           Brand      Gas              Region  \
+    PolicyID                                                                    
+    1         Japanese (except Nissan) or Korean   Diesel           Aquitaine   
+    2         Japanese (except Nissan) or Korean   Diesel           Aquitaine   
+    3         Japanese (except Nissan) or Korean  Regular  Nord-Pas-de-Calais   
+    4         Japanese (except Nissan) or Korean  Regular  Nord-Pas-de-Calais   
+    5         Japanese (except Nissan) or Korean   Diesel    Pays-de-la-Loire   
+    
+              Density  ClaimFreq  
+    PolicyID                      
+    1              76        0.0  
+    2              76        0.0  
+    3            3003        0.0  
+    4            3003        0.0  
+    5              60        0.0  
+    
+
+# Step 6: Encode categorical variables as numeric inputs for use in ML
+modelling¶
+
+**Label Encoding**
+
+> Here, we label-encode the **Power** column such that it changes each
+> (ordinal) text-based label to a numerical value which is machine-
+> interpretable, for later use in feature scaling as well as model fitting.
+
+In [9]:
+
+    
+    
+    from sklearn.preprocessing import LabelEncoder
+    
+    # Make a copy of the training/validation feature subsets to avoid changing any original data.
+    copy_X_train = X_train.copy()
+    copy_X_valid = X_valid.copy()
+    
+    # Apply a label encoder to the 'Power' column (i.e. encoding of ordinal variable).
+    label_encoder = LabelEncoder()
+    
+    copy_X_train['Power'] = label_encoder.fit_transform(X_train['Power'])
+    copy_X_valid['Power'] = label_encoder.transform(X_valid['Power'])
+    
+
+**One-Hot Encoding**
+
+> We also one-hot encode the **Brand** , **Gas** and **Region** columns, such
+> that these categories are converted to numerical and machine-interpretable
+> values that can be supplied to each regression model.
+
+In [10]:
+
+    
+    
+    from sklearn.preprocessing import OneHotEncoder
+    
+    # Initialise a one-hot encoder to columns that contain categorical data.
+    OH_encoder = OneHotEncoder(handle_unknown='ignore', sparse=False)
+    OH_cols = ['Brand', 'Gas', 'Region']
+    
+    ## We set handle_unknown='ignore' to avoid errors when the validation data contains classes that aren't represented
+    ## in the training data, and setting sparse=False ensures that the encoded columns are returned as a numpy array
+    ## (instead of a sparse matrix).
+    
+    # Use the one-hot encoder to transform the categorical data columns. 
+    OH_cols_train = pd.DataFrame(OH_encoder.fit_transform(copy_X_train[OH_cols]))
+    OH_cols_valid = pd.DataFrame(OH_encoder.transform(copy_X_valid[OH_cols]))
+    
+    # One-hot encoding removes the index; re-assign the original index.
+    OH_cols_train.index = copy_X_train.index
+    OH_cols_valid.index = copy_X_valid.index
+    
+    # Add column-labelling back in, using the get_feature_names() function. 
+    OH_cols_train.columns = OH_encoder.get_feature_names(OH_cols)
+    OH_cols_valid.columns = OH_encoder.get_feature_names(OH_cols)
+    
+    # Create copies that only include numerical feature columns (these will be replaced with one-hot encoded versions).
+    copy_X_train_no_OH_cols = copy_X_train.drop(OH_cols, axis=1)
+    copy_X_valid_no_OH_cols = copy_X_valid.drop(OH_cols, axis=1)
+    
+    # Concatenate the one-hot encoded columns with the existing numerical feature columns.
+    X_train_enc = pd.concat([copy_X_train_no_OH_cols, OH_cols_train], axis=1)
+    X_valid_enc = pd.concat([copy_X_valid_no_OH_cols, OH_cols_valid], axis=1)
+    
+
+**Data scaling - normalisation**
+
+> Next, we perform min-max scaling on the encoded dataset, such that all
+> features lie between 0 and 1 - this is so that, when training any of the
+> regression models, all features will have variances with the same order of
+> magnitude as each other. Thus, no single feature will dominate the objective
+> function and prohibit the model from learning from other features correctly
+> as expected.
+
+In [11]:
+
+    
+    
+    from sklearn.preprocessing import MinMaxScaler
+    
+    # Initialise the MinMaxScaler model, then fit it to the (encoded) training feature dataset.
+    MM_scaler = MinMaxScaler()
+    MM_scaler.fit(X_train_enc)
+    
+    # Fit the scaler, then normalise/transform both the training and validation feature datasets.
+    X_train_scale = pd.DataFrame(MM_scaler.transform(X_train_enc),
+                                 index=X_train_enc.index,
+                                 columns=X_train_enc.columns)
+    
+    X_valid_scale = pd.DataFrame(MM_scaler.transform(X_valid_enc),
+                                 index=X_valid_enc.index,
+                                 columns=X_valid_enc.columns)
+    
+
+**Comparison of X_train_scale and X_valid_scale**
+
+> Here, we check to ensure that all feature values are now numerically encoded
+> and are between 0 and 1.
+
+In [12]:
+
+    
+    
+    # Verify minimum value of all features in X_train_scale:
+    
+    X_train_scale.min(axis=0)
+    
+
+Out[12]:
+
+    
+    
+    ClaimNb                                     0.0
+    Exposure                                    0.0
+    Power                                       0.0
+    CarAge                                      0.0
+    DriverAge                                   0.0
+    Density                                     0.0
+    ClaimFreq                                   0.0
+    Brand_Fiat                                  0.0
+    Brand_Japanese (except Nissan) or Korean    0.0
+    Brand_Mercedes, Chrysler or BMW             0.0
+    Brand_Opel, General Motors or Ford          0.0
+    Brand_Renault, Nissan or Citroen            0.0
+    Brand_Volkswagen, Audi, Skoda or Seat       0.0
+    Brand_other                                 0.0
+    Gas_Diesel                                  0.0
+    Gas_Regular                                 0.0
+    Region_Aquitaine                            0.0
+    Region_Basse-Normandie                      0.0
+    Region_Bretagne                             0.0
+    Region_Centre                               0.0
+    Region_Haute-Normandie                      0.0
+    Region_Ile-de-France                        0.0
+    Region_Limousin                             0.0
+    Region_Nord-Pas-de-Calais                   0.0
+    Region_Pays-de-la-Loire                     0.0
+    Region_Poitou-Charentes                     0.0
+    dtype: float64
+
+In [13]:
+
+    
+    
+    # Verify maximum value of all features in X_train_scale:
+    
+    X_train_scale.max(axis=0)
+    
+
+Out[13]:
+
+    
+    
+    ClaimNb                                     1.0
+    Exposure                                    1.0
+    Power                                       1.0
+    CarAge                                      1.0
+    DriverAge                                   1.0
+    Density                                     1.0
+    ClaimFreq                                   1.0
+    Brand_Fiat                                  1.0
+    Brand_Japanese (except Nissan) or Korean    1.0
+    Brand_Mercedes, Chrysler or BMW             1.0
+    Brand_Opel, General Motors or Ford          1.0
+    Brand_Renault, Nissan or Citroen            1.0
+    Brand_Volkswagen, Audi, Skoda or Seat       1.0
+    Brand_other                                 1.0
+    Gas_Diesel                                  1.0
+    Gas_Regular                                 1.0
+    Region_Aquitaine                            1.0
+    Region_Basse-Normandie                      1.0
+    Region_Bretagne                             1.0
+    Region_Centre                               1.0
+    Region_Haute-Normandie                      1.0
+    Region_Ile-de-France                        1.0
+    Region_Limousin                             1.0
+    Region_Nord-Pas-de-Calais                   1.0
+    Region_Pays-de-la-Loire                     1.0
+    Region_Poitou-Charentes                     1.0
+    dtype: float64
+
+In [14]:
+
+    
+    
+    # Verify minimum value of all features:
+    
+    X_valid_scale.min(axis=0)
+    
+
+Out[14]:
+
+    
+    
+    ClaimNb                                     0.0
+    Exposure                                    0.0
+    Power                                       0.0
+    CarAge                                      0.0
+    DriverAge                                   0.0
+    Density                                     0.0
+    ClaimFreq                                   0.0
+    Brand_Fiat                                  0.0
+    Brand_Japanese (except Nissan) or Korean    0.0
+    Brand_Mercedes, Chrysler or BMW             0.0
+    Brand_Opel, General Motors or Ford          0.0
+    Brand_Renault, Nissan or Citroen            0.0
+    Brand_Volkswagen, Audi, Skoda or Seat       0.0
+    Brand_other                                 0.0
+    Gas_Diesel                                  0.0
+    Gas_Regular                                 0.0
+    Region_Aquitaine                            0.0
+    Region_Basse-Normandie                      0.0
+    Region_Bretagne                             0.0
+    Region_Centre                               0.0
+    Region_Haute-Normandie                      0.0
+    Region_Ile-de-France                        0.0
+    Region_Limousin                             0.0
+    Region_Nord-Pas-de-Calais                   0.0
+    Region_Pays-de-la-Loire                     0.0
+    Region_Poitou-Charentes                     0.0
+    dtype: float64
+
+In [15]:
+
+    
+    
+    # Verify maximum value of all features:
+    
+    X_valid_scale.max(axis=0)
+    
+
+Out[15]:
+
+    
+    
+    ClaimNb                                     1.000000
+    Exposure                                    0.718206
+    Power                                       1.000000
+    CarAge                                      1.000000
+    DriverAge                                   1.000000
+    Density                                     1.000000
+    ClaimFreq                                   1.000000
+    Brand_Fiat                                  1.000000
+    Brand_Japanese (except Nissan) or Korean    1.000000
+    Brand_Mercedes, Chrysler or BMW             1.000000
+    Brand_Opel, General Motors or Ford          1.000000
+    Brand_Renault, Nissan or Citroen            1.000000
+    Brand_Volkswagen, Audi, Skoda or Seat       1.000000
+    Brand_other                                 1.000000
+    Gas_Diesel                                  1.000000
+    Gas_Regular                                 1.000000
+    Region_Aquitaine                            1.000000
+    Region_Basse-Normandie                      1.000000
+    Region_Bretagne                             1.000000
+    Region_Centre                               1.000000
+    Region_Haute-Normandie                      1.000000
+    Region_Ile-de-France                        1.000000
+    Region_Limousin                             1.000000
+    Region_Nord-Pas-de-Calais                   1.000000
+    Region_Pays-de-la-Loire                     1.000000
+    Region_Poitou-Charentes                     1.000000
+    dtype: float64
+
+# Step 7: Explore the original dataset to obtain descriptive statistics¶
+
+Here, we use the `pd.describe()` function to obtain descriptive statistics of
+the original dataset (prior to preprocessing).
+
+In [16]:
+
+    
+    
+    print(df_merged.describe())
+    
+    
+    
+                 ClaimNb       Exposure         CarAge      DriverAge  \
+    count  413169.000000  413169.000000  413169.000000  413169.000000   
+    mean        0.039163       0.561088       7.532404      45.319876   
+    std         0.204053       0.369477       5.763011      14.328120   
+    min         0.000000       0.002732       0.000000      18.000000   
+    25%         0.000000       0.200000       3.000000      34.000000   
+    50%         0.000000       0.540000       7.000000      44.000000   
+    75%         0.000000       1.000000      12.000000      54.000000   
+    max         4.000000       1.990000     100.000000      99.000000   
+    
+                 Density   ClaimAmount      ClaimFreq      ClaimSev  
+    count  413169.000000  4.131690e+05  413169.000000  4.131690e+05  
+    mean     1985.153913  8.341642e+01       0.118803  3.711403e+02  
+    std      4776.254543  4.192526e+03       2.155181  3.493029e+04  
+    min         2.000000  0.000000e+00       0.000000  0.000000e+00  
+    25%        67.000000  0.000000e+00       0.000000  0.000000e+00  
+    50%       287.000000  0.000000e+00       0.000000  0.000000e+00  
+    75%      1410.000000  0.000000e+00       0.000000  0.000000e+00  
+    max     27000.000000  2.036833e+06     365.000004  1.824670e+07  
+    
+
+Next, we will generate pairplots between the targets and features to
+understand the relationships between them and discover whether there are any
+trends/correlations within the data. To do this, we will use the
+`seaborn.pairplot()` function as a high-level interface to plot the pairwise
+relationships in the `df_merged` dataset.
+
+First, we define two separate lists of x-variables that we will produce
+pairplots with, depending on which y-variable we choose.
+
+In [17]:
+
+    
+    
+    desc_pairplot_x_vars_A = ['ClaimNb', 'Power', 'CarAge', 'DriverAge', 'Brand', 'Gas', 'Density']
+    
+    desc_pairplot_x_vars_B = ['Power', 'CarAge', 'DriverAge', 'Brand', 'Gas', 'Density']
+    
+
+Next, we supply 3 values to this function's parameters:
+
+  * `data` \- positional argument:
+
+> Here, we supply `df_merged` as a `pandas.DataFrame` object, where each
+> column is a variable and each row is an observation.
+
+  * `x_vars` \- keyword argument:
+
+> Here, we provide the lists of variable names (defined above) as the
+> columns/x-axes of the pairplot figures in order to make the non-square
+> plots.
+
+  * `y_vars` \- keyword argument:
+
+> Here, we provide a single variable name (e.g. `ClaimNb`) as the row/y-axis
+> for each pairplot figure.
+
+In [18]:
+
+    
+    
+    # Pairplot 1 - Exposure vs. x_vars.
+    
+    desc_pairplot_1 = sns.pairplot(df_merged, x_vars=desc_pairplot_x_vars_A, y_vars='Exposure')
+    
+
+![](__results___files/__results___41_0.png)
+
+  * ClaimNb: The trend in this graph implies that policyholders with higher claim frequencies tend to be covered on policies with shorter exposure periods (this view may, however, be affected by renewals/binders).
+  * Power: The trend in this graph implies that cars covered by policies with longer exposure periods tend to be less powerful, although there appear to be some high-powered cars (e.g. categories `k`/`n`) that go against this pattern.
+  * CarAge: The trend in this graph implies that a vast majority of the cars insured have 1-year exposure periods, with a wider spread of policy exposure periods in the range of years lower than 25 (i.e. relatively young cars).
+  * DriverAge: This graph shows a wide distribution of exposure periods across drivers of different ages, with a range of middle-aged policyholders that are insured with exposure periods longer than 1 year.
+  * Brand: This graph does not show any clear correlation or trend between the exposure period of the MTPL policy and the brand of the car that is insured.
+  * Gas: This graph does not show any clear correlation or trend between the exposure period of the MTPL policy and the fuel type of the car that is insured.
+  * Density: This graph shows a wide distribution of policy exposure periods, which appears to decrease as the population density of the area that the policyholder inhabits increases; however, this distribution does feature some observations at higher values of Density.
+
+In [19]:
+
+    
+    
+    # Pairplot 2 - ClaimNb vs. x_vars.
+    
+    desc_pairplot_2 = sns.pairplot(df_merged, x_vars=desc_pairplot_x_vars_B, y_vars='ClaimNb')
+    
+
+![](__results___files/__results___43_0.png)
+
+  * Power: The trend in this graph implies that policyholders who are in the upper quartile of claim frequency (i.e. N > 3) tend to drive less powerful/average cars, however there does not appear to be any general correlation between car power and claim frequency, among the majority of other policyholders.
+  * CarAge: The trend in this graph implies that a majority of the variance in ClaimNb is shown across cars that are younger than 50; the number of claims per policyholder tends to decrease with the age of the car.
+  * DriverAge: This graph shows a wide distribution of claim frequencies across drivers of different ages, with no clear trend between the age of the policyholder and the number of claims that they have made.
+  * Brand: This graph does not show any clear correlation or trend between the number of claims made and the brand of the car owned by the (insured) policyholder. 
+  * Gas: This graph also does not show any clear correlation between the number of claims made and the fuel type of the car that is insured.
+  * Density: This graph shows the general trend that the number of claims per policyholder decreases as the population density (of the town/city that they live in) increases.
+
+In [20]:
+
+    
+    
+    # Pairplot 3 - ClaimFreq vs. x_vars (i.e. accounting for policy exposure weighting).
+    
+    desc_pairplot_3 = sns.pairplot(df_merged, x_vars=desc_pairplot_x_vars_B, y_vars='ClaimFreq')
+    
+
+![](__results___files/__results___45_0.png)
+
+  * Power: The trend in this graph implies that ClaimFreq tends to decrease as the power of the car increases, however there are also some small peaks in ClaimFreq for certain categories representing high-powered cars (e.g. k/l).
+  * CarAge: This graph shows that a vast majority of the variance in ClaimFreq is shared across policyholders who own relatively young cars (CarAge < 25), but also implies that ClaimFreq decreases as the age of the car increases.
+  * DriverAge: This graph shows that claim frequency also decreases as the age of the policyholder increases, however a vast majority of the variance in ClaimFreq can be captured between the values of 0-100 (across all driver ages).
+  * Brand: There appears to be no clear trend or correlation between the frequency of claims and the brand of the car owned by the policyholder.
+  * Gas: This graph also does not show any clear correlation between ClaimFreq and the fuel type of the policyholder's car.
+  * Density: This graph displays a negative correlation between the frequency of claims made by the policyholder and the population density of the city that they live in.
+
+In [21]:
+
+    
+    
+    # Pairplot 4 - ClaimAmount vs. x_vars.
+    
+    desc_pairplot_4 = sns.pairplot(df_merged, x_vars=desc_pairplot_x_vars_B, y_vars='ClaimAmount')
+    
+
+![](__results___files/__results___47_0.png)
+
+  * Power: This graph shows that there is an overall negative correlation between the power of the car owned by the policyholder and the total value of claims made by them, however there are two major outliers at lower car powers - this is generally an exception to the rule.
+  * CarAge: Similarly to the power of the car, there is an overall negative correlation between the age of the car and the total value of claims made by the policyholder, however there are some outliers for relatively new cars.
+  * DriverAge: This graph shows that total claim amounts tend to be higher at younger ages (between 20-40), however there is also a smaller group of drivers between 60-80 that are responsible for non-trivial total claim amounts; major outliers can also be seen for two newer drivers (DriverAge ~ 20).
+  * Brand: Whilst there are a handful of brands that are responsible for higher-than-normal claim amounts, these are in the vast minority of policyholders - the overall trend is that there is no clear correlation between the brand of the car and the total claim amount.
+  * Gas: This graph also does not show any clear correlation between ClaimAmount and the fuel type of the policyholder's car, however there are two distinct outliers within the 'Regular' category.
+  * Density: This graph displays a negative correlation between the total value of claims made by the policyholder and the population density of the city that they live in.
+
+In [22]:
+
+    
+    
+    # Pairplot 5 - ClaimSev vs. x_vars (i.e. accounting for policy exposure weighting).
+    
+    desc_pairplot_5 = sns.pairplot(df_merged, x_vars=desc_pairplot_x_vars_B, y_vars='ClaimSev')
+    
+
+![](__results___files/__results___49_0.png)
+
+  * Power: This graph shows that there is an overall negative correlation between the power of the car owned by the policyholder and the exposure-weighted total severity of claims made, however as before there are two major outliers at lower car powers.
+  * CarAge: Similarly to the power of the car, there is an overall negative correlation between the age of the car and the exposure-weighted total severity of claims made by the policyholder, however there are some outliers for relatively new (albeit slightly used) cars.
+  * DriverAge: This graph shows that exposure-weighted claim severities tend to be higher at younger ages (between 20-35), however there is also a smaller group of drivers between 45-55 that are responsible for non-trivial total claim amounts; some major outliers can also be seen for two very new drivers (DriverAge ~ 20).
+  * Brand: Whilst there are a handful of brands that are responsible for higher-than-normal claim severities, these are in the vast minority of policyholders - the overall trend is that there is no clear correlation between the brand of the car and the total claim amount.
+  * Gas: This graph also does not show any clear correlation between ClaimSeverity and the fuel type of the policyholder's car, however there are two distinct outliers within the 'Regular' category.
+  * Density: This graph displays a negative correlation between the total value of claims made by the policyholder and the population density of the city that they live in.
+
+  * What distribution does ClaimAmount have?
+
+> ClaimAmount has a positive continuous distribution (non-negative, for this
+> dataset) which is centred at 0 (a majority of policyholders do not make any
+> claims). Hence, using an ordinary linear regression model that treats the
+> response variable's distribution as normal/Gaussian would not be
+> appropriate, due to the asymmetry in the probability distribution of
+> ClaimAmount as described.
+
+  * How will the distribution of this response variable affect the choice of regressors used for modelling claim severity?
+
+> As claim severity will need to be modelled via asymmetric/skewed
+> distributions, we will need to consider regression approaches using
+> generalised linear models which allow for response variables to have
+> distributions that are non-normal, as well as other regressors that are
+> capable of generalising in an agnostic manner (i.e. these do not require the
+> underlying distribution of the response variable to be pre-defined). These
+> methods are considered in further detail within Step 9.
+
+# Step 8: Perform feature selection via L1 regularisation¶
+
+Next, we will perform feature selection via L1 (lasso) regularisation, in
+order to reduce the number of features that are used for fitting each of the
+models - this is done in order to prevent overfitting. To do this, we add a
+regularisation term (containing the L1 norm) to the standard loss function
+that is to be minimised, such that:
+
+> $\text{Loss} = \text{Error}(y,\hat{y}) + \lambda \displaystyle\sum_{i=1}^{N}
+> |w_i|$
+
+Where:
+
+  * $y$ is the true value/severity of the claim
+  * $\hat{y}$ is the claim value/severity predicted by the model
+  * $\lambda > 0$ is the regularisation parameter that determines the strength of regularisation to be applied to the loss function
+  * $w_i$ is the weight of feature $i$
+
+This modified loss function is then subsequently minimised in order to produce
+the parameters of the Lasso linear regression model. Features that are less
+significant in producing the Lasso model will have their weights/importances
+decreased towards 0 - these "unimportant" features can then be removed from
+the set of inputs/features that are supplied to the models we will use later
+on.
+
+To perform this for our dataset, we will use the `Lasso()` class from
+`sklearn.linear_model`, fit it to our scaled training data, before assigning
+it to a variable called `lasso`. This class requires us to specify the
+following parameters:
+
+  * `alpha` represents the constant that multiplies the L1 term (i.e is equivalent to $\lambda$)
+  * `random_state` sets the random number seed and is used for reproducibility purposes. Here, we set this value to 1.
+  * `max_iter` represents the maximum number of iterations that the underlying solvers are allowed to take, in order to converge.
+
+Next, we will pass `lasso` to the `SelectFromModel` class, before assigning it
+to a new variable called `model` \- we specify `prefit=True` to ensure that
+the meta-transformer should expect a prefit model to be passed directly to it.
+
+Then, we apply the `.transform()` method in order to reduce the scaled
+training dataset down to the features that were selected by the Lasso
+(regression) model.
+
+Finally, we create a new dataframe `selected_features` which holds all
+'important' features from the original set of columns in `X_train_l1` as their
+original (scaled) values, but sets values of 0 for every other feature.
+
+In [23]:
+
+    
+    
+    from sklearn.linear_model import Lasso
+    from sklearn.feature_selection import SelectFromModel
+    
+    # Establish the Lasso (L1) Regularisation model that will perform feature selection.
+    lasso = Lasso(alpha=5e-5, random_state=1, max_iter=1e+6).fit(X_train_scale, y_train)
+    model = SelectFromModel(lasso, prefit=True)
+    
+    X_train_l1 = model.transform(X_train_scale)
+    
+    selected_features = pd.DataFrame(model.inverse_transform(X_train_l1),
+                                    index=X_train_scale.index,
+                                    columns=X_train_scale.columns)
+    
+    print(selected_features)
+    
+    
+    
+              ClaimNb  Exposure     Power  CarAge  DriverAge   Density  ClaimFreq  \
+    PolicyID                                                                        
+    194119       0.00  0.240163  0.181818    0.07   0.407407  0.152826   0.000000   
+    293687       0.00  0.501829  0.272727    0.13   0.358025  0.004667   0.000000   
+    132615       0.25  0.199907  0.090909    0.09   0.333333  1.000000   0.006849   
+    138539       0.00  0.290483  0.090909    0.04   0.172840  0.029632   0.000000   
+    217750       0.00  0.260291  0.181818    0.11   0.111111  0.018631   0.000000   
+    ...           ...       ...       ...     ...        ...       ...        ...   
+    73350        0.00  0.501829  0.181818    0.09   0.567901  0.002630   0.000000   
+    371404       0.00  0.209971  0.545455    0.01   0.111111  1.000000   0.000000   
+    312202       0.00  0.189842  0.000000    0.01   0.481481  1.000000   0.000000   
+    267337       0.00  0.089202  0.000000    0.12   0.456790  0.005223   0.000000   
+    128038       0.00  0.501829  0.181818    0.01   0.358025  0.135529   0.000000   
+    
+              Brand_Fiat  Brand_Japanese (except Nissan) or Korean  \
+    PolicyID                                                         
+    194119           0.0                                       0.0   
+    293687           0.0                                       0.0   
+    132615           0.0                                       0.0   
+    138539           0.0                                       0.0   
+    217750           0.0                                       0.0   
+    ...              ...                                       ...   
+    73350            1.0                                       0.0   
+    371404           0.0                                       0.0   
+    312202           0.0                                       1.0   
+    267337           0.0                                       0.0   
+    128038           0.0                                       0.0   
+    
+              Brand_Mercedes, Chrysler or BMW  ...  Region_Aquitaine  \
+    PolicyID                                   ...                     
+    194119                                0.0  ...               0.0   
+    293687                                0.0  ...               0.0   
+    132615                                0.0  ...               0.0   
+    138539                                0.0  ...               0.0   
+    217750                                0.0  ...               0.0   
+    ...                                   ...  ...               ...   
+    73350                                 0.0  ...               0.0   
+    371404                                1.0  ...               0.0   
+    312202                                0.0  ...               0.0   
+    267337                                0.0  ...               0.0   
+    128038                                0.0  ...               0.0   
+    
+              Region_Basse-Normandie  Region_Bretagne  Region_Centre  \
+    PolicyID                                                           
+    194119                       0.0              0.0            0.0   
+    293687                       0.0              0.0            1.0   
+    132615                       0.0              0.0            0.0   
+    138539                       0.0              0.0            0.0   
+    217750                       1.0              0.0            0.0   
+    ...                          ...              ...            ...   
+    73350                        0.0              0.0            1.0   
+    371404                       0.0              0.0            0.0   
+    312202                       0.0              0.0            0.0   
+    267337                       0.0              1.0            0.0   
+    128038                       0.0              0.0            0.0   
+    
+              Region_Haute-Normandie  Region_Ile-de-France  Region_Limousin  \
+    PolicyID                                                                  
+    194119                       0.0                   0.0              0.0   
+    293687                       0.0                   0.0              0.0   
+    132615                       0.0                   0.0              0.0   
+    138539                       0.0                   0.0              0.0   
+    217750                       0.0                   0.0              0.0   
+    ...                          ...                   ...              ...   
+    73350                        0.0                   0.0              0.0   
+    371404                       0.0                   0.0              0.0   
+    312202                       0.0                   0.0              0.0   
+    267337                       0.0                   0.0              0.0   
+    128038                       0.0                   0.0              0.0   
+    
+              Region_Nord-Pas-de-Calais  Region_Pays-de-la-Loire  \
+    PolicyID                                                       
+    194119                          0.0                      1.0   
+    293687                          0.0                      0.0   
+    132615                          0.0                      0.0   
+    138539                          1.0                      0.0   
+    217750                          0.0                      0.0   
+    ...                             ...                      ...   
+    73350                           0.0                      0.0   
+    371404                          0.0                      0.0   
+    312202                          0.0                      0.0   
+    267337                          0.0                      0.0   
+    128038                          0.0                      0.0   
+    
+              Region_Poitou-Charentes  
+    PolicyID                           
+    194119                        0.0  
+    293687                        0.0  
+    132615                        0.0  
+    138539                        0.0  
+    217750                        0.0  
+    ...                           ...  
+    73350                         0.0  
+    371404                        0.0  
+    312202                        0.0  
+    267337                        0.0  
+    128038                        0.0  
+    
+    [330535 rows x 26 columns]
+    
+
+In [24]:
+
+    
+    
+    selected_columns = selected_features.columns[selected_features.var() != 0]
+    
+    print(selected_columns)
+    
+    
+    
+    Index(['ClaimNb', 'Exposure', 'Power', 'CarAge', 'DriverAge', 'Density',
+           'ClaimFreq', 'Brand_Fiat', 'Brand_Japanese (except Nissan) or Korean',
+           'Brand_Mercedes, Chrysler or BMW', 'Brand_Opel, General Motors or Ford',
+           'Brand_Renault, Nissan or Citroen', 'Brand_other', 'Gas_Diesel',
+           'Region_Aquitaine', 'Region_Basse-Normandie', 'Region_Bretagne',
+           'Region_Centre', 'Region_Haute-Normandie', 'Region_Limousin',
+           'Region_Nord-Pas-de-Calais', 'Region_Pays-de-la-Loire',
+           'Region_Poitou-Charentes'],
+          dtype='object')
+    
+
+In [25]:
+
+    
+    
+    X_train_L1reg = selected_features.drop(selected_features.columns[selected_features.var() == 0], axis=1)
+    
+    print(X_train_L1reg)
+    
+    
+    
+              ClaimNb  Exposure     Power  CarAge  DriverAge   Density  ClaimFreq  \
+    PolicyID                                                                        
+    194119       0.00  0.240163  0.181818    0.07   0.407407  0.152826   0.000000   
+    293687       0.00  0.501829  0.272727    0.13   0.358025  0.004667   0.000000   
+    132615       0.25  0.199907  0.090909    0.09   0.333333  1.000000   0.006849   
+    138539       0.00  0.290483  0.090909    0.04   0.172840  0.029632   0.000000   
+    217750       0.00  0.260291  0.181818    0.11   0.111111  0.018631   0.000000   
+    ...           ...       ...       ...     ...        ...       ...        ...   
+    73350        0.00  0.501829  0.181818    0.09   0.567901  0.002630   0.000000   
+    371404       0.00  0.209971  0.545455    0.01   0.111111  1.000000   0.000000   
+    312202       0.00  0.189842  0.000000    0.01   0.481481  1.000000   0.000000   
+    267337       0.00  0.089202  0.000000    0.12   0.456790  0.005223   0.000000   
+    128038       0.00  0.501829  0.181818    0.01   0.358025  0.135529   0.000000   
+    
+              Brand_Fiat  Brand_Japanese (except Nissan) or Korean  \
+    PolicyID                                                         
+    194119           0.0                                       0.0   
+    293687           0.0                                       0.0   
+    132615           0.0                                       0.0   
+    138539           0.0                                       0.0   
+    217750           0.0                                       0.0   
+    ...              ...                                       ...   
+    73350            1.0                                       0.0   
+    371404           0.0                                       0.0   
+    312202           0.0                                       1.0   
+    267337           0.0                                       0.0   
+    128038           0.0                                       0.0   
+    
+              Brand_Mercedes, Chrysler or BMW  ...  Gas_Diesel  Region_Aquitaine  \
+    PolicyID                                   ...                                 
+    194119                                0.0  ...         0.0               0.0   
+    293687                                0.0  ...         0.0               0.0   
+    132615                                0.0  ...         0.0               0.0   
+    138539                                0.0  ...         1.0               0.0   
+    217750                                0.0  ...         1.0               0.0   
+    ...                                   ...  ...         ...               ...   
+    73350                                 0.0  ...         0.0               0.0   
+    371404                                1.0  ...         0.0               0.0   
+    312202                                0.0  ...         0.0               0.0   
+    267337                                0.0  ...         0.0               0.0   
+    128038                                0.0  ...         1.0               0.0   
+    
+              Region_Basse-Normandie  Region_Bretagne  Region_Centre  \
+    PolicyID                                                           
+    194119                       0.0              0.0            0.0   
+    293687                       0.0              0.0            1.0   
+    132615                       0.0              0.0            0.0   
+    138539                       0.0              0.0            0.0   
+    217750                       1.0              0.0            0.0   
+    ...                          ...              ...            ...   
+    73350                        0.0              0.0            1.0   
+    371404                       0.0              0.0            0.0   
+    312202                       0.0              0.0            0.0   
+    267337                       0.0              1.0            0.0   
+    128038                       0.0              0.0            0.0   
+    
+              Region_Haute-Normandie  Region_Limousin  Region_Nord-Pas-de-Calais  \
+    PolicyID                                                                       
+    194119                       0.0              0.0                        0.0   
+    293687                       0.0              0.0                        0.0   
+    132615                       0.0              0.0                        0.0   
+    138539                       0.0              0.0                        1.0   
+    217750                       0.0              0.0                        0.0   
+    ...                          ...              ...                        ...   
+    73350                        0.0              0.0                        0.0   
+    371404                       0.0              0.0                        0.0   
+    312202                       0.0              0.0                        0.0   
+    267337                       0.0              0.0                        0.0   
+    128038                       0.0              0.0                        0.0   
+    
+              Region_Pays-de-la-Loire  Region_Poitou-Charentes  
+    PolicyID                                                    
+    194119                        1.0                      0.0  
+    293687                        0.0                      0.0  
+    132615                        0.0                      0.0  
+    138539                        0.0                      0.0  
+    217750                        0.0                      0.0  
+    ...                           ...                      ...  
+    73350                         0.0                      0.0  
+    371404                        0.0                      0.0  
+    312202                        0.0                      0.0  
+    267337                        0.0                      0.0  
+    128038                        0.0                      0.0  
+    
+    [330535 rows x 23 columns]
+    
+
+In [26]:
+
+    
+    
+    # The X_valid dataframe is truncated such that only the L1-selected features are used for validation purposes.
+    X_valid_L1reg = X_valid_scale[selected_columns]
+    
+
+# Step 9: Define the regressors/models used¶
+
+In this project, we aim to predict the target (ClaimAmount) using the
+following linear regression approaches:
+
+  1. Random Forest Regression
+
+**Random Forest Regression** works by training multiple decision trees, based
+on the random sampling (with replacement) of a training dataset. Input
+features from an unseen dataset can then be supplied to each trained decision
+tree in order to generate a prediction, which is subsequently averaged across
+all predictions to produce a final regression output; averaging across all
+predictions has the benefit of reducing overfitting to any given random sample
+within the training set.
+
+  1. Poisson (GLM) Regression
+
+**Poisson Regression** works in a very similar way to ordinary linear
+regression, except here we assume that the response variable (ClaimAmount) has
+a Poisson distribution - thus forming one of two generalised linear models
+(GLMs) that we will use in this project:
+
+> $Y_i \stackrel{iid}{\sim} Pois(\lambda) $
+
+This model is chosen purely as the first example of a GLM with a positive
+continuous distribution that can be used to predict claim severity, although
+there are better alternatives to use.
+
+  1. Tweedie (GLM) Regression
+
+**Tweedie Regression** , like Poisson regression, also assumes that the
+response variable follows a non-normal distribution - in this case, we assume
+that ClaimAmount has a Tweedie distribution:
+
+> $Y = \displaystyle\sum_{i=1}^{T} X_i, T \sim Pois(\lambda), X_i
+> \stackrel{iid}{\sim} Ga(\alpha,\gamma), T \perp X_i $
+
+Where $Y$ is the aggregate claim amount for a covered risk, $T$ is the number
+of reported claims and $X_i$ is the insurance payment for the $i_{th}$ claim.
+
+However, the Tweedie distribution is special in that it is an example of a
+compound Poisson-Gamma distribution, which means that the distribution shows a
+mix between both Poisson and Gamma form. The Poisson component helps to
+account for the large positive mass at zero (i.e. where ClaimAmount is 0, as
+most policyholders do not make any claims), however the Gamma component allows
+for a continuous, positively skewed, tail-shaped distribution associated with
+exponentially decaying probability density (i.e. higher claim severities can
+also be accounted for).
+
+  1. XGBoost (eXtreme Gradient Boosting) Regression
+
+**XGBoost Regression** works similarly to random forest regression, however it
+is based on an iterative process of gradually reducing the error between
+predicted & true values. This is achieved by building a new decision tree to
+fit on the pseudo-residuals of the previous tree, allowing the algorithm to
+"learn" and iteratively refine the regression model until the objective loss
+function is sufficiently minimised. This can be performed using gradient
+descent optimisation algorithms; XGBoost is one example of a gradient descent
+method, and is widely implemented due to its effectiveness in this context.
+
+# Step 10: Perform cross-validation to obtain the optimal set of
+hyperparameters for each model¶
+
+Here, we will perform 5-fold cross-validation in order to optimise one of each
+models' hyperparameters. These are:
+
+`RandomForestRegressor`
+
+  * `n_estimators` represents the number of decision trees that are implemented by the random forest regressor. **_We will aim to optimise this hyperparameter._**
+  * `random_state` sets the random number seed and is used for reproducibility purposes. Here, we set this value to 1.
+  * `n_jobs` represents the number of calculations to run in parallel; setting a value of -1 means that all processors will be used.
+
+`PoissonRegressor`
+
+  * `alpha` represents the constants that multiplies the penalty term, thus determining the strength of regularisation for the Poisson GLM used. **_We will aim to optimise this hyperparameter._**
+  * `max_iter` represents the maximal number of iterations for the PoissonRegressor's solver.
+
+`TweedieRegressor`
+
+  * `power` determines the underlying target value's distribution - using a value between 1 and 2 produces a compound Poisson-Gamma distribution.
+
+> As a pure Gamma distribution's probability density is not defined at x=0, we
+> set this value to 1.8 such that the target's compound distribution shows
+> more Gamma form than Poisson. This is another hyperparameter that could
+> potentially be optimised for simultaneously, via grid-search methods.
+
+  * `alpha` represents the constants that multiplies the penalty term, thus determining the strength of regularisation for the Tweedie GLM used. **_We will aim to optimise this hyperparameter._**
+  * `max_iter` represents the maximal number of iterations for the TweedieRegressor's solver.
+
+`XGBRegressor`
+
+  * `n_estimators` represents the number of gradient boosted trees implemented by the eXtreme Gradient Boosting (XGB) regressor; this is equivalent to the number of boosting rounds. **_We will aim to optimise this hyperparameter._**
+  * `learning_rate` refers to the boosting learning rate/step size of the XGB regressor - this value is between 0 and 1.
+  * `random_state` sets the random number seed and is used for reproducibility purposes. Here, we set this value to 1.
+
+In [27]:
+
+    
+    
+    # Import the regression models from sklearn/xgboost.
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.linear_model import PoissonRegressor
+    from sklearn.linear_model import TweedieRegressor
+    from xgboost import XGBRegressor
+    
+    # Import the cross_val_score function from sklearn.
+    from sklearn.model_selection import cross_val_score
+    
+
+In [28]:
+
+    
+    
+    ## Define scoring functions for each method.
+    
+    def get_score_RF(n_estimators):
+        model_RF = RandomForestRegressor(n_estimators=n_estimators, random_state=1, n_jobs=-1)
+        
+        scores_RF = -1 * cross_val_score(model_RF, X_train_L1reg, y_train,
+                                  cv=5,
+                                  scoring='neg_mean_absolute_error')
+    
+        return scores_RF.mean()
+    
+    
+    def get_score_PGLM(alpha):
+        model_PGLM = PoissonRegressor(alpha=alpha, max_iter=500)
+        
+        scores_PGLM = -1 * cross_val_score(model_PGLM, X_train_L1reg, y_train,
+                                      cv=5,
+                                      scoring='neg_mean_absolute_error')
+        
+        return scores_PGLM.mean()
+    
+    
+    def get_score_TGLM(alpha):
+        model_TGLM = TweedieRegressor(power=1.8, alpha=alpha, max_iter=500)
+        
+        scores_TGLM = -1 * cross_val_score(model_TGLM, X_train_L1reg, y_train,
+                                      cv=5,
+                                      scoring='neg_mean_absolute_error')
+        
+        return scores_TGLM.mean()
+    
+    
+    def get_score_XGB(n_estimators):
+        model_XGB = XGBRegressor(n_estimators=n_estimators,
+                                   learning_rate=0.01,
+                                   random_state=1)
+        
+        scores_XGB = -1 * cross_val_score(model_XGB, X_train_L1reg, y_train,
+                                         cv=5,
+                                         scoring='neg_mean_absolute_error')
+        
+        return scores_XGB.mean()
+    
+    
+    ## Create empty dictionaries which will be used to store the scoring results for each method.
+    
+    results_RF = {}
+    results_PGLM = {}
+    results_TGLM = {}
+    results_XGB = {}
+    
+
+In [29]:
+
+    
+    
+    ## Obtain 8 scores for the RandomForestRegressor model.
+    
+    for i in range(1, 9):
+        results_RF[100*i] = get_score_RF(100*i)
+        print("results_RF{} recorded".format(i))
+    
+    print("RF done")
+    
+    
+    
+    results_RF1 recorded
+    results_RF2 recorded
+    results_RF3 recorded
+    results_RF4 recorded
+    results_RF5 recorded
+    results_RF6 recorded
+    results_RF7 recorded
+    results_RF8 recorded
+    RF done
+    
+
+In [30]:
+
+    
+    
+    ## Obtain 8 scores for the PoissonRegressor model.
+    
+    for i in range(1, 9):
+        results_PGLM[round(0.2*i, 2)] = get_score_PGLM(round(0.2*i, 2))
+        print("results_PGLM{} recorded".format(i))
+    
+    print("PGLM done")
+    
+    
+    
+    results_PGLM1 recorded
+    results_PGLM2 recorded
+    results_PGLM3 recorded
+    results_PGLM4 recorded
+    results_PGLM5 recorded
+    results_PGLM6 recorded
+    results_PGLM7 recorded
+    results_PGLM8 recorded
+    PGLM done
+    
+
+In [31]:
+
+    
+    
+    ## Obtain 8 scores for the TweedieRegressor model.
+    
+    for i in range(1, 9):
+        results_TGLM[round(0.01*i, 2)] = get_score_TGLM(round(0.01*i, 2))
+        print("results_TGLM{} recorded".format(i))
+    
+    print("TGLM done")
+    
+    
+    
+    results_TGLM1 recorded
+    results_TGLM2 recorded
+    results_TGLM3 recorded
+    results_TGLM4 recorded
+    results_TGLM5 recorded
+    results_TGLM6 recorded
+    results_TGLM7 recorded
+    results_TGLM8 recorded
+    TGLM done
+    
+
+In [32]:
+
+    
+    
+    ## Obtain 8 scores for the XGBRegressor model.
+    
+    for i in range(1, 9):
+        results_XGB[5*i] = get_score_XGB(5*i)
+        print("results_XGB{} recorded".format(i))
+        
+    print("XGB done")
+    
+    
+    
+    results_XGB1 recorded
+    results_XGB2 recorded
+    results_XGB3 recorded
+    results_XGB4 recorded
+    results_XGB5 recorded
+    results_XGB6 recorded
+    results_XGB7 recorded
+    results_XGB8 recorded
+    XGB done
+    
+
+**Determine the optimal hyperparameters**
+
+In [33]:
+
+    
+    
+    RF_n_estimators_best = min(results_RF, key=results_RF.get)
+    print(RF_n_estimators_best)
+    
+    
+    
+    700
+    
+
+In [34]:
+
+    
+    
+    PGLM_alpha_best = min(results_PGLM, key=results_PGLM.get)
+    print(PGLM_alpha_best)
+    
+    
+    
+    0.8
+    
+
+In [35]:
+
+    
+    
+    TGLM_alpha_best = min(results_TGLM, key=results_TGLM.get)
+    print(TGLM_alpha_best)
+    
+    
+    
+    0.04
+    
+
+In [36]:
+
+    
+    
+    XGB_n_estimators_best = min(results_XGB, key=results_XGB.get)
+    print(XGB_n_estimators_best)
+    
+    
+    
+    40
+    
+
+# Step 11: Train (fit) the models to the entire training dataset¶
+
+In [37]:
+
+    
+    
+    # Define the optimised regression models that will be used.
+    
+    model_RF_opt = RandomForestRegressor(n_estimators=RF_n_estimators_best, random_state=1, n_jobs=-1)
+    
+    model_PGLM_opt = PoissonRegressor(alpha=PGLM_alpha_best, max_iter=500)
+    
+    model_TGLM_opt = TweedieRegressor(power=1.8, alpha=TGLM_alpha_best, max_iter=500)
+    
+    model_XGB_opt = XGBRegressor(n_estimators=XGB_n_estimators_best, learning_rate=0.01, random_state=1)
+    
+
+In [38]:
+
+    
+    
+    # Fit the optimised models to the full (pre-processed) training dataset.
+    
+    model_RF_opt.fit(X_train_L1reg, y_train)
+    print("model_RF_opt trained")
+    
+    model_PGLM_opt.fit(X_train_L1reg, y_train)
+    print("model_PGLM_opt trained")
+    
+    model_TGLM_opt.fit(X_train_L1reg, y_train)
+    print("model_TGLM_opt trained")
+    
+    model_XGB_opt.fit(X_train_L1reg, y_train)
+    print("model_XGB_opt trained")
+    
+    
+    
+    model_RF_opt trained
+    model_PGLM_opt trained
+    model_TGLM_opt trained
+    model_XGB_opt trained
+    
+
+# Step 12: Generate a unique set of predictions for each model¶
+
+The next step is to generate predictions of ClaimAmount for each policyholder
+within the pre-processed validation dataset; this is done using the
+`.predict()` function for each of the optimised models.
+
+In [39]:
+
+    
+    
+    # Use the trained models to generate unique sets of predicted y-values i.e. ClaimAmount.
+    
+    preds_RF = model_RF_opt.predict(X_valid_L1reg)
+    preds_PGLM = model_PGLM_opt.predict(X_valid_L1reg)
+    preds_TGLM = model_TGLM_opt.predict(X_valid_L1reg)
+    preds_XGB = model_XGB_opt.predict(X_valid_L1reg)
+    print("All predictions generated")
+    
+    
+    
+    All predictions generated
+    
+
+# Step 13: Assess the chosen models' performance, using validation data¶
+
+In order to evaluate and rank the models based on their regression
+performances, an appropriate scoring metric should be used. One common example
+of this is to calculate the Mean Absolute Error (MAE) for each of the fitted
+models against the validation data, which can then be ranked in order to
+determine the model with the lowest MAE, which is deemed to be the best model
+in terms of accuracy and goodness of fit:
+
+> $\text{MAE} = \frac{1}{n} \displaystyle\sum_{t=1}^{n} |e_t|$
+
+Alternatively, the Root Mean Squared Error (RMSE) can be derived for each
+fitted model against the validation data:
+
+> $\text{RMSE} = \sqrt {\frac{1}{n} \displaystyle\sum_{t=1}^{n} {e_t^2}}$
+
+However, in order to calculate the RMSE of a model, each prediction error must
+be squared before they are averaged together; this means that larger
+errors/outliers are more strongly penalised than smaller errors. Therefore, as
+the vast majority (~96%) of policyholders within the `freMTPL` dataset have
+not made any claims whatsoever, we do not wish to heavily penalise each of the
+models based on any severe claims/outliers that are incorrectly predicted, as
+this would increase the risk of overfitting each model to these outliers (i.e.
+by encouraging the model to predict large claims more frequently).
+
+Hence, we will use the `mean_absolute_error()` function from `sklearn.metrics`
+to calculate the MAE score, comparing each model's predictions against the
+validation dataset's (true) values.
+
+In [40]:
+
+    
+    
+    from sklearn.metrics import mean_absolute_error
+    
+    # Calculate the Mean Absolute Error metric for each set of predicted y-values.
+    
+    MAE_RF = mean_absolute_error(y_valid, preds_RF)
+    MAE_PGLM = mean_absolute_error(y_valid, preds_PGLM)
+    MAE_TGLM = mean_absolute_error(y_valid, preds_TGLM)
+    MAE_XGB = mean_absolute_error(y_valid, preds_XGB)
+    print("All MAE scores calculated")
+    
+    
+    
+    All MAE scores calculated
+    
+
+# Step 14: Evaluate the models' performances¶
+
+Finally, we can determine the most effective model as the one that has
+obtained the lowest MAE.
+
+In [41]:
+
+    
+    
+    # Collect all MAE scores in a single dictionary.
+    
+    MAE_results = {'RF': MAE_RF,
+                    'PGLM': MAE_PGLM,
+                    'TGLM': MAE_TGLM,
+                    'XGB': MAE_XGB}
+    
+    print(MAE_results)
+    
+    
+    
+    {'RF': 95.01813166443816, 'PGLM': 119.47557730386791, 'TGLM': 77.99906852382652, 'XGB': 57.404240598175434}
+    
+
+In [42]:
+
+    
+    
+    # Select the model with the smallest MAE.
+    
+    best_model = min(MAE_results, key=MAE_results.get)
+    print(best_model)
+    
+    
+    
+    XGB
+    
+
+The most logical next step would be to iteratively refine the model chosen
+above, by continually re-training it such that an optimal fit to the _test_
+data is achieved.
+
+Here, we have only optimised each model's fit to the _training_ data before
+generating (and comparing) a single set of predictions for each of these
+regressors; we would need to repeat this for multiple variations of the model
+(ideally for each regressor, as well) - i.e. with different hyperparameter
+configurations - which would then be tested and finally ranked based on their
+performance against _test_ ("live") data.
+
+# Step 15: Review for areas of improvement¶
+
+Whilst this project has aimed to give an overview of the DS workflow and an
+example of how it can be applied within insurance, it does not endeavour to
+provide an all-encompassing perspective on how to apply ML techniques for
+actuarial pricing purposes; there are many areas in which this project could
+be improved or reconsidered.
+
+For example, in terms of the **approach taken to model/predict claim
+severity** :
+
+  * In this project, we have only considered determining the total loss amount per policyholder based on their risk characteristics, and did not determine the average loss amount per claim. It may be possible to model this alternate scenario by deriving additional features beforehand, e.g. max & min ClaimAmounts per policyholder, rather than aggregating ClaimAmount up to policyholder-level.
+
+  * Also, for each ClaimAmount prediction we have simply used the number of claims that was provided within the training/test datasets, rather than generating our own predictions beforehand (i.e. we have skipped the first step in the frequency-severity method of modelling losses) - furthermore, in traditional actuarial pricing we only wish to predict the total loss for policyholders who are expected to make at least 1 claim; policyholders who do not make a claim do not incur a loss for the insurer. As a result, we would only need to use non-zero claim amounts for model training/testing purposes - this would allow the inclusion of a Gamma-based GLM approach to predict individual/average claim severities, which may have provided a more suitable comparison to the Tweedie-based GLM approach, than the Poisson regressor that we had used in this project.
+
+  * Here, we have only trained each model to the data once (via cross-validation), and tested it once; in a real-world situation, each model would be re-trained and re-tested until an optimal fit to the _test_ data is achieved. This was not explored within this project, for the sake of brevity, however this is relatively simple to perform (and automate).
+
+In terms of **data pre-processing** :
+
+  * There will be other, better, alternatives for how to perform categorical encoding of the relevant features, instead of using either label/one-hot encoding; whilst these methods were originally chosen based on the non-/ordinality of each respective column that was encoded, these may still not necessarily be the most appropriate methods to use - for instance, whilst one-hot encoding was performed for the non-ordinal categorical columns `Gas`, `Brand` and `Region`, each of these varied significantly in cardinality (number of unique values per column) - using one-hot encoding is generally not recommended for categories of high cardinality (e.g. `Region`).
+
+In terms of **hyperparameter optimisation** :
+
+  * One potential improvement could be to perform hyperparameter optimisation via grid-search methods, in order to iterate through all (possible) parameter values and find the model associated with the global minimum of its hyperdimensional loss function surface (loss surface), instead of optimising a single parameter whilst holding all other parameters constant as shown earlier above. This would result in obtaining a genuinely optimised set of models, for each regression method, that correspond with the global minima of their respective loss surfaces.
+
+  * Whilst not considered in depth during this project for the sake of brevity, this can be achieved using the `GridSearchCV()` method within `sklearn.model_selection`, which uses the following parameters:
+
+> `estimator` \- the model/estimator that we wish to find the optimal set of
+> hyperparameters for (e.g. RandomForestRegressor, TweedieRegressor).
+>
+> `param_grid` \- the dictionary of parameter names/settings to try as values;
+> for example, when optimising a TweedieRegressor, this could be `{power :
+> [1.7, 1.8, 1.9], alpha: [0.1, 0.2, 0.3]}`, although in practice a much wider
+> range (grid) of values & parameters can be searched across.
+>
+> `scoring` \- the scoring method that we wish to use in order to measure the
+> performance of each model iteration (for each set of hyperparameters); for
+> example, this could also be `'neg_mean_absolute_error'`.
+
+Lastly, in terms of **feature selection** :
+
+  * More stringent feature selection could be performed in order to further reduce the number of features that are supplied to each model during the training process, in order to reduce the likelihood of overfitting to the training dataset as a result.
+
+  * This can be done by increasing the value of `alpha` within the `Lasso`/L1 regularisation model, in order to restrict the number of features that are kept with non-zero coefficients within the regression model - however, this would likely require an additional hyperparameter optimisation exercise of the L1 regularisation model itself, in order to establish a suitable compromise between being able to fit to the data's features/trends and being able to generalise to unseen data as well.
+
+# Acknowledgements¶
+
+In addition to the sources cited earlier above, I would also like to thank
+[Arthur Charpentier](https://freakonometrics.github.io/index.html) for
+publishing the `freMTPL` insurance datasets that was considered in this
+project.
+
+Additional information regarding the dataset that was used throughout this
+project, in addition to a variety of other actuarial datasets, can be found
+[here](http://cas.uqam.ca/pub/web/CASdatasets-manual.pdf).
+

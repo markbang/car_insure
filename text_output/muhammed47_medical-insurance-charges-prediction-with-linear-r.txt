@@ -1,0 +1,729 @@
+In [1]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/insurance/insurance.csv
+    
+
+In [2]:
+
+    
+    
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    
+    pd.set_option('display.float_format', lambda x: '%.2f' % x)
+    
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    from sklearn.model_selection import train_test_split, cross_val_score
+    
+
+In [3]:
+
+    
+    
+    from sklearn.preprocessing import MinMaxScaler, LabelEncoder, StandardScaler, RobustScaler
+    
+
+In [4]:
+
+    
+    
+    df = pd.read_csv("/kaggle/input/insurance/insurance.csv")
+    
+
+# DATA OVERVIEW¶
+
+In [5]:
+
+    
+    
+    def general_pict(dataframe, head=5):
+        print("---------- HEAD ------------")
+        print(f"{dataframe.head(head)}\n\n")
+        print("---------- COLUMNS ------------")
+        print(f"{dataframe.columns}\n\n")
+        print("---------- INFO ------------")
+        print(f"{dataframe.info()}\n\n")
+        print("---------- IS THERE ANY NULL? ------------")
+        print(f"{dataframe.isnull().sum()}\n\n")
+        print("---------- NUMBER OF UNIQUE ------------")
+        print(f"{dataframe.nunique()}\n\n")
+        print("---------- DESCRIBE ------------")
+        print(f"{dataframe.describe().T}\n\n")
+    
+
+In [6]:
+
+    
+    
+    general_pict(df)
+    
+    
+    
+    ---------- HEAD ------------
+       age     sex   bmi  children smoker     region  charges
+    0   19  female 27.90         0    yes  southwest 16884.92
+    1   18    male 33.77         1     no  southeast  1725.55
+    2   28    male 33.00         3     no  southeast  4449.46
+    3   33    male 22.70         0     no  northwest 21984.47
+    4   32    male 28.88         0     no  northwest  3866.86
+    
+    
+    ---------- COLUMNS ------------
+    Index(['age', 'sex', 'bmi', 'children', 'smoker', 'region', 'charges'], dtype='object')
+    
+    
+    ---------- INFO ------------
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 1338 entries, 0 to 1337
+    Data columns (total 7 columns):
+     #   Column    Non-Null Count  Dtype  
+    ---  ------    --------------  -----  
+     0   age       1338 non-null   int64  
+     1   sex       1338 non-null   object 
+     2   bmi       1338 non-null   float64
+     3   children  1338 non-null   int64  
+     4   smoker    1338 non-null   object 
+     5   region    1338 non-null   object 
+     6   charges   1338 non-null   float64
+    dtypes: float64(2), int64(2), object(3)
+    memory usage: 73.3+ KB
+    None
+    
+    
+    ---------- IS THERE ANY NULL? ------------
+    age         0
+    sex         0
+    bmi         0
+    children    0
+    smoker      0
+    region      0
+    charges     0
+    dtype: int64
+    
+    
+    ---------- NUMBER OF UNIQUE ------------
+    age           47
+    sex            2
+    bmi          548
+    children       6
+    smoker         2
+    region         4
+    charges     1337
+    dtype: int64
+    
+    
+    ---------- DESCRIBE ------------
+               count     mean      std     min     25%     50%      75%      max
+    age      1338.00    39.21    14.05   18.00   27.00   39.00    51.00    64.00
+    bmi      1338.00    30.66     6.10   15.96   26.30   30.40    34.69    53.13
+    children 1338.00     1.09     1.21    0.00    0.00    1.00     2.00     5.00
+    charges  1338.00 13270.42 12110.01 1121.87 4740.29 9382.03 16639.91 63770.43
+    
+    
+    
+
+In [7]:
+
+    
+    
+    df.groupby("smoker").agg({"charges": "mean"})
+    
+
+Out[7]:
+
+| charges  
+---|---  
+smoker |   
+no | 8434.27  
+yes | 32050.23  
+  
+In [8]:
+
+    
+    
+    ax = sns.lmplot(x = 'age', y = 'charges', data=df, hue='smoker', palette='Set1')
+    ax = sns.lmplot(x = 'bmi', y = 'charges', data=df, hue='smoker', palette='Set2')
+    ax = sns.lmplot(x = 'children', y = 'charges', data=df, hue='smoker', palette='Set3')
+    
+
+![](__results___files/__results___8_0.png)
+
+![](__results___files/__results___8_1.png)
+
+![](__results___files/__results___8_2.png)
+
+**_As can be seen, smoking has a serious effect on the charge._**
+
+# PREPARING THE DATA¶
+
+  * Determining the types of features
+  * Outlier control
+  * Correlation analysis
+  * Encoding
+  * Standartization
+
+> **_Determining the types of features_**
+
+In [9]:
+
+    
+    
+    def grab_col_names(dataframe, cat_th=10, car_th=20):
+    
+        # cat_cols, cat_but_car
+        cat_cols = [col for col in dataframe.columns if dataframe[col].dtypes == "O"]
+        num_but_cat = [col for col in dataframe.columns if dataframe[col].nunique() < cat_th and
+                       dataframe[col].dtypes != "O"]
+        cat_but_car = [col for col in dataframe.columns if dataframe[col].nunique() > car_th and
+                       dataframe[col].dtypes == "O"]
+        cat_cols = cat_cols + num_but_cat
+        cat_cols = [col for col in cat_cols if col not in cat_but_car]
+    
+        # num_cols
+        num_cols = [col for col in dataframe.columns if dataframe[col].dtypes != "O"]
+        num_cols = [col for col in num_cols if col not in num_but_cat]
+    
+        print(f"Observations: {dataframe.shape[0]}")
+        print(f"Variables: {dataframe.shape[1]}")
+        print(f'cat_cols: {len(cat_cols)}')
+        print(f'num_cols: {len(num_cols)}')
+        print(f'cat_but_car: {len(cat_but_car)}')
+        print(f'num_but_cat: {len(num_but_cat)}')
+        return cat_cols, num_cols, cat_but_car
+    
+
+In [10]:
+
+    
+    
+    cat_cols, num_cols, cat_but_car = grab_col_names(df, cat_th=5)
+    
+    
+    
+    Observations: 1338
+    Variables: 7
+    cat_cols: 3
+    num_cols: 4
+    cat_but_car: 0
+    num_but_cat: 0
+    
+
+In [11]:
+
+    
+    
+    print(f"categorical cols: {cat_cols}, numeical cols: {num_cols}")
+    
+    
+    
+    categorical cols: ['sex', 'smoker', 'region'], numeical cols: ['age', 'bmi', 'children', 'charges']
+    
+
+> **_Outlier control_**
+
+In [12]:
+
+    
+    
+    def outlier_thresholds(dataframe, col_name, q1=0.25, q3=0.75):
+        quartile1 = dataframe[col_name].quantile(q1)
+        quartile3 = dataframe[col_name].quantile(q3)
+        interquartile = quartile3 - quartile1
+        up_limit = quartile3 + 1.5 * interquartile
+        low_limit = quartile1 - 1.5 * interquartile
+        return low_limit, up_limit
+    
+
+In [13]:
+
+    
+    
+    def check_outlier(dataframe, col_name):
+        low_limit, up_limit = outlier_thresholds(dataframe, col_name)
+        if dataframe[(dataframe[col_name] > up_limit) | (dataframe[col_name] < low_limit)].any(axis=None):
+            return True
+        else:
+            return False
+    
+
+In [14]:
+
+    
+    
+    for col in num_cols:
+        print(col, check_outlier(df, col))
+    
+    
+    
+    age False
+    bmi True
+    children False
+    charges True
+    
+
+In [15]:
+
+    
+    
+    def replace_with_thresholds(dataframe, variable):
+        low_limit, up_limit = outlier_thresholds(dataframe, variable)
+        dataframe.loc[(dataframe[variable] < low_limit), variable] = low_limit
+        dataframe.loc[(dataframe[variable] > up_limit), variable] = up_limit
+    
+
+In [16]:
+
+    
+    
+    for col in num_cols:
+        replace_with_thresholds(df, col)
+    
+
+In [17]:
+
+    
+    
+    for col in num_cols:
+        print(col, check_outlier(df, col))
+    
+    
+    
+    age False
+    bmi False
+    children False
+    charges False
+    
+
+> **_Correlation analysis_**
+
+In [18]:
+
+    
+    
+    corr_matrix = df.corr() # korelasyon analizi
+    
+
+In [19]:
+
+    
+    
+    print(corr_matrix)
+    
+    
+    
+              age  bmi  children  charges
+    age      1.00 0.11      0.04     0.31
+    bmi      0.11 1.00      0.01     0.16
+    children 0.04 0.01      1.00     0.07
+    charges  0.31 0.16      0.07     1.00
+    
+
+In [20]:
+
+    
+    
+    sns.heatmap(corr_matrix, annot=True)
+    plt.show()
+    
+
+![](__results___files/__results___25_0.png)
+
+**_The correlation between the variables is not exaggerated._**
+
+> **_Encoding_**
+
+In [21]:
+
+    
+    
+    def label_encoder(dataframe, binary_col):
+        labalencoder = LabelEncoder()
+        dataframe[binary_col] = labalencoder.fit_transform(dataframe[binary_col])
+        return dataframe
+    
+
+In [22]:
+
+    
+    
+    binary_cols = [col for col in df.columns if df[col].dtype not in [int, float]
+                   and df[col].nunique() == 2]
+    
+
+In [23]:
+
+    
+    
+    binary_cols
+    
+
+Out[23]:
+
+    
+    
+    ['sex', 'smoker']
+
+In [24]:
+
+    
+    
+    for col in binary_cols:
+        label_encoder(df, col)
+    
+
+In [25]:
+
+    
+    
+    df.head()
+    
+
+Out[25]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | 0 | 27.90 | 0 | 1 | southwest | 16884.92  
+1 | 18 | 1 | 33.77 | 1 | 0 | southeast | 1725.55  
+2 | 28 | 1 | 33.00 | 3 | 0 | southeast | 4449.46  
+3 | 33 | 1 | 22.70 | 0 | 0 | northwest | 21984.47  
+4 | 32 | 1 | 28.88 | 0 | 0 | northwest | 3866.86  
+  
+In [26]:
+
+    
+    
+    def one_hot_encoder(dataframe, categorical_cols, drop_first=False):
+        dataframe = pd.get_dummies(dataframe, columns=categorical_cols, drop_first=drop_first)
+        return dataframe
+    
+
+In [27]:
+
+    
+    
+    ohe_cols = [col for col in df.columns if 5 >= df[col].nunique() > 2]
+    
+
+In [28]:
+
+    
+    
+    ohe_cols
+    
+
+Out[28]:
+
+    
+    
+    ['region']
+
+In [29]:
+
+    
+    
+    df = one_hot_encoder(df, ohe_cols, drop_first=True)
+    
+
+In [30]:
+
+    
+    
+    df.head()
+    
+
+Out[30]:
+
+| age | sex | bmi | children | smoker | charges | region_northwest | region_southeast | region_southwest  
+---|---|---|---|---|---|---|---|---|---  
+0 | 19 | 0 | 27.90 | 0 | 1 | 16884.92 | 0 | 0 | 1  
+1 | 18 | 1 | 33.77 | 1 | 0 | 1725.55 | 0 | 1 | 0  
+2 | 28 | 1 | 33.00 | 3 | 0 | 4449.46 | 0 | 1 | 0  
+3 | 33 | 1 | 22.70 | 0 | 0 | 21984.47 | 1 | 0 | 0  
+4 | 32 | 1 | 28.88 | 0 | 0 | 3866.86 | 1 | 0 | 0  
+  
+In [31]:
+
+    
+    
+    df.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 1338 entries, 0 to 1337
+    Data columns (total 9 columns):
+     #   Column            Non-Null Count  Dtype  
+    ---  ------            --------------  -----  
+     0   age               1338 non-null   int64  
+     1   sex               1338 non-null   int64  
+     2   bmi               1338 non-null   float64
+     3   children          1338 non-null   int64  
+     4   smoker            1338 non-null   int64  
+     5   charges           1338 non-null   float64
+     6   region_northwest  1338 non-null   uint8  
+     7   region_southeast  1338 non-null   uint8  
+     8   region_southwest  1338 non-null   uint8  
+    dtypes: float64(2), int64(4), uint8(3)
+    memory usage: 66.8 KB
+    
+
+> **_Standardization_**
+
+In [32]:
+
+    
+    
+    cat_cols, num_cols, car_cols = grab_col_names(df)
+    
+    
+    
+    Observations: 1338
+    Variables: 9
+    cat_cols: 6
+    num_cols: 3
+    cat_but_car: 0
+    num_but_cat: 6
+    
+
+In [33]:
+
+    
+    
+    num_cols
+    
+
+Out[33]:
+
+    
+    
+    ['age', 'bmi', 'charges']
+
+In [34]:
+
+    
+    
+    num_cols = [col for col in num_cols if col != "charges"]
+    
+
+In [35]:
+
+    
+    
+    num_cols
+    
+
+Out[35]:
+
+    
+    
+    ['age', 'bmi']
+
+In [36]:
+
+    
+    
+    scaler = StandardScaler()
+    df[num_cols] = scaler.fit_transform(df[num_cols])
+    
+
+In [37]:
+
+    
+    
+    df[num_cols].head()
+    
+
+Out[37]:
+
+| age | bmi  
+---|---|---  
+0 | -1.44 | -0.45  
+1 | -1.51 | 0.52  
+2 | -0.80 | 0.39  
+3 | -0.44 | -1.31  
+4 | -0.51 | -0.29  
+  
+# MODEL¶
+
+In [38]:
+
+    
+    
+    X = df.drop("charges", axis=1)
+    y = df["charges"]
+    
+
+In [39]:
+
+    
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=1)
+    
+
+In [40]:
+
+    
+    
+    X_train.shape
+    
+
+Out[40]:
+
+    
+    
+    (1070, 8)
+
+In [41]:
+
+    
+    
+    reg_model = LinearRegression().fit(X_train, y_train)
+    
+
+In [42]:
+
+    
+    
+    reg_model.intercept_
+    
+
+Out[42]:
+
+    
+    
+    8706.151239099174
+
+In [43]:
+
+    
+    
+    reg_model.coef_
+    
+
+Out[43]:
+
+    
+    
+    array([ 3206.23893058,  -301.4738981 ,  1282.6075129 ,   407.99511834,
+           20041.84168859,  -416.43120137, -1103.930683  ,  -909.37266559])
+
+In [44]:
+
+    
+    
+    random_user = X.sample(1, random_state=45)
+    
+
+In [45]:
+
+    
+    
+    random_user
+    
+
+Out[45]:
+
+| age | sex | bmi | children | smoker | region_northwest | region_southeast | region_southwest  
+---|---|---|---|---|---|---|---|---  
+910 | -1.23 | 1 | -0.39 | 1 | 0 | 1 | 0 | 0  
+  
+In [46]:
+
+    
+    
+    reg_model.predict(random_user)
+    
+
+Out[46]:
+
+    
+    
+    array([3972.37529579])
+
+In [47]:
+
+    
+    
+    df.loc[random_user.index]
+    
+
+Out[47]:
+
+| age | sex | bmi | children | smoker | charges | region_northwest | region_southeast | region_southwest  
+---|---|---|---|---|---|---|---|---|---  
+910 | -1.23 | 1 | -0.39 | 1 | 0 | 2639.04 | 1 | 0 | 0  
+  
+# SUCCESS OF THE MODEL¶
+
+In [48]:
+
+    
+    
+    y_pred = reg_model.predict(X_test)
+    np.sqrt(mean_squared_error(y_test, y_pred))
+    
+
+Out[48]:
+
+    
+    
+    4912.350356050052
+
+In [49]:
+
+    
+    
+    reg_model.score(X_test, y_test)
+    
+
+Out[49]:
+
+    
+    
+    0.7613316768154901
+
+In [50]:
+
+    
+    
+    np.mean(np.sqrt(-cross_val_score(reg_model,
+                                     X, y,
+                                     cv=10,
+                                     scoring="neg_mean_squared_error")))
+    
+
+Out[50]:
+
+    
+    
+    5101.0340995292545
+
+If we look at the R-square score, it cannot be said that our model success is
+good. The following ways can be followed to increase model success:
+
+  * The sample size can be increased.
+  * Optimizations can be made for the relevant algorithm.
+

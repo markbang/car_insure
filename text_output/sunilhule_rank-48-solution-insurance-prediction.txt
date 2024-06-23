@@ -1,0 +1,1089 @@
+# Please Do Upvote If You Like The Notebook.¶
+
+## I Got ROC_AUC_SCORE : 0.858765 On Analystics Vidhya Leaderboard. Rank :
+48.¶
+
+### This Notebook Contains :¶
+
+    
+    
+    1. Deep Exploratory Data Analysis
+    2. Outlier Analysis
+    3. Corelation Analysis
+    4. Data Preprocessing
+    5. Model Building
+    6. Hyperparameter Tuning
+    7. Submission With Short Ensembling
+
+# Importing Libraries¶
+
+In [1]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    import matplotlib.pyplot as plt # data visualization
+    import seaborn as sns # data visualizatin
+    from sklearn.metrics import roc_auc_score,accuracy_score
+    from sklearn.model_selection import train_test_split
+    from catboost import CatBoostClassifier
+    from lightgbm import LGBMClassifier
+    sns.set(style="ticks", context="talk")
+    from sklearn.preprocessing import LabelEncoder
+    le = LabelEncoder()
+    import optuna
+    from optuna.samplers import TPESampler
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 5GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/health-insurance-cross-sell-prediction/train.csv
+    /kaggle/input/health-insurance-cross-sell-prediction/test.csv
+    /kaggle/input/health-insurance-cross-sell-prediction/sample_submission.csv
+    
+
+# Reading Data¶
+
+In [2]:
+
+    
+    
+    train = pd.read_csv('../input/health-insurance-cross-sell-prediction/train.csv')
+    test = pd.read_csv('../input/health-insurance-cross-sell-prediction/test.csv')
+    sample_sub = pd.read_csv('../input/health-insurance-cross-sell-prediction/sample_submission.csv')
+    
+
+In [3]:
+
+    
+    
+    print('Shape of train: {}'.format(train.shape))
+    print('Shape of test: {}'.format(test.shape))
+    
+    
+    
+    Shape of train: (381109, 12)
+    Shape of test: (127037, 11)
+    
+
+In [4]:
+
+    
+    
+    train.head()
+    
+
+Out[4]:
+
+| id | Gender | Age | Driving_License | Region_Code | Previously_Insured | Vehicle_Age | Vehicle_Damage | Annual_Premium | Policy_Sales_Channel | Vintage | Response  
+---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | Male | 44 | 1 | 28.0 | 0 | > 2 Years | Yes | 40454.0 | 26.0 | 217 | 1  
+1 | 2 | Male | 76 | 1 | 3.0 | 0 | 1-2 Year | No | 33536.0 | 26.0 | 183 | 0  
+2 | 3 | Male | 47 | 1 | 28.0 | 0 | > 2 Years | Yes | 38294.0 | 26.0 | 27 | 1  
+3 | 4 | Male | 21 | 1 | 11.0 | 1 | < 1 Year | No | 28619.0 | 152.0 | 203 | 0  
+4 | 5 | Female | 29 | 1 | 41.0 | 1 | < 1 Year | No | 27496.0 | 152.0 | 39 | 0  
+  
+# Data Dictionary¶
+
+id: Unique ID for the customer
+
+Gender: Gender of the customer
+
+Age: Age of the customer
+
+Driving_License: 0 : Customer does not have DL, 1 : Customer already has DL
+
+Region_Code: Unique code for the region of the customer
+
+Previously_Insured: 1 : Customer already has Vehicle Insurance, 0 : Customer
+doesn't have Vehicle Insurance
+
+Vehicle_Age: Age of the Vehicle
+
+Vehicle_Damage: 1 : Customer got his/her vehicle damaged in the past. 0 :
+Customer didn't get his/her vehicle damaged in the past.
+
+Annual_Premium: The amount customer needs to pay as premium in the year
+
+Policy_Sales_Channel: Anonymised Code for the channel of outreaching to the
+customer ie. Different Agents, Over Mail, Over Phone, In Person, etc.
+
+Vintage: Number of Days, Customer has been associated with the company
+
+Response: 1 : Customer is interested, 0 : Customer is not interested
+
+## Encoding Target Variable¶
+
+In [5]:
+
+    
+    
+    train['Response'] = le.fit_transform(train['Response'])
+    
+
+# Exploratory Data Analysis¶
+
+### Checking Target Variable Bias¶
+
+In [6]:
+
+    
+    
+    train['Response'].value_counts().plot.pie(autopct = '%1.1f%%',colors=['Orange','Blue'], figsize = (7,7))
+    
+
+Out[6]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f4607f0ca10>
+
+![](__results___files/__results___12_1.png)
+
+## Data is Imbalanced. Only 12.3% of customers are likely to buy insuarance.¶
+
+## Missing Value Analysis¶
+
+In [7]:
+
+    
+    
+    train.isna().sum()/train.shape[0]*100
+    
+
+Out[7]:
+
+    
+    
+    id                      0.0
+    Gender                  0.0
+    Age                     0.0
+    Driving_License         0.0
+    Region_Code             0.0
+    Previously_Insured      0.0
+    Vehicle_Age             0.0
+    Vehicle_Damage          0.0
+    Annual_Premium          0.0
+    Policy_Sales_Channel    0.0
+    Vintage                 0.0
+    Response                0.0
+    dtype: float64
+
+There are no missing values
+
+## Analysing Each Variable's Relationship with Target Variablem¶
+
+### 1\. Gender¶
+
+In [8]:
+
+    
+    
+    sns.countplot(train['Gender'], hue = train['Response'],palette=['Orange','Purple'])
+    
+
+Out[8]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f4606c6a710>
+
+![](__results___files/__results___19_1.png)
+
+## 2\. Age¶
+
+In [9]:
+
+    
+    
+    f,ax = plt.subplots(nrows=2,ncols=1,figsize=(30,10))
+    axx = ax.flatten()
+    #plt.figure(figsize=(30,10))
+    sns.distplot(train['Age'],ax=axx[0], color='Blue')
+    sns.boxplot(train['Age'],ax=axx[1],color='Orange')
+    
+
+Out[9]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f4606bac650>
+
+![](__results___files/__results___21_1.png)
+
+### Analysing Response for different Age-Groups¶
+
+In [10]:
+
+    
+    
+    age_grp_20_to_30 = train[ train['Age'] <31]
+    age_grp_31_to_40 = train[ train['Age'].between(31,40)]
+    age_grp_41_to_50 = train[ train['Age'].between(41,50)]
+    age_grp_50_to_60 = train[ train['Age'].between(51,60)]
+    age_grp_old = train[ train['Age'] >60]
+    
+    age_grp = [age_grp_20_to_30,age_grp_31_to_40,age_grp_41_to_50,age_grp_50_to_60,age_grp_old]
+    age_grp_name = ['age_grp_20_to_30','age_grp_31_to_40','age_grp_41_to_50','age_grp_50_to_60','age_grp_old']
+    age_grp_dict = dict(zip(age_grp_name, age_grp))
+    
+
+In [11]:
+
+    
+    
+    f,ax = plt.subplots(nrows=2, ncols=3, figsize = (20,10))
+    axx = ax.flatten()
+    for pos,tup in enumerate(age_grp_dict.items()):
+        axx[pos].set_title(tup[0])
+        data = tup[1]
+        data['Response'].value_counts().plot.pie(autopct='%1.1f%%', ax = axx[pos],colors=['Red','Blue'])
+    
+
+![](__results___files/__results___24_0.png)
+
+### Analysing Response with both 'Age-Groups' and 'Gender'¶
+
+In [12]:
+
+    
+    
+    f,ax = plt.subplots(nrows=2, ncols=3, figsize = (20,10))
+    axx = ax.flatten()
+    plt.title('Response Percentage of Different Age Groups with Genders',fontsize=40,x=-0.5,y=2.5)
+    for pos,tup in enumerate(age_grp_dict.items()):
+        axx[pos].set_title(tup[0])
+        temp = tup[1]
+        temp.groupby('Gender')['Response'].value_counts().plot.pie(autopct='%1.1f%%', ax = axx[pos],colors=['Orange','Purple'])
+    
+
+![](__results___files/__results___26_0.png)
+
+In [13]:
+
+    
+    
+    sns.catplot(x = 'Gender', y="Age",hue = 'Response', data=train)
+    
+
+Out[13]:
+
+    
+    
+    <seaborn.axisgrid.FacetGrid at 0x7f4606a71f90>
+
+![](__results___files/__results___27_1.png)
+
+## Insights:¶
+
+  1. Customers of age between 30 to 60 are more likely to buy insurance.
+  2. Customes of age between 20 to 30 are less likely to buy insurance.
+  3. In almost every age group, 'Male's are more likely to buy insurance.
+  4. Females under age 30 are very less likely ho buy insurance
+
+* * *
+
+## 3\. Driving_License¶
+
+In [14]:
+
+    
+    
+    train['Driving_License'].value_counts().plot.pie(autopct='%1.1f%%',colors = ['Blue','Red'])
+    
+
+Out[14]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f46054b0810>
+
+![](__results___files/__results___30_1.png)
+
+In [15]:
+
+    
+    
+    f,ax = plt.subplots(nrows=1,ncols=2,figsize = (20,5))
+    axx = ax.flatten()
+    #plt.title('Driving_License wise Response',fontsize=40,x=-0.5,y=2)
+    axx[0].set_title('Driving_Licence = 1')
+    axx[1].set_title('Driving_Licence = 0')
+    train[ train['Driving_License'] == 1]['Response'].value_counts().plot.pie(autopct='%1.1f%%',colors = ['Blue','Red'],ax=axx[0])
+    train[ train['Driving_License'] == 0]['Response'].value_counts().plot.pie(autopct='%1.1f%%',colors = ['Blue','Red'],ax=axx[1])
+    
+
+Out[15]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f4605421290>
+
+![](__results___files/__results___31_1.png)
+
+### Insights:¶
+
+  1. Very few customers don't have Driving License.
+  2. Customers with Driving License have higher chance of buying Insurancem
+
+* * *
+
+## 4\. Region_Code¶
+
+In [16]:
+
+    
+    
+    plt.figure(figsize = (40,10))
+    plt.title('Region Wise Response Count',fontsize=50)
+    sns.countplot(train['Region_Code'], hue = train['Response'],palette=['Red','Blue'])
+    
+
+Out[16]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f46053f6750>
+
+![](__results___files/__results___34_1.png)
+
+### Visualizing Percentage of Response : 1 in all Region_Codes¶
+
+In [17]:
+
+    
+    
+    u_region = train['Region_Code'].unique()
+    region_perc = {}
+    for i in u_region:
+        total_region = train[ train['Region_Code'] == i].shape[0]
+        buy_region = train[ (train['Region_Code'] == i) & train['Response'] == 1].shape[0]
+        region_perc[i] = (buy_region/total_region)*100
+    
+    region_perc = sorted(region_perc.items(), key=lambda x: x[1], reverse=True)
+    region_perc = list(zip(*region_perc))
+    
+    region = np.array(region_perc[0])
+    region_perc = np.array(region_perc[1])
+    region = pd.DataFrame(region)
+    region_perc = pd.DataFrame(region_perc)
+    
+    region_res_perc = pd.concat((region,region_perc), axis=1)
+    region_res_perc.columns = ['Region_Code', 'Buy_Percentage']
+    
+
+In [18]:
+
+    
+    
+    plt.figure(figsize=(40,10))
+    plt.title('Region Wise Buying Percentage',fontsize=50)
+    ax = sns.barplot(x = region_res_perc['Region_Code'], y = region_res_perc['Buy_Percentage'])
+    
+
+![](__results___files/__results___37_0.png)
+
+### Insights:¶
+
+  1. We have most of the customers from Region_Code : 28.
+  2. Region_Codes: [4,19,23,24,,28,38,51] have higher percentage of buying insurance.
+  3. Region_Codes: 25 and 44 have lower percentage of buying insurance.
+
+* * *
+
+## 5\. Previously_Insuaranced¶
+
+In [19]:
+
+    
+    
+    plt.figure(figsize=(15,5))
+    sns.countplot(train['Previously_Insured'],hue=train['Response'],palette=['Brown','Purple'])
+    
+
+Out[19]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f4600964d50>
+
+![](__results___files/__results___40_1.png)
+
+### Insights:¶
+
+  1. Customers who Previously_Insured are very likely to buy Insurnce now.
+  2. Customers who didn't Previously_Insured have good chance of buying Insurnce.
+
+* * *
+
+## 6\. Vehicle_Age¶
+
+In [20]:
+
+    
+    
+    plt.figure(figsize=(7,7))
+    train['Vehicle_Age'].value_counts().plot.pie(autopct='%1.1f%%', colors = ['r', 'b', 'g'])
+    
+
+Out[20]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f460521fa10>
+
+![](__results___files/__results___43_1.png)
+
+In [21]:
+
+    
+    
+    plt.figure(figsize = (30,10))
+    sns.countplot(train['Vehicle_Age'], hue = train['Response'])
+    
+
+Out[21]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f4600751c90>
+
+![](__results___files/__results___44_1.png)
+
+In [22]:
+
+    
+    
+    ls = train['Vehicle_Age'].unique()
+    
+
+In [23]:
+
+    
+    
+    f,ax = plt.subplots(nrows=1, ncols=3,figsize = (30,10))
+    axx = ax.flatten()
+    for pos,val in enumerate(ls):
+        axx[pos].set_title(str(val))
+        train[ train['Vehicle_Age'] == val]['Response'].value_counts().plot.pie(autopct = '%1.1f%%',ax = axx[pos], colors=['Purple', 'Orange'])
+    
+
+![](__results___files/__results___46_0.png)
+
+### Insights :¶
+
+  1. We have half of our customers with Vehicle_Age `1-2 years`.
+  2. We have very few customers (4.2%) with Vehicle_Age `>2 years.
+  3. Customers with Vehicle_Age `>2years` have better chance (29.4%) of buying Insurance.
+  4. Customers with with Vehicle_Age `<1 years` have very less chance of buying Insurance.
+
+* * *
+
+## 7\. Vehicle_Damage¶
+
+In [24]:
+
+    
+    
+    sns.countplot(train['Vehicle_Damage'], hue = train['Response'])
+    
+
+Out[24]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f46005f07d0>
+
+![](__results___files/__results___49_1.png)
+
+### Insights:¶
+
+  1. We have almost same number of customes with damaged and non_damaged vehicle.
+  2. Customers with Vehicle_Damage are likely to buy insurance.
+  3. Customers with non damaged vehicle have least chance (less than 1%) of buying insurance.
+
+* * *
+
+## 8\. Annual_Premium¶
+
+In [25]:
+
+    
+    
+    f,ax = plt.subplots(nrows=2,ncols=1,figsize=(30,20))
+    axx = ax.flatten()
+    #plt.figure(figsize=(30,10))
+    sns.distplot(train['Annual_Premium'],ax=axx[0], color='Blue')
+    sns.boxplot(train['Annual_Premium'],ax=axx[1],color='Orange')
+    
+
+Out[25]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f460076e210>
+
+![](__results___files/__results___52_1.png)
+
+In [26]:
+
+    
+    
+    plt.figure(figsize=(40,10))
+    sns.distplot(train[ train['Annual_Premium'] < 100000]['Annual_Premium'])#.plot.hist(bins = 500, frequency=(0,10000))
+    
+
+Out[26]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f4600627f10>
+
+![](__results___files/__results___53_1.png)
+
+In [27]:
+
+    
+    
+    start = 0
+    step = 10000
+    ls = []
+    for _ in range(10):
+        ls.append((start,step))
+        start = step
+        step+=10000
+    
+    for tup in ls:
+        count = train[ train['Annual_Premium'].between(tup[0],tup[1])].shape[0]
+        percentage = train[ (train['Annual_Premium'].between(tup[0], tup[1])) & (train['Response'] == 1)].shape[0]/train[ train['Annual_Premium'].between(tup[0], tup[1])].shape[0]*100
+        print('Number of Customers with Annual_Premium Between {} : {} and Insurance Buy Percentage:{}'.format(tup,count,percentage))
+    
+    
+    
+    Number of Customers with Annual_Premium Between (0, 10000) : 64882 and Insurance Buy Percentage:13.109953453962579
+    Number of Customers with Annual_Premium Between (10000, 20000) : 5803 and Insurance Buy Percentage:7.858004480441151
+    Number of Customers with Annual_Premium Between (20000, 30000) : 95393 and Insurance Buy Percentage:10.03742412965312
+    Number of Customers with Annual_Premium Between (30000, 40000) : 125062 and Insurance Buy Percentage:11.992451743935009
+    Number of Customers with Annual_Premium Between (40000, 50000) : 57793 and Insurance Buy Percentage:14.32699461872545
+    Number of Customers with Annual_Premium Between (50000, 60000) : 20050 and Insurance Buy Percentage:15.261845386533665
+    Number of Customers with Annual_Premium Between (60000, 70000) : 7271 and Insurance Buy Percentage:15.334892036858754
+    Number of Customers with Annual_Premium Between (70000, 80000) : 2524 and Insurance Buy Percentage:14.183835182250396
+    Number of Customers with Annual_Premium Between (80000, 90000) : 1030 and Insurance Buy Percentage:14.854368932038836
+    Number of Customers with Annual_Premium Between (90000, 100000) : 557 and Insurance Buy Percentage:16.15798922800718
+    
+
+### Insights:¶
+
+  1. 'Annual Premium' data is highlt left skewed.
+  2. Most of the customers have "Annual_Premium' in range (0, 10000) and (20000 to 50000)
+  3. In every 'Annual Premium' range, the insurance buy percentage is almost same.
+
+* * *
+
+## 9\. Plolicy_Sales_Channel¶
+
+In [28]:
+
+    
+    
+    plt.figure(figsize=(40,10))
+    train['Policy_Sales_Channel'].value_counts().plot.bar()
+    
+
+Out[28]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f4605fd1250>
+
+![](__results___files/__results___57_1.png)
+
+### Insights:¶
+
+  1. Policy_Sales_Channel no. 152 have higest number of customers.
+  2. Policy_Sales_Channel no. [152,26,124,160,156,122,157,154,151,163] have most of the customers.
+
+* * *
+
+## 10\. Vintage¶
+
+In [29]:
+
+    
+    
+    f,ax = plt.subplots(nrows=2,ncols=1,figsize=(30,20))
+    axx = ax.flatten()
+    sns.distplot(train['Vintage'],ax=axx[0], color='Blue')
+    sns.boxplot(train['Vintage'],ax=axx[1],color='Orange')
+    
+
+Out[29]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f4600528e10>
+
+![](__results___files/__results___60_1.png)
+
+### Insights:¶
+
+  1. Every 'Vintage' value have almost same number of customers.
+
+* * *
+
+# Everything at Once.¶
+
+### All Insights From Variable Analysis¶
+
+  1. Customers of age between 30 to 60 are more likely to buy insurance.
+  2. Customes of age between 20 to 30 are less likely to buy insurance.
+  3. In almost every age group, 'Male's are more likely to buy insurance.
+  4. Females under age 30 are very less likely ho buy insurance.
+  5. Very few customers don't have Driving License.
+  6. Customers with Driving License have higher chance of buying Insurance.
+  7. We have most of the customers from Region_Code : 28.
+  8. Region_Codes: [4,19,23,24,,28,38,51] have higher percentage of buying insurance.
+  9. Region_Codes: 25 and 44 have lower percentage of buying insurance.
+  10. Customers who Previously_Insured are very likely to buy Insurnce now.
+  11. Customers who didn't Previously_Insured have good chance of buying Insurnce.
+  12. We have half of our customers with Vehicle_Age 1-2 years.
+  13. We have very few customers (4.2%) with Vehicle_Age >2 years.
+  14. Customers with Vehicle_Age >2years have better chance (29.4%) of buying Insurance.
+  15. Customers with with Vehicle_Age <1 years have very less chance of buying Insurance.
+  16. We have almost same number of customes with damaged and non_damaged vehicle.
+  17. Customers with Vehicle_Damage are likely to buy insurance.
+  18. Customers with non damaged vehicle have least chance (less than 1%) of buying insurance.
+  19. 'Annual Premium' data is highlt left skewed.
+  20. Most of the customers have "Annual_Premium' in range (0, 10000) and (20000 to 50000)
+  21. In every 'Annual Premium' range, the insurance buy percentage is almost same.
+  22. Policy_Sales_Channel no. 152 have higest number of customers.
+  23. Policy_Sales_Channel no. [152,26,124,160,156,122,157,154,151,163] have most of the customers.
+  24. Every 'Vintage' value have almost same number of customers.
+
+* * *
+
+# Merging Train and Test Data¶
+
+In [30]:
+
+    
+    
+    train['is_train'] = 1
+    test['is_train'] = 0
+    test['Response'] = None
+    
+    data = pd.concat((train,test))
+    data.set_index('id',inplace=True)
+    data.shape
+    
+
+Out[30]:
+
+    
+    
+    (508146, 12)
+
+* * *
+
+# Outlier Analysis¶
+
+## 1\. Age¶
+
+In [31]:
+
+    
+    
+    sns.boxplot('Age', data=data, orient='v', color='Red')
+    
+
+Out[31]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f460067ed50>
+
+![](__results___files/__results___68_1.png)
+
+## 2\. Annual_Premium¶
+
+In [32]:
+
+    
+    
+    sns.boxplot('Annual_Premium', data=data,orient='v', color='red')
+    
+
+Out[32]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f4600534750>
+
+![](__results___files/__results___70_1.png)
+
+In [33]:
+
+    
+    
+    f,ax = plt.subplots(nrows=1,ncols=2,figsize = (40,10))
+    axx = ax.flatten()
+    sns.kdeplot(data['Annual_Premium'], legend=False,ax = axx[0])
+    sns.kdeplot(np.log(data['Annual_Premium']), legend=False,ax = axx[1]) # after using log transformation
+    
+
+Out[33]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f46003a3590>
+
+![](__results___files/__results___71_1.png)
+
+### we will do log transformation on 'Annual_Premium'm¶
+
+* * *
+
+# Corelation Analysis¶
+
+### Label Encoding for co-relation checking¶
+
+In [34]:
+
+    
+    
+    corr_check = data.copy()
+    
+    col_ls = ['Gender', 'Vehicle_Age', 'Vehicle_Damage']
+    
+    for col in col_ls:
+        corr_check[col] = le.fit_transform(corr_check[col])
+    
+
+In [35]:
+
+    
+    
+    plt.figure(figsize=(20,10))
+    sns.heatmap(corr_check.corr(), annot=True, square=True,annot_kws={'size': 10})
+    
+
+Out[35]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f4600283c50>
+
+![](__results___files/__results___76_1.png)
+
+## Insights:¶
+
+  1. 'Previously_Insured' and 'Vehicle_Damage' are highly positively corelated.
+  2. 'Age' and 'Policy_Sales_Channel' are negatively corelated.
+  3. 'Age' and 'Vehicle_Age' are negatively corelated.
+
+* * *
+
+# Data Preprocessing¶
+
+In [36]:
+
+    
+    
+    train['Vehicle_Age']=train['Vehicle_Age'].replace({'< 1 Year':0,'1-2 Year':1,'> 2 Years':2})
+    train['Gender']=train['Gender'].replace({'Male':1,'Female':0})
+    train['Vehicle_Damage']=train['Vehicle_Damage'].replace({'Yes':1,'No':0})
+    
+    test['Vehicle_Age']=test['Vehicle_Age'].replace({'< 1 Year':0,'1-2 Year':1,'> 2 Years':2})
+    test['Gender']=test['Gender'].replace({'Male':1,'Female':0})
+    test['Vehicle_Damage']=test['Vehicle_Damage'].replace({'Yes':1,'No':0})
+    
+
+In [37]:
+
+    
+    
+    # Changing Datatype
+    train['Region_Code']=train['Region_Code'].astype(int)
+    test['Region_Code']=test['Region_Code'].astype(int)
+    train['Policy_Sales_Channel']=train['Policy_Sales_Channel'].astype(int)
+    test['Policy_Sales_Channel']=test['Policy_Sales_Channel'].astype(int)
+    
+
+* * *
+
+# Model Building¶
+
+In [38]:
+
+    
+    
+    features=['Gender', 'Age', 'Driving_License', 'Region_Code', 'Previously_Insured', 'Vehicle_Age', 'Vehicle_Damage', 'Annual_Premium', 'Policy_Sales_Channel', 'Vintage']
+    
+    cat_col=['Gender','Driving_License', 'Region_Code', 'Previously_Insured', 'Vehicle_Age', 'Vehicle_Damage','Policy_Sales_Channel']
+    
+
+* * *
+
+## Train Test Split¶
+
+In [39]:
+
+    
+    
+    X=train[features]
+    y=train['Response']
+    
+
+In [40]:
+
+    
+    
+    # Train Test Split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.25, random_state=150303,stratify=y,shuffle=True)
+    
+
+## 1\. CatBoost Model¶
+
+In [41]:
+
+    
+    
+    catb = CatBoostClassifier()
+    catb= catb.fit(X_train, y_train,cat_features=cat_col,eval_set=(X_test, y_test),early_stopping_rounds=30,verbose=100)
+    y_pred = catb.predict(X_test)
+    proba = catb.predict_proba(X_test)[:, 1]
+    print('CatBoost Base Accuracy : {}'.format(accuracy_score(y_test,y_pred)))
+    print('CatBoost Base ROC_AUC_SCORE: {}'.format(roc_auc_score(y_test,proba)))
+    
+    
+    
+    Learning rate set to 0.128106
+    0:	learn: 0.4910032	test: 0.4914047	best: 0.4914047 (0)	total: 313ms	remaining: 5m 13s
+    100:	learn: 0.2632019	test: 0.2644836	best: 0.2644836 (100)	total: 19.2s	remaining: 2m 51s
+    200:	learn: 0.2614128	test: 0.2643219	best: 0.2643075 (176)	total: 38s	remaining: 2m 31s
+    Stopped by overfitting detector  (30 iterations wait)
+    
+    bestTest = 0.2642913884
+    bestIteration = 230
+    
+    Shrink model to first 231 iterations.
+    CatBoost Base Accuracy : 0.8775792942756985
+    CatBoost Base ROC_AUC_SCORE: 0.8585958158759243
+    
+
+## 2\. LGBM Model¶
+
+In [42]:
+
+    
+    
+    model = LGBMClassifier()
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    proba = model.predict_proba(X_test)[:,1]
+    
+
+In [43]:
+
+    
+    
+    print('LGBM Base Accuracy : {}'.format(accuracy_score(y_test,y_pred)))
+    print('LGBM Base ROC_AUC_SCORE: {}'.format(roc_auc_score(y_test,proba)))
+    
+    
+    
+    LGBM Base Accuracy : 0.8769285669304562
+    LGBM Base ROC_AUC_SCORE: 0.8569089338845954
+    
+
+## Hyperparameter Tuning LGBM¶
+
+In [44]:
+
+    
+    
+    def create_model(trial):
+        max_depth = trial.suggest_int("max_depth", 2, 30)
+        n_estimators = trial.suggest_int("n_estimators", 1, 500)
+        learning_rate = trial.suggest_uniform('learning_rate', 0.0000001, 1)
+        num_leaves = trial.suggest_int("num_leaves", 2, 5000)
+        min_child_samples = trial.suggest_int('min_child_samples', 3, 200)
+        reg_alpha = trial.suggest_int("reg_alpha", 1, 10)
+        reg_lambda = trial.suggest_int("reg_lambda", 1, 10)
+        model = LGBMClassifier(
+            learning_rate=learning_rate, 
+            n_estimators=n_estimators, 
+            max_depth=max_depth,
+            num_leaves=num_leaves, 
+            min_child_samples=min_child_samples,
+            random_state=0
+        )
+        return model
+    
+    sampler = TPESampler(seed=0)
+    def objective(trial):
+        model = create_model(trial)
+        model.fit(X_train, y_train)
+        proba = model.predict_proba(X_test)[:,1]
+        score = roc_auc_score(y_test,proba)
+        return score
+    
+    study = optuna.create_study(direction="maximize", sampler=sampler)
+    study.optimize(objective, n_trials=50)
+    
+    lgb_params = study.best_params
+    lgb_params['random_state'] = 0
+    lgb = LGBMClassifier(**lgb_params)
+    lgb.fit(X_train, y_train)
+    proba = lgb.predict_proba(X_test)[:,1]
+    print('Optimized LightGBM roc_auc_score', roc_auc_score(y_test, proba))
+    
+    
+    
+    [I 2020-09-25 05:07:34,638] A new study created in memory with name: no-name-dc5bc449-ffc5-4c0d-8fb4-50d351138557
+    [I 2020-09-25 05:07:37,082] Trial 0 finished with value: 0.8382877728415841 and parameters: {'max_depth': 14, 'n_estimators': 48, 'learning_rate': 0.7151893948534829, 'num_leaves': 4933, 'min_child_samples': 198, 'reg_alpha': 8, 'reg_lambda': 10}. Best is trial 0 with value: 0.8382877728415841.
+    [I 2020-09-25 05:08:02,310] Trial 1 finished with value: 0.8301963584657203 and parameters: {'max_depth': 21, 'n_estimators': 278, 'learning_rate': 0.3843817688545291, 'num_leaves': 3470, 'min_child_samples': 61, 'reg_alpha': 2, 'reg_lambda': 7}. Best is trial 0 with value: 0.8382877728415841.
+    [I 2020-09-25 05:08:04,805] Trial 2 finished with value: 0.8483195731187176 and parameters: {'max_depth': 9, 'n_estimators': 88, 'learning_rate': 0.47997722437734014, 'num_leaves': 2899, 'min_child_samples': 168, 'reg_alpha': 10, 'reg_lambda': 9}. Best is trial 2 with value: 0.8483195731187176.
+    [I 2020-09-25 05:08:18,969] Trial 3 finished with value: 0.8575133465699623 and parameters: {'max_depth': 11, 'n_estimators': 405, 'learning_rate': 0.020218495418485975, 'num_leaves': 4853, 'min_child_samples': 200, 'reg_alpha': 1, 'reg_lambda': 3}. Best is trial 3 with value: 0.8575133465699623.
+    [I 2020-09-25 05:08:26,848] Trial 4 finished with value: 0.8357168834007593 and parameters: {'max_depth': 5, 'n_estimators': 473, 'learning_rate': 0.8009107718885691, 'num_leaves': 799, 'min_child_samples': 150, 'reg_alpha': 4, 'reg_lambda': 8}. Best is trial 3 with value: 0.8575133465699623.
+    [I 2020-09-25 05:08:31,990] Trial 5 finished with value: 0.8584792648795306 and parameters: {'max_depth': 2, 'n_estimators': 450, 'learning_rate': 0.14335337307371768, 'num_leaves': 4737, 'min_child_samples': 35, 'reg_alpha': 5, 'reg_lambda': 8}. Best is trial 5 with value: 0.8584792648795306.
+    [I 2020-09-25 05:08:40,218] Trial 6 finished with value: 0.8387915490092603 and parameters: {'max_depth': 5, 'n_estimators': 460, 'learning_rate': 0.7369182034371404, 'num_leaves': 804, 'min_child_samples': 131, 'reg_alpha': 1, 'reg_lambda': 5}. Best is trial 5 with value: 0.8584792648795306.
+    [I 2020-09-25 05:08:59,164] Trial 7 finished with value: 0.5765924588499538 and parameters: {'max_depth': 23, 'n_estimators': 390, 'learning_rate': 0.6120957615128492, 'num_leaves': 758, 'min_child_samples': 20, 'reg_alpha': 5, 'reg_lambda': 10}. Best is trial 5 with value: 0.8584792648795306.
+    [I 2020-09-25 05:09:15,072] Trial 8 finished with value: 0.8013667302481008 and parameters: {'max_depth': 12, 'n_estimators': 443, 'learning_rate': 0.6130634965777866, 'num_leaves': 4355, 'min_child_samples': 68, 'reg_alpha': 8, 'reg_lambda': 10}. Best is trial 5 with value: 0.8584792648795306.
+    [I 2020-09-25 05:09:25,763] Trial 9 finished with value: 0.7845104676851169 and parameters: {'max_depth': 27, 'n_estimators': 292, 'learning_rate': 0.6531400704839341, 'num_leaves': 432, 'min_child_samples': 85, 'reg_alpha': 1, 'reg_lambda': 4}. Best is trial 5 with value: 0.8584792648795306.
+    [I 2020-09-25 05:09:28,229] Trial 10 finished with value: 0.838972927153745 and parameters: {'max_depth': 2, 'n_estimators': 163, 'learning_rate': 0.011974972378603066, 'num_leaves': 2200, 'min_child_samples': 6, 'reg_alpha': 4, 'reg_lambda': 1}. Best is trial 5 with value: 0.8584792648795306.
+    [I 2020-09-25 05:10:12,701] Trial 11 finished with value: 0.8509778303537261 and parameters: {'max_depth': 18, 'n_estimators': 362, 'learning_rate': 0.008125784281843747, 'num_leaves': 4906, 'min_child_samples': 39, 'reg_alpha': 7, 'reg_lambda': 2}. Best is trial 5 with value: 0.8584792648795306.
+    [I 2020-09-25 05:10:16,917] Trial 12 finished with value: 0.858505628196314 and parameters: {'max_depth': 2, 'n_estimators': 375, 'learning_rate': 0.22802552329977888, 'num_leaves': 4160, 'min_child_samples': 114, 'reg_alpha': 3, 'reg_lambda': 3}. Best is trial 12 with value: 0.858505628196314.
+    [I 2020-09-25 05:10:20,806] Trial 13 finished with value: 0.8585438180285836 and parameters: {'max_depth': 2, 'n_estimators': 330, 'learning_rate': 0.21780859550495008, 'num_leaves': 4026, 'min_child_samples': 113, 'reg_alpha': 3, 'reg_lambda': 6}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:10:25,225] Trial 14 finished with value: 0.8526636035452095 and parameters: {'max_depth': 7, 'n_estimators': 209, 'learning_rate': 0.2578656138015656, 'num_leaves': 3792, 'min_child_samples': 112, 'reg_alpha': 3, 'reg_lambda': 6}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:10:29,547] Trial 15 finished with value: 0.8585265699171796 and parameters: {'max_depth': 2, 'n_estimators': 341, 'learning_rate': 0.25170349928798064, 'num_leaves': 2024, 'min_child_samples': 110, 'reg_alpha': 3, 'reg_lambda': 4}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:11:02,251] Trial 16 finished with value: 0.8172818527210615 and parameters: {'max_depth': 30, 'n_estimators': 316, 'learning_rate': 0.9983428427348384, 'num_leaves': 1810, 'min_child_samples': 92, 'reg_alpha': 3, 'reg_lambda': 5}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:11:06,008] Trial 17 finished with value: 0.8547471593213756 and parameters: {'max_depth': 5, 'n_estimators': 218, 'learning_rate': 0.36767184774160006, 'num_leaves': 2931, 'min_child_samples': 135, 'reg_alpha': 6, 'reg_lambda': 6}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:11:13,803] Trial 18 finished with value: 0.8521513513325265 and parameters: {'max_depth': 8, 'n_estimators': 344, 'learning_rate': 0.16989116552227446, 'num_leaves': 1647, 'min_child_samples': 169, 'reg_alpha': 2, 'reg_lambda': 4}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:11:26,875] Trial 19 finished with value: 0.8339725957941608 and parameters: {'max_depth': 16, 'n_estimators': 240, 'learning_rate': 0.33436134845222043, 'num_leaves': 1458, 'min_child_samples': 72, 'reg_alpha': 4, 'reg_lambda': 7}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:11:28,841] Trial 20 finished with value: 0.8550987313281179 and parameters: {'max_depth': 2, 'n_estimators': 149, 'learning_rate': 0.0946838241139589, 'num_leaves': 2465, 'min_child_samples': 124, 'reg_alpha': 6, 'reg_lambda': 4}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:11:33,366] Trial 21 finished with value: 0.858177485411984 and parameters: {'max_depth': 3, 'n_estimators': 331, 'learning_rate': 0.2676318432467393, 'num_leaves': 3845, 'min_child_samples': 107, 'reg_alpha': 3, 'reg_lambda': 2}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:11:39,908] Trial 22 finished with value: 0.854820142934287 and parameters: {'max_depth': 5, 'n_estimators': 397, 'learning_rate': 0.22048945876102882, 'num_leaves': 4220, 'min_child_samples': 149, 'reg_alpha': 2, 'reg_lambda': 3}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:11:43,572] Trial 23 finished with value: 0.8583626698384319 and parameters: {'max_depth': 2, 'n_estimators': 291, 'learning_rate': 0.48676789850073077, 'num_leaves': 3125, 'min_child_samples': 98, 'reg_alpha': 3, 'reg_lambda': 3}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:11:56,775] Trial 24 finished with value: 0.8512945440492121 and parameters: {'max_depth': 10, 'n_estimators': 413, 'learning_rate': 0.09145144154351928, 'num_leaves': 3353, 'min_child_samples': 109, 'reg_alpha': 4, 'reg_lambda': 1}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:12:07,278] Trial 25 finished with value: 0.8430818377253758 and parameters: {'max_depth': 7, 'n_estimators': 496, 'learning_rate': 0.31395041644225385, 'num_leaves': 2094, 'min_child_samples': 83, 'reg_alpha': 2, 'reg_lambda': 5}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:12:12,342] Trial 26 finished with value: 0.8542479084910817 and parameters: {'max_depth': 4, 'n_estimators': 344, 'learning_rate': 0.4195769274132507, 'num_leaves': 4250, 'min_child_samples': 118, 'reg_alpha': 5, 'reg_lambda': 2}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:12:19,903] Trial 27 finished with value: 0.8520955594947683 and parameters: {'max_depth': 7, 'n_estimators': 372, 'learning_rate': 0.1899310771124623, 'num_leaves': 2651, 'min_child_samples': 142, 'reg_alpha': 3, 'reg_lambda': 4}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:12:29,308] Trial 28 finished with value: 0.8502652766499148 and parameters: {'max_depth': 13, 'n_estimators': 264, 'learning_rate': 0.11032805269594619, 'num_leaves': 1359, 'min_child_samples': 160, 'reg_alpha': 2, 'reg_lambda': 6}. Best is trial 13 with value: 0.8585438180285836.
+    [I 2020-09-25 05:12:32,865] Trial 29 finished with value: 0.8586769800245995 and parameters: {'max_depth': 2, 'n_estimators': 303, 'learning_rate': 0.2815571831164996, 'num_leaves': 3770, 'min_child_samples': 185, 'reg_alpha': 4, 'reg_lambda': 7}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:12:47,449] Trial 30 finished with value: 0.8329779383144685 and parameters: {'max_depth': 15, 'n_estimators': 311, 'learning_rate': 0.44032742218054205, 'num_leaves': 4585, 'min_child_samples': 192, 'reg_alpha': 4, 'reg_lambda': 7}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:12:50,541] Trial 31 finished with value: 0.858415675592514 and parameters: {'max_depth': 2, 'n_estimators': 249, 'learning_rate': 0.2872329641415212, 'num_leaves': 3848, 'min_child_samples': 181, 'reg_alpha': 3, 'reg_lambda': 8}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:12:56,009] Trial 32 finished with value: 0.8572387488312789 and parameters: {'max_depth': 4, 'n_estimators': 360, 'learning_rate': 0.2137167283859303, 'num_leaves': 3379, 'min_child_samples': 126, 'reg_alpha': 4, 'reg_lambda': 5}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:13:04,855] Trial 33 finished with value: 0.8478193343554438 and parameters: {'max_depth': 6, 'n_estimators': 425, 'learning_rate': 0.37626254874158965, 'num_leaves': 3632, 'min_child_samples': 52, 'reg_alpha': 2, 'reg_lambda': 7}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:13:14,340] Trial 34 finished with value: 0.8557946796659321 and parameters: {'max_depth': 9, 'n_estimators': 331, 'learning_rate': 0.060641424389139914, 'num_leaves': 4055, 'min_child_samples': 100, 'reg_alpha': 5, 'reg_lambda': 6}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:13:18,081] Trial 35 finished with value: 0.8580930911475468 and parameters: {'max_depth': 3, 'n_estimators': 283, 'learning_rate': 0.2570301039208332, 'num_leaves': 4470, 'min_child_samples': 80, 'reg_alpha': 1, 'reg_lambda': 3}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:13:18,648] Trial 36 finished with value: 0.8440091313892478 and parameters: {'max_depth': 3, 'n_estimators': 14, 'learning_rate': 0.1449682506117337, 'num_leaves': 3109, 'min_child_samples': 159, 'reg_alpha': 3, 'reg_lambda': 9}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:13:29,899] Trial 37 finished with value: 0.8316979049470193 and parameters: {'max_depth': 10, 'n_estimators': 376, 'learning_rate': 0.545075700955808, 'num_leaves': 2511, 'min_child_samples': 118, 'reg_alpha': 4, 'reg_lambda': 7}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:13:51,182] Trial 38 finished with value: 0.8336365234264569 and parameters: {'max_depth': 22, 'n_estimators': 309, 'learning_rate': 0.31329145013789206, 'num_leaves': 4970, 'min_child_samples': 138, 'reg_alpha': 10, 'reg_lambda': 8}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:13:54,424] Trial 39 finished with value: 0.8579738749343426 and parameters: {'max_depth': 4, 'n_estimators': 207, 'learning_rate': 0.21247366086248046, 'num_leaves': 4044, 'min_child_samples': 181, 'reg_alpha': 5, 'reg_lambda': 4}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:14:04,127] Trial 40 finished with value: 0.843609547068835 and parameters: {'max_depth': 6, 'n_estimators': 492, 'learning_rate': 0.42850828762699833, 'num_leaves': 4659, 'min_child_samples': 93, 'reg_alpha': 1, 'reg_lambda': 5}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:14:09,308] Trial 41 finished with value: 0.8583444404519684 and parameters: {'max_depth': 2, 'n_estimators': 452, 'learning_rate': 0.15050031794300736, 'num_leaves': 4712, 'min_child_samples': 50, 'reg_alpha': 6, 'reg_lambda': 9}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:14:14,501] Trial 42 finished with value: 0.8583522983346594 and parameters: {'max_depth': 2, 'n_estimators': 438, 'learning_rate': 0.14390995421351924, 'num_leaves': 4102, 'min_child_samples': 31, 'reg_alpha': 5, 'reg_lambda': 8}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:14:20,668] Trial 43 finished with value: 0.8586706421963844 and parameters: {'max_depth': 4, 'n_estimators': 403, 'learning_rate': 0.06901864598301596, 'num_leaves': 3584, 'min_child_samples': 4, 'reg_alpha': 4, 'reg_lambda': 8}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:14:26,762] Trial 44 finished with value: 0.8580338494826488 and parameters: {'max_depth': 4, 'n_estimators': 391, 'learning_rate': 0.03984581520024225, 'num_leaves': 3599, 'min_child_samples': 3, 'reg_alpha': 4, 'reg_lambda': 7}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:14:33,799] Trial 45 finished with value: 0.8517136504169702 and parameters: {'max_depth': 6, 'n_estimators': 355, 'learning_rate': 0.2449088875481766, 'num_leaves': 3291, 'min_child_samples': 66, 'reg_alpha': 2, 'reg_lambda': 6}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:15:00,341] Trial 46 finished with value: 0.8471915723427113 and parameters: {'max_depth': 19, 'n_estimators': 416, 'learning_rate': 0.05804866323674859, 'num_leaves': 2806, 'min_child_samples': 117, 'reg_alpha': 3, 'reg_lambda': 8}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:15:11,543] Trial 47 finished with value: 0.8404168944016926 and parameters: {'max_depth': 8, 'n_estimators': 470, 'learning_rate': 0.3410987449196904, 'num_leaves': 2128, 'min_child_samples': 127, 'reg_alpha': 3, 'reg_lambda': 9}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:15:15,668] Trial 48 finished with value: 0.8563756042318973 and parameters: {'max_depth': 3, 'n_estimators': 273, 'learning_rate': 0.5502449440546007, 'num_leaves': 3549, 'min_child_samples': 107, 'reg_alpha': 9, 'reg_lambda': 3}. Best is trial 29 with value: 0.8586769800245995.
+    [I 2020-09-25 05:15:22,516] Trial 49 finished with value: 0.8419556704382591 and parameters: {'max_depth': 5, 'n_estimators': 387, 'learning_rate': 0.8810368433427658, 'num_leaves': 4347, 'min_child_samples': 91, 'reg_alpha': 4, 'reg_lambda': 5}. Best is trial 29 with value: 0.8586769800245995.
+    
+    
+    
+    Optimized LightGBM roc_auc_score 0.8584318558758914
+    
+
+In [45]:
+
+    
+    
+    lgb
+    
+
+Out[45]:
+
+    
+    
+    LGBMClassifier(learning_rate=0.2815571831164996, max_depth=2,
+                   min_child_samples=185, n_estimators=303, num_leaves=3770,
+                   random_state=0, reg_alpha=4, reg_lambda=7)
+
+In [46]:
+
+    
+    
+    LGBM = lgb
+    LGBM.fit(X, y)
+    y_pred = LGBM.predict(X_test)
+    proba = LGBM.predict_proba(X_test)[:,1]
+    
+
+In [47]:
+
+    
+    
+    print('LGBM Tuned Accuracy : {}'.format(accuracy_score(y_test,y_pred)))
+    print('LGBM Tuned ROC_AUC_SCORE: {}'.format(roc_auc_score(y_test,proba)))
+    
+    
+    
+    LGBM Tuned Accuracy : 0.8779676315623753
+    LGBM Tuned ROC_AUC_SCORE: 0.8603507479610375
+    
+
+* * *
+
+## Short Ensemble¶
+
+### Combining Results of CatBoost and LGBM for final submission¶
+
+In [48]:
+
+    
+    
+    LGBM_proba = LGBM.predict_proba(test[features])[:, 1] # Class 1 probability of LGBM model
+    cat_proba = catb.predict_proba(test[features])[:, 1] # Class 1 probability of CatBoost model
+    
+
+#### Taking Weighted Average.¶
+
+In [49]:
+
+    
+    
+    submit_proba = ((LGBM_proba * 0.45) + (cat_proba * 0.55))/2
+    
+    sample_sub['Response'] = submit_proba
+    
+    # sample_sub.to_csv() --- > Add your path here
+    
+
+# Please Upvote if you like the notebook. Feel free to give suggestions about
+improving my work. Thank You.¶
+
+In [ ]:
+
+    
+    
+     
+    
+

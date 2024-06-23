@@ -1,0 +1,1064 @@
+In [1]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/insurance/insurance.csv
+    
+
+# Problem Statement¶
+
+Understanding the relation between the various factor like bmi, number of
+children or smoker affecting the Hosiptalization charges. Predicting the
+hospitalization by understanding patterns from other parameters.
+
+# Understanding the data¶
+
+  * ****age**** : age of primary beneficiary
+  * ****sex**** : insurance contractor gender, female, male
+  * ****bmi**** : Body mass index, providing an understanding of body, weights that are relatively high or low relative to height,objective index of body weight (kg / m ^ 2) using the ratio of height to weight, ideally 18.5 to 24.9
+  * ****children**** : Number of children covered by health insurance / Number of dependents
+  * ****smoker**** : Smoking
+  * ****region**** : the beneficiary's residential area in the US, northeast, southeast, southwest, northwest.
+  * ****charges**** : Individual medical costs billed by health insurance
+
+In [2]:
+
+    
+    
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from scipy import stats
+    from scipy.stats import levene
+    
+
+In [3]:
+
+    
+    
+    data = pd.read_csv('../input/insurance/insurance.csv')
+    pd.set_option('mode.chained_assignment', None)
+    
+
+In [4]:
+
+    
+    
+    data.head()
+    
+
+Out[4]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+  
+In [5]:
+
+    
+    
+    data.shape
+    
+
+Out[5]:
+
+    
+    
+    (1338, 7)
+
+****There are 1338 medical records here.****
+
+In [6]:
+
+    
+    
+    data.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 1338 entries, 0 to 1337
+    Data columns (total 7 columns):
+     #   Column    Non-Null Count  Dtype  
+    ---  ------    --------------  -----  
+     0   age       1338 non-null   int64  
+     1   sex       1338 non-null   object 
+     2   bmi       1338 non-null   float64
+     3   children  1338 non-null   int64  
+     4   smoker    1338 non-null   object 
+     5   region    1338 non-null   object 
+     6   charges   1338 non-null   float64
+    dtypes: float64(2), int64(2), object(3)
+    memory usage: 73.3+ KB
+    
+
+****Data has numerical as well as categorical data.****
+
+In [7]:
+
+    
+    
+    data.describe(include='all').T
+    
+
+Out[7]:
+
+| count | unique | top | freq | mean | std | min | 25% | 50% | 75% | max  
+---|---|---|---|---|---|---|---|---|---|---|---  
+age | 1338.0 | NaN | NaN | NaN | 39.207025 | 14.04996 | 18.0 | 27.0 | 39.0 | 51.0 | 64.0  
+sex | 1338 | 2 | male | 676 | NaN | NaN | NaN | NaN | NaN | NaN | NaN  
+bmi | 1338.0 | NaN | NaN | NaN | 30.663397 | 6.098187 | 15.96 | 26.29625 | 30.4 | 34.69375 | 53.13  
+children | 1338.0 | NaN | NaN | NaN | 1.094918 | 1.205493 | 0.0 | 0.0 | 1.0 | 2.0 | 5.0  
+smoker | 1338 | 2 | no | 1064 | NaN | NaN | NaN | NaN | NaN | NaN | NaN  
+region | 1338 | 4 | southeast | 364 | NaN | NaN | NaN | NaN | NaN | NaN | NaN  
+charges | 1338.0 | NaN | NaN | NaN | 13270.422265 | 12110.011237 | 1121.8739 | 4740.28715 | 9382.033 | 16639.912515 | 63770.42801  
+  
+### From the above table, we can say -¶
+
+  * Mean age is around 39
+  * Mean BMI is 30.66
+  * Max number of children is 5
+  * Mean charges is 12k but the 50% is 9K so there is a hint of outliers
+
+# Non Graphical Analysis¶
+
+In [8]:
+
+    
+    
+    data['age'].value_counts().sort_values(ascending=False)[:10]
+    
+
+Out[8]:
+
+    
+    
+    18    69
+    19    68
+    50    29
+    51    29
+    47    29
+    46    29
+    45    29
+    20    29
+    48    29
+    52    29
+    Name: age, dtype: int64
+
+****Most common ages that we can see is 18-20 and 45-52.****
+
+In [9]:
+
+    
+    
+    data['sex'].value_counts()
+    
+
+Out[9]:
+
+    
+    
+    male      676
+    female    662
+    Name: sex, dtype: int64
+
+****Both sex shares almost same number of records.****
+
+In [10]:
+
+    
+    
+    data['smoker'].value_counts()
+    
+
+Out[10]:
+
+    
+    
+    no     1064
+    yes     274
+    Name: smoker, dtype: int64
+
+****Number of smokers are less than non-smokers.****
+
+In [11]:
+
+    
+    
+    data['region'].value_counts()
+    
+
+Out[11]:
+
+    
+    
+    southeast    364
+    southwest    325
+    northwest    325
+    northeast    324
+    Name: region, dtype: int64
+
+****Almost all the regions have same number of records.****
+
+In [12]:
+
+    
+    
+    sex = data.groupby(['sex']).agg({'age':['mean']})
+    sex.reset_index()
+    
+
+Out[12]:
+
+| sex | age  
+---|---|---  
+|  | mean  
+0 | female | 39.503021  
+1 | male | 38.917160  
+  
+****Mean age of both sexes are almost same.****
+
+In [13]:
+
+    
+    
+    smoker = data.groupby(['smoker']).agg({'age':['mean']})
+    smoker.reset_index()
+    
+
+Out[13]:
+
+| smoker | age  
+---|---|---  
+|  | mean  
+0 | no | 39.385338  
+1 | yes | 38.514599  
+  
+****Mean age of smokers and non-smokers are almost same.****
+
+In [14]:
+
+    
+    
+    smoker = data.groupby(['region']).agg({'age':['mean']})
+    smoker.reset_index()
+    
+
+Out[14]:
+
+| region | age  
+---|---|---  
+|  | mean  
+0 | northeast | 39.268519  
+1 | northwest | 39.196923  
+2 | southeast | 38.939560  
+3 | southwest | 39.455385  
+  
+****Mean age across regions is almost same.****
+
+# Univariate Analysis¶
+
+In [15]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    sns.histplot(data['age'],kde=True,bins=10)
+    plt.title('Age')
+    plt.show()
+    
+
+![](__results___files/__results___28_0.png)
+
+****Age distribution is almost normal. People with age under 23 is more than
+rest ages.****
+
+In [16]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    sns.countplot(data=data,x='smoker')
+    plt.title('Smoker v/s Non Smokers')
+    plt.show()
+    
+
+![](__results___files/__results___30_0.png)
+
+****As we saw earlier smokers data is less than non-smokers.****
+
+In [17]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    sns.countplot(data=data,x='sex')
+    plt.title('Male v/s Female')
+    plt.show()
+    
+
+![](__results___files/__results___32_0.png)
+
+****Both sex have almost equal number of data.****
+
+In [18]:
+
+    
+    
+    sns.set(style="darkgrid")
+    f, (ax_box, ax_hist) = plt.subplots(2, sharex=True, gridspec_kw={"height_ratios": (.15, .85)})
+    sns.boxplot(data=data,x='bmi', ax=ax_box)
+    sns.histplot(data=data, x="bmi", ax=ax_hist,kde=True)
+    ax_box.set(xlabel='')
+    plt.show()
+    
+
+![](__results___files/__results___34_0.png)
+
+## Treating Outliers¶
+
+In [19]:
+
+    
+    
+    Q3 = data['bmi'].quantile(0.75)
+    Q1 = data['bmi'].quantile(0.25)
+    IQR = Q3-Q1
+    upper = Q3+(1.5*IQR)
+    lower = Q1-(1.5*IQR)
+    
+
+In [20]:
+
+    
+    
+    data = data[(data['bmi']>lower) & (data['bmi']<upper)]
+    
+
+In [21]:
+
+    
+    
+    sns.set(style="darkgrid")
+    f, (ax_box, ax_hist) = plt.subplots(2, sharex=True, gridspec_kw={"height_ratios": (.15, .85)})
+    sns.boxplot(data=data,x='bmi', ax=ax_box)
+    sns.histplot(data=data, x="bmi", ax=ax_hist,kde=True)
+    ax_box.set(xlabel='')
+    plt.show()
+    
+
+![](__results___files/__results___38_0.png)
+
+### From the above graph, we can say -¶
+
+  * Avg BMI is around 30
+  * 75% of BMI is under 33
+  * 25% of BMI is less the 26
+
+In [22]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    sns.countplot(data = data,x='children')
+    plt.title('Number of children')
+    plt.show()
+    
+
+![](__results___files/__results___40_0.png)
+
+### From the above graphs, we can say -¶
+
+  * Number of children 0,1,2,3 are more common
+  * Number of children 4 and 5 are almost equal and rare.
+
+In [23]:
+
+    
+    
+    type_value_count = data['region'].value_counts(normalize=True)*100
+    plt.figure(figsize=(10,6))
+    plt.pie(type_value_count,labels=['South East','North West','South West','North East'],autopct='%1.2f%%')
+    plt.title('Regions')
+    plt.show()
+    
+
+![](__results___files/__results___42_0.png)
+
+In [24]:
+
+    
+    
+    sns.set(style="darkgrid")
+    f, (ax_box, ax_hist) = plt.subplots(2, sharex=True, gridspec_kw={"height_ratios": (.15, .85)})
+    sns.boxplot(data=data,x='charges', ax=ax_box)
+    sns.histplot(data=data, x="charges", ax=ax_hist,kde=True)
+    ax_box.set(xlabel='')
+    plt.show()
+    
+
+![](__results___files/__results___43_0.png)
+
+## Data is highly right skewed. We transform data to make it normal.¶
+
+In [25]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    sns.histplot(np.log(data['charges']),kde=True,bins=10)
+    plt.title('Charges')
+    plt.show()
+    
+
+![](__results___files/__results___45_0.png)
+
+****Performing log transformation we get almost normal.****
+
+****Checking Normality using Q-Q Plot.****
+
+In [26]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    stats.probplot(data['charges'].apply(np.log), plot= plt, dist="norm")
+    plt.title('Q-Q plot for charges')
+    plt.show()
+    
+
+![](__results___files/__results___47_0.png)
+
+****As seen from the Q-Q plot the data is almost normal. Will perform Shapiro
+Wilk test once to confirm hypothesis.****
+
+## Performing log transformation¶
+
+In [27]:
+
+    
+    
+    data['charges'] = data['charges'].apply(np.log)
+    
+
+In [28]:
+
+    
+    
+    sns.set(style="darkgrid")
+    f, (ax_box, ax_hist) = plt.subplots(2, sharex=True, gridspec_kw={"height_ratios": (.15, .85)})
+    sns.boxplot(data=data,x='charges', ax=ax_box)
+    sns.histplot(data=data, x="charges", ax=ax_hist,kde=True)
+    ax_box.set(xlabel='')
+    plt.show()
+    
+
+![](__results___files/__results___51_0.png)
+
+### From the above graph, we can say -¶
+
+  * Avg charges is around 18k
+  * 75% of charges are less than 35k
+  * 25% of charges are less than 15k
+
+# Bivariate Analysis¶
+
+In [29]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    sns.lineplot(x='age',y='bmi',data=data,hue='sex')
+    plt.title('bmi across ages')
+    plt.show()
+    
+
+![](__results___files/__results___54_0.png)
+
+### From the above graph, we can say -¶
+
+  * Male with age between 26 and 32 have significantly more BMI than Females in same age range
+  * More or less both the age group shares same trend in BMI throughtout various agres.
+
+In [30]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    sns.scatterplot(y='bmi',x='charges',data=data)
+    plt.title('Charges v/s BMI')
+    plt.show()
+    
+
+![](__results___files/__results___56_0.png)
+
+### From the above graph we can say -¶
+
+  * Charge is almost uniformly distributed 
+  * Higher BMI have only high charge
+
+In [31]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    sns.boxplot(x='sex',y='bmi',data=data)
+    plt.title('Gender v/s BMI')
+    plt.show()
+    
+
+![](__results___files/__results___58_0.png)
+
+****Almost both the sexes have same BMI with males having a slightly higher
+average BMI.****
+
+In [32]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    sns.boxplot(x='sex',y='age',data=data)
+    plt.title('Gender v/s Age')
+    plt.show()
+    
+
+![](__results___files/__results___60_0.png)
+
+****Females mean age is more than male, but the age group spread is more on
+males.****
+
+In [33]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    sns.boxplot(x='smoker',y='bmi',data=data)
+    plt.title('Smoker v/s BMI')
+    plt.show()
+    
+
+![](__results___files/__results___62_0.png)
+
+****Average BMI is slightly more for smokers than non-smokers.****
+
+In [34]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    sns.boxplot(x='children',y='charges',data=data)
+    plt.show()
+    
+
+![](__results___files/__results___64_0.png)
+
+### From the above graph, we can say¶
+
+  * Almost all the number of children have same average of charge.
+  * Number of children 0,1,2 may be low but the charges are still high.
+
+In [35]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    (data
+     .groupby(['smoker'])['children']
+     .value_counts(normalize=True)
+     .mul(100)
+     .rename('Percent')
+     .reset_index()
+     .pipe((sns.barplot,'data'),x = "smoker",y="Percent",hue='children')
+    )
+    plt.title('Number of children for Smokers')
+    plt.show()
+    
+
+![](__results___files/__results___66_0.png)
+
+****The Number of children across smoker and non smoker are almost same****
+
+In [36]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    (data
+     .groupby(['region'])['children']
+     .value_counts(normalize=True)
+     .mul(100)
+     .rename('Percent')
+     .reset_index()
+     .pipe((sns.barplot,'data'),x = "region",y="Percent",hue='children')
+    )
+    plt.title('Number of children per Region')
+    plt.show()
+    
+
+![](__results___files/__results___68_0.png)
+
+****All the regions seems to have same share of seveity levels.****
+
+In [37]:
+
+    
+    
+    sns.heatmap(data.corr(),annot=True)
+    plt.show()
+    
+
+![](__results___files/__results___70_0.png)
+
+****We can see good co-relation between the age and charges.****
+
+In [38]:
+
+    
+    
+    sns.pairplot(data,hue='smoker',y_vars=['charges'])
+    plt.show()
+    
+
+![](__results___files/__results___72_0.png)
+
+# Hypothesis Testing¶
+
+****Setting up a function to return result on the basis of the significance
+value(0.05).****
+
+In [39]:
+
+    
+    
+    def htResult(p_value):
+        significance_level = 0.05
+        if p_value <= significance_level: 
+            print('Reject NULL HYPOTHESIS') 
+        else: 
+            print('Fail to Reject NULL HYPOTHESIS') 
+    
+
+## Question 1 -¶
+
+To prove charges of people who do smoking are greater than those who don't.
+
+### Performing Right Tailed T-test¶
+
+Null Hypothesis ( H0 ) - Charges are same for Smokers and Non-Smokers
+
+Alternate Hypothesis ( HA ) - Charges are greater for smokers.
+
+#### First Step -¶
+
+Checking for basic assumpitons for the hypothesis
+
+#### Second step-¶
+
+Performing Right tailed t-test
+
+#### Third step -¶
+
+Checking for hypothesis result
+
+## Checking for basic assumptions¶
+
+  * Normality check
+  * Homogeneity of Variances
+
+### For normality check, using Q-Q Plot¶
+
+In [40]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    stats.probplot(data['charges'], plot= plt, dist="norm")
+    plt.title('Q-Q plot for charges')
+    plt.show()
+    
+
+![](__results___files/__results___79_0.png)
+
+****From the above graph we can say, the data points roughly fall along a
+straight diagonal line in a Q-Q plot, then the dataset likely follows a normal
+distribution.****
+
+### Homogeneity of Variances using Lavene's test¶
+
+Null Hypothesis(H0) - Homogenous Variance
+
+Alternate Hypothesis(HA) - Non Homogenous variance
+
+In [41]:
+
+    
+    
+    smokers = data[data['smoker']=='yes']['charges']
+    non_smokers = data[data['smoker']=='no']['charges']
+    stat,p = levene(smokers,non_smokers)
+    
+
+In [42]:
+
+    
+    
+    print('P-value :',p)
+    
+    
+    
+    P-value : 1.5030077909802603e-20
+    
+
+In [43]:
+
+    
+    
+    htResult(p)
+    
+    
+    
+    Reject NULL HYPOTHESIS
+    
+
+****We reject null hypothesis, which means variance is not equal.****
+
+## Performing Right tailed t-test¶
+
+In [44]:
+
+    
+    
+    st,p = stats.ttest_ind(smokers,non_smokers)
+    print('P-value :',(p/2))
+    
+    
+    
+    P-value : 9.15281412995057e-170
+    
+
+In [45]:
+
+    
+    
+    htResult(p/2)
+    
+    
+    
+    Reject NULL HYPOTHESIS
+    
+
+## Answer¶
+
+****We reject null hypothesis, which means the hospitalization charge for
+smokers is more than non-smoker.****
+
+## Question 2 -¶
+
+To prove the BMI of females is different from that of males .
+
+### Performing Two Tailed T-test¶
+
+Null Hypothesis ( H0 ) - BMI for male and females are same.
+
+Alternate Hypothesis ( HA ) - BMI for males and females are different.
+
+#### First Step -¶
+
+Checking for basic assumpitons for the hypothesis
+
+#### Second step-¶
+
+Performing Two tailed t-test
+
+#### Third step -¶
+
+Checking for hypothesis result
+
+## Checking for basic assumptions¶
+
+  * Normality check
+  * Homogeneity of Variances
+
+### For normality check, using Q-Q Plot¶
+
+In [46]:
+
+    
+    
+    plt.figure(figsize=(10,6))
+    stats.probplot(data['bmi'], plot= plt, dist="norm")
+    plt.title('Q-Q plot for BMI')
+    plt.show()
+    
+
+![](__results___files/__results___93_0.png)
+
+****From the above graph we can say, the data points roughly fall along a
+straight diagonal line in a Q-Q plot, then the dataset likely follows a normal
+distribution.****
+
+### Homogeneity of Variances using Levene's test¶
+
+Null Hypothesis(H0) - Homogenous Variance
+
+Alternate Hypothesis(HA) - Non Homogenous variance
+
+In [47]:
+
+    
+    
+    males = data[data['sex']=='male']['bmi']
+    females = data[data['sex']=='female']['bmi']
+    stat,p = levene(males,females)
+    
+
+In [48]:
+
+    
+    
+    print('P-value :',p)
+    
+    
+    
+    P-value : 0.7548571190984414
+    
+
+In [49]:
+
+    
+    
+    htResult(p)
+    
+    
+    
+    Fail to Reject NULL HYPOTHESIS
+    
+
+****We fail to reject null hypothesis, which means the variance is same.****
+
+## Performing two tailed t-test¶
+
+In [50]:
+
+    
+    
+    st,p = stats.ttest_ind(males,females)
+    print('P-value :',p)
+    
+    
+    
+    P-value : 0.14542176311155552
+    
+
+In [51]:
+
+    
+    
+    htResult(p)
+    
+    
+    
+    Fail to Reject NULL HYPOTHESIS
+    
+
+## Answer¶
+
+****We fail to reject null hypothesis, which means the bmi for females is not
+different from males.****
+
+## Question 3 -¶
+
+To check if the proportion of smoking significantly different across different
+regions.
+
+### Performing Chi-Square test¶
+
+Null Hypothesis ( H0 ) - Proportion of smoking is equal across different
+regions.
+
+Alternate Hypothesis ( HA ) - Proportion of smoking is different across
+different regions.
+
+#### First step-¶
+
+Performing chi-square test
+
+#### Second step -¶
+
+Checking for hypothesis result
+
+In [52]:
+
+    
+    
+    cont = pd.crosstab(data['smoker'],data['region'])
+    value = np.array([cont.iloc[0][0:4].values,cont.iloc[1][0:4].values])
+    
+
+### Performing chi-square test¶
+
+In [53]:
+
+    
+    
+    c, p, dof, expected = stats.chi2_contingency(value)
+    print('P-value :',p)
+    
+    
+    
+    P-value : 0.05978076201764091
+    
+
+In [54]:
+
+    
+    
+    htResult(p)
+    
+    
+    
+    Fail to Reject NULL HYPOTHESIS
+    
+
+## Answer¶
+
+****We fail to reject null hypothesis, which means the proportion of smoking
+is same across different regions.****
+
+## Question 4 -¶
+
+To check if the mean BMI of women with 0 child , 1 child, and 2 children the
+same.
+
+### Performing One-way Anova¶
+
+Null Hypothesis ( H0 ) - Mean BMI for females of children 0,1,2 is same.
+
+Alternate Hypothesis ( HA ) - Mean BMI for females of children 0,1,2 is
+different.
+
+#### First Step -¶
+
+Checking for basic assumpitons for the hypothesis
+
+#### Second step-¶
+
+Performing One-way Anova
+
+#### Third step -¶
+
+Checking for hypothesis result
+
+## Checking for basic assumptions¶
+
+  * Normality check
+  * Homogeneity of Variances
+
+****Normality check for viral load is done and found out to be normal.****
+
+### Homogeneity of Variances with Levene's test¶
+
+Null Hypothesis(H0) - Homogenous Variance
+
+Alternate Hypothesis(HA) - Non Homogenous variance
+
+In [55]:
+
+    
+    
+    female = data[data['sex']=='female']
+    fem_ch_0 = female[female['children']==0]['bmi']
+    fem_ch_1 = female[female['children']==1]['bmi']
+    fem_ch_2 = female[female['children']==2]['bmi']
+    fem_ch_3 = female[female['children']==3]['bmi']
+    fem_ch_4 = female[female['children']==4]['bmi']
+    fem_ch_5 = female[female['children']==5]['bmi']
+    
+
+In [56]:
+
+    
+    
+    stat,p = levene(fem_ch_0,fem_ch_1,fem_ch_2,fem_ch_3,fem_ch_4,fem_ch_5)
+    print('P-value :',p)
+    
+    
+    
+    P-value : 0.4427290219991681
+    
+
+In [57]:
+
+    
+    
+    htResult(p)
+    
+    
+    
+    Fail to Reject NULL HYPOTHESIS
+    
+
+****We fail to reject null hypothesis, which means the variance is same across
+the groups.****
+
+## Performing One-Way Anova¶
+
+In [58]:
+
+    
+    
+    stat,p = stats.f_oneway(fem_ch_0,fem_ch_1,fem_ch_2,fem_ch_3,fem_ch_4,fem_ch_5)
+    print('P-value :',p)
+    
+    
+    
+    P-value : 0.9465287059938946
+    
+
+In [59]:
+
+    
+    
+    htResult(p)
+    
+    
+    
+    Fail to Reject NULL HYPOTHESIS
+    
+
+## Answer¶
+
+****We fail to reject null hypothesis, which means the mean viral load for
+females of severity levels 0,1,2 is same.****
+
+# Recommendations -¶
+
+  * As we can observe the smokers in general have a higher charges so we can create awareness around to stop smoking as it is not at all pocket friendly.
+  * Women with any number of children have almost same BMI as observed by hypothesis testing, basic awareness around family planning can be provided to keep them from facing financial issues.
+  * With increasing age the charges too increase, so we can promote a healthy living in the middle ages to avoid these charges in the later stage of life.
+

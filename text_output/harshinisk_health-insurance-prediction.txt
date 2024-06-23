@@ -1,0 +1,517 @@
+## HEALTH INSURANCE PREDICTION MODEL
+
+![](https://m.economictimes.com/thumb/msid-69278711,width-1200,height-900,resizemode-4,imgsize-132321/home-
+insurance-getty.jpg)
+
+### Introduction
+
+Linear regression is a linear model, e.g. a model that assumes a linear
+relationship between the input variables `x` and the single output variable
+`y`. It can be said that `y` can be calculated from a linear combination of
+the input variables `x`.  
+  
+When there is a single input variable `x`, the method is referred to as
+**simple linear regression**.
+
+## y = b0 \+ b1x
+
+  
+When there are multiple input variables `x1`,`x2`...`xn`, the method is
+referred as **multiple linear regression**.
+
+## y = b0 \+ b1x1\+ b2x2\+ ... + bnxn
+
+### Data Features
+
+  * **Age** \- Age of the person
+  * **Sex** \- Gender of the person
+  * **BMI** \- Body Mass Index of the person
+  * **Children** \- Count of Children of the person
+  * **Smoker** \- Smoking Status of the person
+  * **Region** \- Region to which the person belongs to
+  * **Charges** \- The target variable, the Insurance Charge the person is eligible for
+
+### Importing the required packages
+
+In [1]:
+
+    
+    
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    %matplotlib inline
+    
+    import warnings
+    warnings.filterwarnings("ignore")
+    
+
+### Importing the dataset
+
+In [2]:
+
+    
+    
+    df = pd.read_csv("../input/health-insurance-dataset/Health_insurance.csv")
+    data = df.copy()
+    data.head()
+    
+
+Out[2]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+  
+In [3]:
+
+    
+    
+    print(data.shape)
+    
+    
+    
+    (1338, 7)
+    
+
+In [4]:
+
+    
+    
+    print(data.dtypes)
+    
+    
+    
+    age           int64
+    sex          object
+    bmi         float64
+    children      int64
+    smoker       object
+    region       object
+    charges     float64
+    dtype: object
+    
+
+We have 4 numerical attributes and 3 categorical attributes in our data
+
+In [5]:
+
+    
+    
+    print(data.isna().sum())
+    
+    
+    
+    age         0
+    sex         0
+    bmi         0
+    children    0
+    smoker      0
+    region      0
+    charges     0
+    dtype: int64
+    
+
+The data is clean without any missing or null values
+
+### Visualizing the data
+
+In [6]:
+
+    
+    
+    sns.pairplot(data)
+    plt.show()
+    
+
+![](__results___files/__results___14_0.png)
+
+### Comparing the data based on Regions
+
+In [7]:
+
+    
+    
+    print(data["region"].value_counts())
+    
+    
+    
+    southeast    364
+    southwest    325
+    northwest    325
+    northeast    324
+    Name: region, dtype: int64
+    
+
+In [8]:
+
+    
+    
+    sns.countplot(x = data["region"])
+    plt.title("Comparing the data based on regions")
+    plt.xlabel("Regions")
+    plt.ylabel("Count")
+    plt.show()
+    
+
+![](__results___files/__results___17_0.png)
+
+We see that the data from Southwest, Northwest and Northeast have more or less
+a similar count, while data from Southeast is the maximum
+
+### Comparing the data based on Gender
+
+In [9]:
+
+    
+    
+    print(data["sex"].value_counts())
+    
+    
+    
+    male      676
+    female    662
+    Name: sex, dtype: int64
+    
+
+In [10]:
+
+    
+    
+    colors = sns.color_palette('pastel')[0:5]
+    plt.pie(data["sex"].value_counts(), labels = ["Male", "Female"], colors = colors, autopct='%.0f%%')
+    plt.show()
+    
+
+![](__results___files/__results___21_0.png)
+
+We have almost equal ratio of male and female data, with 51% and 49%
+respectively
+
+### Comparing the Gender ratio in Smokers category
+
+In [11]:
+
+    
+    
+    print(data["smoker"].value_counts())
+    
+    
+    
+    no     1064
+    yes     274
+    Name: smoker, dtype: int64
+    
+
+In [12]:
+
+    
+    
+    sns.countplot(data=data, x="sex", hue="smoker")
+    plt.title("Comparing the gender ratio in smokers category")
+    plt.xlabel("Sex")
+    plt.ylabel("Count")
+    plt.show()
+    
+
+![](__results___files/__results___25_0.png)
+
+The count of non smokers is very large than that of smokers in both the gender
+category
+
+### Distribution of Age Attribute
+
+In [13]:
+
+    
+    
+    sns.histplot(data["age"],kde=True, color= sns.color_palette('colorblind')[2])
+    plt.show()
+    
+
+![](__results___files/__results___28_0.png)
+
+### Comparing the data based on Children Count
+
+In [14]:
+
+    
+    
+    colors = sns.color_palette('pastel')[0:5]
+    plt.pie(data["children"].value_counts(), labels = ["Zero", "One", "Two","Three","Four", "Five"],
+                                            colors = colors, autopct='%.0f%%')
+    plt.show()
+    
+
+![](__results___files/__results___30_0.png)
+
+It is clear that majority of the data are that of people with no children
+
+### Encoding Categorical Attributes
+
+It is important to encode the categorical attributes in the dataset, so that
+it can be used properly
+
+  * Sex - Encoded as Male `1` Female `0`
+  * Smoker - Encoded as Yes `1` No `0`
+  * Region - Transformed into 4 columns - `southwest` `southeast` `northwest` `northeast`
+
+In [15]:
+
+    
+    
+    from sklearn.preprocessing import LabelEncoder
+    labelEncoder = LabelEncoder()
+    data["sex"] = labelEncoder.fit_transform(data["sex"])
+    data["smoker"] = labelEncoder.fit_transform(data["smoker"])
+    data.head()
+    
+
+Out[15]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | 0 | 27.900 | 0 | 1 | southwest | 16884.92400  
+1 | 18 | 1 | 33.770 | 1 | 0 | southeast | 1725.55230  
+2 | 28 | 1 | 33.000 | 3 | 0 | southeast | 4449.46200  
+3 | 33 | 1 | 22.705 | 0 | 0 | northwest | 21984.47061  
+4 | 32 | 1 | 28.880 | 0 | 0 | northwest | 3866.85520  
+  
+In [16]:
+
+    
+    
+    from sklearn.preprocessing import OneHotEncoder
+    from sklearn.compose import ColumnTransformer
+    columnTransformer = ColumnTransformer(transformers = [('encoder',OneHotEncoder(),[5])], remainder="passthrough")
+    datavalues = columnTransformer.fit_transform(data)
+    
+
+### Splitting the Dependent and Independent variables
+
+In [17]:
+
+    
+    
+    X = datavalues[:,:-1]
+    y = datavalues[:,-1]
+    
+
+In [18]:
+
+    
+    
+    print(X.shape)
+    print(y.shape)
+    
+    
+    
+    (1338, 9)
+    (1338,)
+    
+
+### Train Test Split Data
+
+In [19]:
+
+    
+    
+    from sklearn.model_selection import train_test_split
+    X_train, X_test, y_train, y_test = train_test_split(X,y, test_size = 0.25, random_state=11)
+    
+
+In [20]:
+
+    
+    
+    print(X_train.shape)
+    print(X_test.shape)
+    
+    
+    
+    (1003, 9)
+    (335, 9)
+    
+
+### Scaling the Data
+
+In [21]:
+
+    
+    
+    print(data.var())
+    
+    
+    
+    age         1.974014e+02
+    sex         2.501596e-01
+    bmi         3.718788e+01
+    children    1.453213e+00
+    smoker      1.629689e-01
+    charges     1.466524e+08
+    dtype: float64
+    
+
+In [22]:
+
+    
+    
+    from sklearn.preprocessing import StandardScaler
+    st_X = StandardScaler()
+    st_Y = StandardScaler()
+    
+
+In [23]:
+
+    
+    
+    X_train = st_X.fit_transform(X_train)
+    X_test = st_X.transform(X_test)
+    
+
+In [24]:
+
+    
+    
+    y_train = st_Y.fit_transform(y_train.reshape(-1,1))
+    y_test = st_Y.transform(y_test.reshape(-1,1))
+    
+
+All data preprocessing completed â  
+Time to train the model!
+
+### Training the model
+
+In [25]:
+
+    
+    
+    from sklearn.ensemble import GradientBoostingRegressor
+    
+
+In [26]:
+
+    
+    
+    gbr = GradientBoostingRegressor()
+    gbr.fit(X_train,y_train)
+    
+
+Out[26]:
+
+    
+    
+    GradientBoostingRegressor()
+
+In [27]:
+
+    
+    
+    y_pred = gbr.predict(X_test)
+    
+
+Model is trained and tested ââ  
+Time to evaluate the performance of the model
+
+### Evaluating the model
+
+In [28]:
+
+    
+    
+    from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+    
+
+### Mean Absolute Error
+
+![](https://miro.medium.com/max/630/1*OVlFLnMwHDx08PHzqlBDag.gif)
+
+In [29]:
+
+    
+    
+    print("Mean Absolute Error:",mean_absolute_error(y_test, y_pred))
+    
+    
+    
+    Mean Absolute Error: 0.20881325417955315
+    
+
+### Mean Squared Error
+
+![](https://lh3.googleusercontent.com/-JBio3Q_1FiI/YB2oQKEmRBI/AAAAAAAAAkM/c8KJ3wPwtMEd3Ik0nYMMdmr_pRqMF6MlQCLcBGAsYHQ/w550-h177/image.png)
+
+In [30]:
+
+    
+    
+    print("Mean Squared Error:",mean_squared_error(y_test, y_pred))
+    
+    
+    
+    Mean Squared Error: 0.1250417931911153
+    
+
+### Root Mean Squared Error
+
+![](https://miro.medium.com/max/966/1*lqDsPkfXPGen32Uem1PTNg.png)
+
+In [31]:
+
+    
+    
+    print("Root Mean Squared Error:", np.sqrt(mean_squared_error(y_test, y_pred)))
+    
+    
+    
+    Root Mean Squared Error: 0.35361249015145846
+    
+
+### Coefficient of Determination - R2 Value
+
+![](https://www.gstatic.com/education/formulas2/397133473/en/coefficient_of_determination.svg)
+
+In [32]:
+
+    
+    
+    print("R Squared Value:", r2_score(y_test, y_pred))
+    
+    
+    
+    R Squared Value: 0.8671037111027202
+    
+
+We got an R2 score of almost 87% âð
+
+### Comparing The Actual And Predicted Values
+
+In [33]:
+
+    
+    
+    compare = pd.DataFrame({"Actual": y_test[:,0], "Predicted": y_pred.reshape(-1,1)[:,0]})
+    compare.head()
+    
+
+Out[33]:
+
+| Actual | Predicted  
+---|---|---  
+0 | 1.888680 | 1.880189  
+1 | -0.733918 | -0.551531  
+2 | -0.469525 | -0.395612  
+3 | -0.360760 | -0.243868  
+4 | -0.311786 | -0.320893  
+  
+#### If you liked the notebook and found it useful to learn, give an upvote
+ðð» and share it with your friends ðð
+
+#### ðDo check out my other notebooks at:
+<https://www.kaggle.com/harshinisk>
+

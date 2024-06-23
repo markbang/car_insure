@@ -1,0 +1,670 @@
+In [40]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    dataset=pd.read_csv(r"/kaggle/input/sample-insurance-claim-prediction-dataset/insurance2.csv")
+    
+    
+    
+    /kaggle/input/sample-insurance-claim-prediction-dataset/insurance2.csv
+    /kaggle/input/sample-insurance-claim-prediction-dataset/insurance3r2.csv
+    
+
+In [2]:
+
+    
+    
+    dataset.head()
+    
+
+Out[2]:
+
+| age | sex | bmi | children | smoker | region | charges | insuranceclaim  
+---|---|---|---|---|---|---|---|---  
+0 | 19 | 0 | 27.900 | 0 | 1 | 3 | 16884.92400 | 1  
+1 | 18 | 1 | 33.770 | 1 | 0 | 2 | 1725.55230 | 1  
+2 | 28 | 1 | 33.000 | 3 | 0 | 2 | 4449.46200 | 0  
+3 | 33 | 1 | 22.705 | 0 | 0 | 1 | 21984.47061 | 0  
+4 | 32 | 1 | 28.880 | 0 | 0 | 1 | 3866.85520 | 1  
+  
+In [3]:
+
+    
+    
+    dataset.shape
+    
+
+Out[3]:
+
+    
+    
+    (1338, 8)
+
+# Will check for Data Preprocessing¶
+
+In [5]:
+
+    
+    
+    dataset.isnull().sum()
+    
+
+Out[5]:
+
+    
+    
+    age               0
+    sex               0
+    bmi               0
+    children          0
+    smoker            0
+    region            0
+    charges           0
+    insuranceclaim    0
+    dtype: int64
+
+In [ ]:
+
+    
+    
+    # We are not having any null values
+    
+
+# Working on Corelation of Columns¶
+
+In [6]:
+
+    
+    
+    dataset.corr()
+    
+
+Out[6]:
+
+| age | sex | bmi | children | smoker | region | charges | insuranceclaim  
+---|---|---|---|---|---|---|---|---  
+age | 1.000000 | -0.020856 | 0.109272 | 0.042469 | -0.025019 | 0.002127 | 0.299008 | 0.113723  
+sex | -0.020856 | 1.000000 | 0.046371 | 0.017163 | 0.076185 | 0.004588 | 0.057292 | 0.031565  
+bmi | 0.109272 | 0.046371 | 1.000000 | 0.012759 | 0.003750 | 0.157566 | 0.198341 | 0.384198  
+children | 0.042469 | 0.017163 | 0.012759 | 1.000000 | 0.007673 | 0.016569 | 0.067998 | -0.409526  
+smoker | -0.025019 | 0.076185 | 0.003750 | 0.007673 | 1.000000 | -0.002181 | 0.787251 | 0.333261  
+region | 0.002127 | 0.004588 | 0.157566 | 0.016569 | -0.002181 | 1.000000 | -0.006208 | 0.020891  
+charges | 0.299008 | 0.057292 | 0.198341 | 0.067998 | 0.787251 | -0.006208 | 1.000000 | 0.309418  
+insuranceclaim | 0.113723 | 0.031565 | 0.384198 | -0.409526 | 0.333261 | 0.020891 | 0.309418 | 1.000000  
+  
+In [8]:
+
+    
+    
+    import seaborn as sns
+    sns.heatmap(data=dataset.corr(),annot=True)
+    
+
+Out[8]:
+
+    
+    
+    <AxesSubplot:>
+
+![](__results___files/__results___8_1.png)
+
+In [ ]:
+
+    
+    
+    # Your dataset gives uncorelation 
+    
+
+# Working on Outliear¶
+
+In [9]:
+
+    
+    
+    import pandas as pd
+    import matplotlib
+    from matplotlib import pyplot as plt
+    %matplotlib inline
+    matplotlib.rcParams['figure.figsize'] = (10,6)
+    
+
+#### Use Histogram for Checking data Behaviors¶
+
+In [ ]:
+
+    
+    
+    # Age Column Outliear Checking
+    
+
+In [10]:
+
+    
+    
+    # 1)Histogram
+    plt.hist(dataset["age"],bins=20, rwidth=0.8)
+    plt.xlabel('age')
+    plt.ylabel('Count')
+    plt.show()
+    
+
+![](__results___files/__results___14_0.png)
+
+In [11]:
+
+    
+    
+    # Show your normal Dist Plot with Bell Curve
+    
+    from scipy.stats import norm
+    import numpy as np
+    plt.hist(dataset["age"], bins=20, rwidth=0.8, density=True)
+    plt.xlabel('age')
+    plt.ylabel('Count')
+    rng = np.arange(dataset["age"].min(), dataset["age"].max(), 0.1)
+    plt.plot(rng, norm.pdf(rng,dataset["age"].mean(),dataset["age"].std()))
+    
+
+Out[11]:
+
+    
+    
+    [<matplotlib.lines.Line2D at 0x7f9755a7f590>]
+
+![](__results___files/__results___15_1.png)
+
+In [ ]:
+
+    
+    
+    # BMI Column Outliear Checking
+    
+
+In [12]:
+
+    
+    
+    # 1)Histogram
+    plt.hist(dataset["bmi"],bins=20, rwidth=0.8)
+    plt.xlabel('bmi')
+    plt.ylabel('Count')
+    plt.show()
+    
+
+![](__results___files/__results___17_0.png)
+
+In [14]:
+
+    
+    
+    from scipy.stats import norm
+    import numpy as np
+    plt.hist(dataset["bmi"], bins=20, rwidth=0.8, density=True)
+    plt.xlabel('bmi')
+    plt.ylabel('Count')
+    rng = np.arange(dataset["bmi"].min(), dataset["bmi"].max(), 0.1)
+    plt.plot(rng, norm.pdf(rng,dataset["bmi"].mean(),dataset["bmi"].std()))
+    
+
+Out[14]:
+
+    
+    
+    [<matplotlib.lines.Line2D at 0x7f975581d050>]
+
+![](__results___files/__results___18_1.png)
+
+In [16]:
+
+    
+    
+    dataset.head()
+    
+
+Out[16]:
+
+| age | sex | bmi | children | smoker | region | charges | insuranceclaim  
+---|---|---|---|---|---|---|---|---  
+0 | 19 | 0 | 27.900 | 0 | 1 | 3 | 16884.92400 | 1  
+1 | 18 | 1 | 33.770 | 1 | 0 | 2 | 1725.55230 | 1  
+2 | 28 | 1 | 33.000 | 3 | 0 | 2 | 4449.46200 | 0  
+3 | 33 | 1 | 22.705 | 0 | 0 | 1 | 21984.47061 | 0  
+4 | 32 | 1 | 28.880 | 0 | 0 | 1 | 3866.85520 | 1  
+  
+In [ ]:
+
+    
+    
+    # charges Column Outliear Checking
+    
+
+In [18]:
+
+    
+    
+    # 1)Histogram
+    plt.hist(dataset["charges"],bins=20, rwidth=0.8)
+    plt.xlabel('charges')
+    plt.ylabel('Count')
+    plt.show()
+    
+
+![](__results___files/__results___21_0.png)
+
+In [17]:
+
+    
+    
+    from scipy.stats import norm
+    import numpy as np
+    plt.hist(dataset["charges"], bins=20, rwidth=0.8, density=True)
+    plt.xlabel('charges')
+    plt.ylabel('Count')
+    rng = np.arange(dataset["charges"].min(), dataset["charges"].max(), 0.1)
+    plt.plot(rng, norm.pdf(rng,dataset["charges"].mean(),dataset["charges"].std()))
+    
+
+Out[17]:
+
+    
+    
+    [<matplotlib.lines.Line2D at 0x7f97557b24d0>]
+
+![](__results___files/__results___22_1.png)
+
+In [19]:
+
+    
+    
+    dataset
+    
+
+Out[19]:
+
+| age | sex | bmi | children | smoker | region | charges | insuranceclaim  
+---|---|---|---|---|---|---|---|---  
+0 | 19 | 0 | 27.900 | 0 | 1 | 3 | 16884.92400 | 1  
+1 | 18 | 1 | 33.770 | 1 | 0 | 2 | 1725.55230 | 1  
+2 | 28 | 1 | 33.000 | 3 | 0 | 2 | 4449.46200 | 0  
+3 | 33 | 1 | 22.705 | 0 | 0 | 1 | 21984.47061 | 0  
+4 | 32 | 1 | 28.880 | 0 | 0 | 1 | 3866.85520 | 1  
+... | ... | ... | ... | ... | ... | ... | ... | ...  
+1333 | 50 | 1 | 30.970 | 3 | 0 | 1 | 10600.54830 | 0  
+1334 | 18 | 0 | 31.920 | 0 | 0 | 0 | 2205.98080 | 1  
+1335 | 18 | 0 | 36.850 | 0 | 0 | 2 | 1629.83350 | 1  
+1336 | 21 | 0 | 25.800 | 0 | 0 | 3 | 2007.94500 | 0  
+1337 | 61 | 0 | 29.070 | 0 | 1 | 1 | 29141.36030 | 1  
+  
+1338 rows Ã 8 columns
+
+# Lets Work on Data Imbalancing on Dependant Variable¶
+
+In [20]:
+
+    
+    
+    x=dataset.iloc[:,:-1].values
+    y=dataset.iloc[:,-1].values
+    
+
+In [21]:
+
+    
+    
+    from imblearn.over_sampling import SMOTE
+    s1=SMOTE()
+    x_data,y_data=s1.fit_resample(x,y)
+    
+
+In [23]:
+
+    
+    
+    from collections import Counter
+    print(Counter(y_data))
+    
+    
+    
+    Counter({1: 783, 0: 783})
+    
+
+# Lets Work on Standardization of Dataset¶
+
+# SC¶
+
+In [25]:
+
+    
+    
+    from sklearn.preprocessing import StandardScaler
+    sd=StandardScaler()
+    x_data=sd.fit_transform(x_data)
+    
+
+In [28]:
+
+    
+    
+    x_data1=x_data.mean()
+    x_data2=round(x_data1)
+    x_data2
+    
+
+Out[28]:
+
+    
+    
+    0
+
+In [29]:
+
+    
+    
+    x_data1=x_data.var()
+    x_data2=round(x_data1)
+    x_data2
+    
+
+Out[29]:
+
+    
+    
+    1
+
+# Lets make training and Testing Model¶
+
+In [30]:
+
+    
+    
+    from sklearn.model_selection import train_test_split
+    x_train,x_test,y_train,y_test=train_test_split(x_data,y_data,test_size=0.2,random_state=11)
+    
+
+#### Working with Logistic Regression¶
+
+In [38]:
+
+    
+    
+    # testing dataset
+    from sklearn.linear_model import LogisticRegression
+    l1=LogisticRegression()
+    l1.fit(x_train,y_train)
+    
+    y_log=l1.predict(x_test)
+    
+    from sklearn.metrics import accuracy_score
+    ac=accuracy_score(y_log,y_test)*100
+    ac
+    
+
+Out[38]:
+
+    
+    
+    87.89808917197452
+
+In [39]:
+
+    
+    
+    # Training dataset
+    from sklearn.linear_model import LogisticRegression
+    l1=LogisticRegression()
+    l1.fit(x_train,y_train)
+    
+    y_log_train=l1.predict(x_train)
+    
+    from sklearn.metrics import accuracy_score
+    ac=accuracy_score(y_log_train,y_train)*100
+    ac
+    
+    # Low bias And Low Variance
+    
+
+Out[39]:
+
+    
+    
+    89.61661341853035
+
+# Working with Naive Bayes¶
+
+In [33]:
+
+    
+    
+    from sklearn.naive_bayes import GaussianNB
+    g1=GaussianNB()
+    g1.fit(x_train,y_train)
+    
+    y_naive=g1.predict(x_test)
+    
+    from sklearn.metrics import accuracy_score
+    ac1=accuracy_score(y_naive,y_test)*100
+    ac1
+    
+
+Out[33]:
+
+    
+    
+    71.97452229299363
+
+# Working with Decision Tree Classifier¶
+
+In [35]:
+
+    
+    
+    # Worked on Test Case
+    
+    from sklearn.tree import DecisionTreeClassifier
+    d1=DecisionTreeClassifier(criterion='gini',max_depth=5)
+    d1.fit(x_train,y_train)
+    
+    y_dt=d1.predict(x_test)
+    
+    from sklearn.metrics import accuracy_score
+    ac2=accuracy_score(y_dt,y_test)*100
+    ac2
+    
+
+Out[35]:
+
+    
+    
+    92.67515923566879
+
+In [37]:
+
+    
+    
+    # Worked on Train Case
+    
+    from sklearn.tree import DecisionTreeClassifier
+    d1=DecisionTreeClassifier(criterion='gini',max_depth=5)
+    d1.fit(x_train,y_train)
+    
+    y_dt1=d1.predict(x_train)
+    
+    from sklearn.metrics import accuracy_score
+    ac21=accuracy_score(y_dt1,y_train)*100
+    ac21
+    
+    
+    # Low Bias and Low Variance
+    
+
+Out[37]:
+
+    
+    
+    94.6485623003195
+
+In [ ]:
+
+    
+    
+     
+    
+
+In [ ]:
+
+    
+    
+    # x=dataset.iloc[:,:-1].values
+    # y=dataset.iloc[:,-1].values
+    
+
+In [ ]:
+
+    
+    
+    # from imblearn.over_sampling import SMOTE
+    # s1=SMOTE()
+    # x_data,y_data=s1.fit_resample(x,y)
+    
+
+In [ ]:
+
+    
+    
+    # from collections import Counter
+    # print(Counter(y_data))
+    
+
+In [ ]:
+
+    
+    
+    # from sklearn.model_selection import train_test_split
+    # x_train,x_test,y_train,y_test=train_test_split(x_data,y_data,test_size=0.2,random_state=11)
+    
+
+In [ ]:
+
+    
+    
+    # print(Counter(y_train),Counter(y_test))
+    
+
+In [ ]:
+
+    
+    
+    # from sklearn.linear_model import LogisticRegression
+    # l1=LogisticRegression()
+    # l1.fit(x_train,y_train)
+    
+
+# Cross Validation Score¶
+
+In [ ]:
+
+    
+    
+    # from sklearn.model_selection import cross_val_score
+    # cross_val_score(l1,x_train,y_train,cv=5)
+    
+
+# K Fold Cross Validation Score¶
+
+In [ ]:
+
+    
+    
+    # from sklearn.model_selection import KFold
+    # kf=KFold(n_splits=5)
+    # kf.get_n_splits(x)
+    
+    # scores=cross_val_score(l1,x_data,y_data,cv=kf)
+    # print(scores)
+    # print(np.mean(scores)*100)
+    
+
+In [ ]:
+
+    
+    
+    # for train_data,test_data in kf.split(x_data):
+    #     x_train,x_test=x_data[train_data],x_data[test_data]
+    #     y_train,y_test=y_data[train_data],y_data[test_data]
+        
+    #     scores=cross_val_score(l1,x_train,y_train,cv=kf)
+    #     print(scores)
+    #     print(np.mean(scores)*100)
+    #     print("Y data Counter: ",Counter(y_test))
+        
+    
+
+In [ ]:
+
+    
+    
+    # for train_data,test_data in kf.split(x_data):
+    #     x_train,x_test=x_data[train_data],x_data[test_data]
+    #     y_train,y_test=y_data[train_data],y_data[test_data]
+        
+    #     scores=cross_val_score(l1,x_train,y_train,cv=kf)
+    #     print(scores)
+    #     print(np.mean(scores)*100)
+    #     print("Y data Counter: ",Counter(y_test))
+        
+        
+    #     ypred = l1.predict(x_test)
+    #     print(ypred)
+    
+
+# Stratify Cross Validation Tech¶
+
+In [ ]:
+
+    
+    
+    # from sklearn.model_selection import StratifiedKFold
+    # skf = StratifiedKFold(n_splits=5,shuffle=True, random_state=21)
+    # skf.get_n_splits(x_data,y_data)
+    
+
+In [ ]:
+
+    
+    
+    # for train_data,test_data in skf.split(x_data,y_data): 
+    #     x_train,x_test=x_data[train_data],x_data[test_data]
+    #     y_train,y_test=y_data[train_data],y_data[test_data]
+    #     scores=cross_val_score(l1,x_train,y_train,cv=skf)
+    # #     y_pred=cross_val_predict(l1,x_test,y_test,cv=skf)
+    #     print("Checking y_test Balancing:",Counter(y_test))
+    #     print("Checking y_train Balancing:",Counter(y_train))
+    #     print(scores)
+    #     print(np.mean(scores)*100)
+    
+
+In [ ]:
+
+    
+    
+     
+    
+

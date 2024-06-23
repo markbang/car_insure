@@ -1,0 +1,666 @@
+In [28]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/insurance/insurance.csv
+    
+
+**Table of Contents**
+
+  * Understanding Business Case
+  * Variable Description
+  * Data Understanding
+  * Data Cleaning
+  * Data Visualization
+
+**1\. Understanding Business Problem**
+
+Our business case is to predict customer charges for an insurance company
+based on given variables. So that the company can decide how much they charge
+people correctly.
+
+**2\. Variable Description**
+
+After understanding the business case, we need to know our variables before
+analyzing them. Thus we have a clear understanding as we go further.
+
+We will use parameters from the dataset
+
+Age: Age of the primary beneficiary Sex: Insurance contractor gender, female,
+male BMI: Body mass index, providing an understanding of the body, weights
+that are relatively high or low relative to height, an objective index of body
+weight (kg / m ^ 2) using the ratio of height to weight, ideally 18.5 to 24.9
+Children: Number of children covered by health insurance / Number of
+dependents Smoker: Smoking Region: the beneficiaryâs residential area in the
+US, northeast, southeast, southwest and northwest. Charges: Individual medical
+costs billed by health insurance
+
+**3\. Data Understanding**
+
+importing necessary library required and understanding the dataset
+
+In [29]:
+
+    
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data manipulation and analysis
+    
+    import matplotlib.pyplot as plt # data visualization
+    import seaborn as sns # data visualization
+    sns.set_style('whitegrid') # set style for visualization
+    
+    import warnings # ignore warnings
+    warnings.filterwarnings('ignore')
+    
+
+In [30]:
+
+    
+    
+    df = pd.read_csv('/kaggle/input/insurance/insurance.csv')
+    
+
+In [31]:
+
+    
+    
+    df.shape
+    
+
+Out[31]:
+
+    
+    
+    (1338, 7)
+
+In [32]:
+
+    
+    
+    df.head()
+    
+
+Out[32]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+  
+.head() returns the first 5 rows of the dataset. We can also use df.sample(5)
+to get randomly select 5 rows or df.tail() to get last 5 rows.
+
+In [33]:
+
+    
+    
+    df.columns
+    
+
+Out[33]:
+
+    
+    
+    Index(['age', 'sex', 'bmi', 'children', 'smoker', 'region', 'charges'], dtype='object')
+
+In [34]:
+
+    
+    
+    df.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 1338 entries, 0 to 1337
+    Data columns (total 7 columns):
+     #   Column    Non-Null Count  Dtype  
+    ---  ------    --------------  -----  
+     0   age       1338 non-null   int64  
+     1   sex       1338 non-null   object 
+     2   bmi       1338 non-null   float64
+     3   children  1338 non-null   int64  
+     4   smoker    1338 non-null   object 
+     5   region    1338 non-null   object 
+     6   charges   1338 non-null   float64
+    dtypes: float64(2), int64(2), object(3)
+    memory usage: 73.3+ KB
+    
+
+df.info() method returns information about the DataFrame including the index
+data type and columns, non-null values, and memory usage.
+
+In [35]:
+
+    
+    
+    df.describe()
+    
+
+Out[35]:
+
+| age | bmi | children | charges  
+---|---|---|---|---  
+count | 1338.000000 | 1338.000000 | 1338.000000 | 1338.000000  
+mean | 39.207025 | 30.663397 | 1.094918 | 13270.422265  
+std | 14.049960 | 6.098187 | 1.205493 | 12110.011237  
+min | 18.000000 | 15.960000 | 0.000000 | 1121.873900  
+25% | 27.000000 | 26.296250 | 0.000000 | 4740.287150  
+50% | 39.000000 | 30.400000 | 1.000000 | 9382.033000  
+75% | 51.000000 | 34.693750 | 2.000000 | 16639.912515  
+max | 64.000000 | 53.130000 | 5.000000 | 63770.428010  
+  
+df.describe() method generates descriptive statistics for us. For numeric
+data, the resultâs index will include count, mean, std, min, max as well as
+lower, 50(median) and upper percentiles.
+
+We can easily notice that the minimum age is 18 and the maximum age is 64. We
+can also see mean and median values of age are almost the same.
+
+I also noticed that the maximum charge value is 63.770 which might be an
+unusual value. We can investigate this in the data visualization part.
+
+( With describe method, we can also understand if our data is skewed or not
+looking at the range of quantiles )
+
+In [36]:
+
+    
+    
+    df.describe(include='O')
+    
+
+Out[36]:
+
+| sex | smoker | region  
+---|---|---|---  
+count | 1338 | 1338 | 1338  
+unique | 2 | 2 | 4  
+top | male | no | southeast  
+freq | 676 | 1064 | 364  
+  
+We see that the most frequent value for sex is male and shown in the dataset
+676 times.
+
+There are 4 unique regions in our dataset and the most frequent value is
+southeast and 364 times counted in the data.
+
+Most people are not smokers with a number of 1064 observations.
+
+**4\. Data Cleaning**
+
+In this part of the EDA. We will check ;
+
+  * Missing Values
+  * Duplicated Values
+
+The purpose of data cleaning is to get our data ready to analyze and
+visualize.
+
+In [37]:
+
+    
+    
+    df.isnull().sum()
+    
+
+Out[37]:
+
+    
+    
+    age         0
+    sex         0
+    bmi         0
+    children    0
+    smoker      0
+    region      0
+    charges     0
+    dtype: int64
+
+When combining .isnull() method with .sum() we can sum up all the missing
+values for each variables.
+
+Luckily, there are no missing values in this dataset. We will now proceed to
+analyze the data, observe patterns, and identify outliers with the help of
+visualization methods.
+
+most datasets contains missing values so checking for missing values is must.
+
+Now we will look for duplicated values.
+
+In [38]:
+
+    
+    
+    df[df.duplicated(keep='first')]
+    
+
+Out[38]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+581 | 19 | male | 30.59 | 0 | no | northwest | 1639.5631  
+  
+Dataset has only one duplicated observation. We can simply drop this row using
+the drop_duplicates() method.
+
+In [39]:
+
+    
+    
+    df.drop_duplicates(keep ='first', inplace = True)
+    
+
+We use some attributes inside the parenthesis;
+
+keep = âfirstâ is used to keep the first row of duplicated ones.
+
+inplace = True is used to change the data frame permanently. If we didn't use
+inplace attributes, we would not remove the duplicated observation from the
+dataset.
+
+**5\. Data Visualization**
+
+Now, We understood our dataset in general and checked the missing values. We
+also deleted duplicated values from the data frame.
+
+The next part of this journey is data visualization! Our goal is to perform
+univariate, bivariate and multivariate analysis to see the distribution and
+relationship between variables.
+
+We will use the seaborn library for statistical data visualization. Seaborn is
+a data visualization library based on matplotlib and my favorite with ease of
+use.
+
+_Univariate Analysis_
+
+The purpose of the univariate analysis is to understand the distribution of
+values for a single variable.
+
+We can perform univariate analysis with 3 options :
+
+  * Summary Statistics
+  * Frequency Distributions Table
+  * Charts ( Boxplot, Histogram, Barplot, Pie Chart)
+
+We will perform univariate analysis by using visualization techniques.
+
+Univariate Analysis for Numerical Features
+
+In [40]:
+
+    
+    
+    ##Charges
+    
+    plt.figure(figsize=(10,6))
+    sns.distplot(df.charges,color='b')
+    plt.title('Charges Distribution',size=18)
+    plt.xlabel('Charges',size=14)
+    plt.ylabel('Density',size=14)
+    plt.show()
+    
+
+![](__results___files/__results___26_0.png)
+
+Letâs begin with sns.distplot() function. Displot stands for distribution
+plot and shows us distribution and kernel density estimation by default.
+
+The distribution plot shows us how our variable is distributed.
+
+On the other hand, kernel density estimation allows us to estimate the
+probability density function from the numerical variables. So that we can
+easily see the probability of getting each value visually.
+
+> We see that our data looks like the right(positive) skewed. Most of the
+> charges are between 0 â 10000 dollars.
+
+In [41]:
+
+    
+    
+    ## Age
+    
+    plt.figure(figsize=(10,6))
+    sns.histplot(df.age)
+    plt.title('Age Distribution',size=16)
+    plt.xlabel('Age',size=14)
+    plt.ylabel('Count',size=14)
+    plt.show()
+    
+
+![](__results___files/__results___28_0.png)
+
+> We see that most of the customers are 18â19 years old. The distribution
+> looks like a uniform distribution.
+
+In [42]:
+
+    
+    
+    ## BMI
+    
+    plt.figure(figsize = (10,6))
+    plt.hist(df.bmi, color= 'g')
+    plt.title("BMI Distribution", size=18)
+    plt.show()
+    
+
+![](__results___files/__results___30_0.png)
+
+As seen in the code block, Matplotlib also gives us an option to create a
+histogram.
+
+> BMI of people seems like a normal distribution. Thatâs what we expected
+> right? Most people have BMI between 27 -34 years old.
+
+In [43]:
+
+    
+    
+    ## Boxplot for Charges
+    
+    plt.figure(figsize = (10,6))
+    sns.boxplot(df.charges)
+    plt.title('Distribution Charges',size=18)
+    plt.show()
+    
+
+![](__results___files/__results___32_0.png)
+
+By using a boxplot, We can easily interpret our variable if it has outliers.
+Outliers can be easily removed from our dataset. But we reconsider before
+removing any of them.
+
+We need to examine or ask domain expertise if they are anomalies or not.
+
+A common way to remove outliers is to use IQR Method.
+
+In [44]:
+
+    
+    
+    Q1 = df['charges'].quantile(0.25)
+    Q3 = df['charges'].quantile(0.75)
+    IQR = Q3 - Q1
+    print(IQR)
+    
+    
+    
+    11911.37345
+    
+
+IQR = 11911.37345
+
+After obtaining Inter Quantile Range, we can use the IQR method to see
+outliers or remove them from the dataset.
+
+In [45]:
+
+    
+    
+    df[(df['charges']< Q1-1.5* IQR) | (df['charges']> Q3+1.5* IQR)]
+    
+
+Out[45]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+14 | 27 | male | 42.130 | 0 | yes | southeast | 39611.75770  
+19 | 30 | male | 35.300 | 0 | yes | southwest | 36837.46700  
+23 | 34 | female | 31.920 | 1 | yes | northeast | 37701.87680  
+29 | 31 | male | 36.300 | 2 | yes | southwest | 38711.00000  
+30 | 22 | male | 35.600 | 0 | yes | southwest | 35585.57600  
+... | ... | ... | ... | ... | ... | ... | ...  
+1300 | 45 | male | 30.360 | 0 | yes | southeast | 62592.87309  
+1301 | 62 | male | 30.875 | 3 | yes | northwest | 46718.16325  
+1303 | 43 | male | 27.800 | 0 | yes | southwest | 37829.72420  
+1313 | 19 | female | 34.700 | 2 | yes | southwest | 36397.57600  
+1323 | 42 | female | 40.370 | 2 | yes | southeast | 43896.37630  
+  
+139 rows Ã 7 columns
+
+Now We can easily detect outliers with a boxplot or using python code. In this
+example. I will proceed with my analysis without removing outliers.
+
+_Univariate Analysis for Categorical Features_
+
+A bar chart is commonly used to visualize categorical features. We will use
+sns.countplot() method for sex, children, smoker and region variables.
+
+In [46]:
+
+    
+    
+    ## Gender
+    
+    plt.figure(figsize=(10,6))
+    sns.countplot(x = 'sex', data = df)
+    plt.title('Total Number of Male and Female',size=18)
+    plt.xlabel('Sex',size=14)
+    plt.show()
+    
+
+![](__results___files/__results___39_0.png)
+
+In [47]:
+
+    
+    
+    ##Children 
+    
+    
+    child_counts = df.children.value_counts()
+    
+    # Create a bar plot of the child counts
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x=child_counts.index, y=child_counts.values)
+    plt.title('Children Distribution', size=18)
+    plt.xlabel('Children', size=14)
+    plt.ylabel('Count', size=14)
+    plt.show()
+    
+
+![](__results___files/__results___40_0.png)
+
+In [48]:
+
+    
+    
+    ## Smoker
+    
+    
+    
+    # Get the count of each unique value in the smoker column
+    smoker_count = df.smoker.value_counts()
+    
+    # Create a bar plot of the smoker count
+    plt.figure(figsize=(10,6))
+    sns.barplot(x=smoker_count.index, y=smoker_count)
+    plt.title('Smoker Distribution', size=18)
+    plt.xlabel('Smoker', size=14)
+    plt.ylabel('Count', size=14)
+    plt.show()
+    
+
+![](__results___files/__results___41_0.png)
+
+In [49]:
+
+    
+    
+    df.smoker.value_counts()
+    
+
+Out[49]:
+
+    
+    
+    no     1063
+    yes     274
+    Name: smoker, dtype: int64
+
+In [50]:
+
+    
+    
+    ## Region
+    
+    
+    # Create a countplot of region with a hue for smoker
+    plt.figure(figsize=(10,6))
+    sns.countplot(x='region', data=df, hue='smoker', palette='Blues')
+    plt.title('Region Distribution by Smoker', size=18)
+    plt.xlabel('Region', size=14)
+    plt.ylabel('Count', size=14)
+    plt.show()
+    
+
+![](__results___files/__results___43_0.png)
+
+**Bivariate Analysis**
+
+Bivariate analysis is the analysis of exactly two variables. We will use
+bivariate analysis to find relationships between two variables.
+
+For bivariate analysis, we usually use boxplot(categorical vs numerical),
+scatterplot(numerical vs numerical), or contingency table(categorical vs
+categorical).
+
+In [ ]:
+
+    
+    
+    ## Age vs Charges
+    ## This also shows who is a smoker or not.
+    
+    plt.figure(figsize = (10,6))
+    sns.scatterplot(x='age',y='charges',hue='smoker', data=df, palette='deep')
+    plt.title('Age vs Charges',size=18)
+    plt.xlabel('Age',size=14)
+    plt.ylabel('Charges',size=14)
+    plt.show()
+    
+
+![](__results___files/__results___45_0.png)
+
+In [52]:
+
+    
+    
+    ## Smoker Vs Charges
+    
+    plt.figure(figsize = (10,6))
+    sns.set_style('darkgrid')
+    sns.boxplot(x='smoker',y='charges',data=df)
+    plt.title('Smoker vs Charges',size=18);
+    
+
+![](__results___files/__results___46_0.png)
+
+The boxplot shows us the cost of insurance for smokers is higher than for non-
+smokers.
+
+Pair plot is another awesome method that shows us the relationship between two
+numerical values as well as the distribution of each variable.
+
+In [ ]:
+
+    
+    
+    sns.pairplot(df, 
+                     markers="+",
+                     diag_kind="kde",
+                     kind='reg',
+                     plot_kws={'line_kws':{'color':'#aec6cf'}, 
+                               'scatter_kws': {'alpha': 0.7, 
+                                               'color': 'green'}},
+                     corner=True);
+    
+
+![](__results___files/__results___48_0.png)
+
+**Correlation**
+
+Correlation is used to test relationships between quantitative variables or
+categorical variables. Itâs a measure of how things are related. The table
+above shows us how we can interpret correlation coefficients.
+
+As we said earlier, seaborn is an awesome library that helps us visualize our
+variables easily and clearly. The heatmap() method shows us the relationship
+between numeric variables.
+
+There are different methods to calculate correlation coefficient ;
+
+1.Pearson 2.Kendall 3.Spearman
+
+We will combine the .corr() method with heatmap so that we will be able to see
+the relationship in the graph. .corr() method is used Pearson correlation by
+default.
+
+In [54]:
+
+    
+    
+    #heatmap of all df
+    
+    plt.figure(figsize = (10,6))
+    sns.heatmap(df.corr(),annot=True,square=True,
+                cmap='RdBu',
+                vmax=1,
+                vmin=-1)
+    plt.title('Correlations Between Variables',size=18);
+    plt.xticks(size=13)
+    plt.yticks(size=13)
+    plt.show()
+    
+
+![](__results___files/__results___50_0.png)
+
+The heatmap shows us there is a correlation between age and charges. As the
+age increases insurance charges also increase or vice versa.
+
+We can also see that there is a weak correlation between BMI and charges.
+
+**Conclusion**
+
+In this post, We examined our dataset using exploratory data analysis and try
+to understand each variable as well as their relationship with each other.
+
+The main purpose of EDA is to help understand data before making any
+assumptions. EDA helps us to see distribution, summary statistics,
+relationships between variables and outliers.
+
+Thank you :) update - Became Kaggle exprt today <3
+
+In [ ]:
+
+    
+    
+     
+    
+

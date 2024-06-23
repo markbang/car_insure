@@ -1,0 +1,1680 @@
+In [1]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/fraudulent-claim-on-cars-physical-damage/test_2021.csv
+    /kaggle/input/fraudulent-claim-on-cars-physical-damage/training data/training data.csv
+    
+
+In [2]:
+
+    
+    
+    data=pd.read_csv('/kaggle/input/fraudulent-claim-on-cars-physical-damage/training data/training data.csv')
+    
+
+In [3]:
+
+    
+    
+    data
+    
+
+Out[3]:
+
+| claim_number | age_of_driver | gender | marital_status | safty_rating | annual_income | high_education_ind | address_change_ind | living_status | zip_code | ... | liab_prct | channel | policy_report_filed_ind | claim_est_payout | age_of_vehicle | vehicle_category | vehicle_price | vehicle_color | vehicle_weight | fraud  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 46 | M | 1.0 | 85 | 38301 | 1 | 1 | Rent | 80006 | ... | 74 | Broker | 0 | 7530.940993 | 9.0 | Compact | 12885.452350 | white | 16161.33381 | 0  
+1 | 3 | 21 | F | 0.0 | 75 | 30445 | 0 | 1 | Rent | 15021 | ... | 79 | Online | 0 | 2966.024895 | 4.0 | Large | 29429.452180 | white | 28691.96422 | 0  
+2 | 4 | 49 | F | 0.0 | 87 | 38923 | 0 | 1 | Own | 20158 | ... | 0 | Broker | 0 | 6283.888333 | 3.0 | Compact | 21701.181950 | white | 22090.94758 | 1  
+3 | 5 | 58 | F | 1.0 | 58 | 40605 | 1 | 0 | Own | 15024 | ... | 99 | Broker | 1 | 6169.747994 | 4.0 | Medium | 13198.273440 | other | 38329.58106 | 1  
+4 | 6 | 38 | M | 1.0 | 95 | 36380 | 1 | 0 | Rent | 50034 | ... | 7 | Broker | 0 | 4541.387150 | 7.0 | Medium | 38060.211220 | gray | 25876.56319 | 0  
+... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ...  
+17993 | 29993 | 69 | M | 1.0 | 93 | 42338 | 1 | 0 | Own | 15012 | ... | 99 | Broker | 0 | 4806.841803 | 6.0 | Medium | 32144.571850 | black | 16868.53410 | 0  
+17994 | 29996 | 35 | F | 0.0 | 22 | 35579 | 1 | 1 | Own | 20111 | ... | 94 | Phone | 1 | 4089.794471 | 3.0 | Medium | 9468.510601 | blue | 31500.99689 | 1  
+17995 | 29997 | 27 | F | 1.0 | 81 | 32953 | 0 | 1 | Rent | 15012 | ... | 1 | Online | 1 | 2225.803056 | 5.0 | Medium | 64974.369590 | black | 44536.25506 | 0  
+17996 | 29999 | 52 | F | 1.0 | 86 | 39519 | 1 | 0 | Own | 15026 | ... | 75 | Broker | 1 | 9560.744844 | 3.0 | Compact | 24983.268110 | white | 50093.75959 | 0  
+17997 | 30000 | 61 | F | 0.0 | 60 | 41126 | 1 | 0 | Rent | 50001 | ... | 35 | Phone | 0 | 5166.915270 | 5.0 | Medium | 19295.970480 | blue | 15257.21450 | 0  
+  
+17998 rows Ã 25 columns
+
+In [4]:
+
+    
+    
+    data.isnull().sum()
+    
+
+Out[4]:
+
+    
+    
+    claim_number                 0
+    age_of_driver                0
+    gender                       0
+    marital_status               5
+    safty_rating                 0
+    annual_income                0
+    high_education_ind           0
+    address_change_ind           0
+    living_status                0
+    zip_code                     0
+    claim_date                   0
+    claim_day_of_week            0
+    accident_site                0
+    past_num_of_claims           0
+    witness_present_ind        132
+    liab_prct                    0
+    channel                      0
+    policy_report_filed_ind      0
+    claim_est_payout            17
+    age_of_vehicle               8
+    vehicle_category             0
+    vehicle_price                0
+    vehicle_color                0
+    vehicle_weight               0
+    fraud                        0
+    dtype: int64
+
+In [5]:
+
+    
+    
+    data.claim_est_payout=data.claim_est_payout.fillna(0)
+    data.witness_present_ind=data.witness_present_ind.fillna(0)
+    data.age_of_vehicle=data.age_of_vehicle.fillna(0)
+    data.marital_status=data.marital_status.fillna(0)
+    
+
+In [6]:
+
+    
+    
+    data.isnull().sum()
+    
+
+Out[6]:
+
+    
+    
+    claim_number               0
+    age_of_driver              0
+    gender                     0
+    marital_status             0
+    safty_rating               0
+    annual_income              0
+    high_education_ind         0
+    address_change_ind         0
+    living_status              0
+    zip_code                   0
+    claim_date                 0
+    claim_day_of_week          0
+    accident_site              0
+    past_num_of_claims         0
+    witness_present_ind        0
+    liab_prct                  0
+    channel                    0
+    policy_report_filed_ind    0
+    claim_est_payout           0
+    age_of_vehicle             0
+    vehicle_category           0
+    vehicle_price              0
+    vehicle_color              0
+    vehicle_weight             0
+    fraud                      0
+    dtype: int64
+
+In [7]:
+
+    
+    
+    data[['claim_day_of_week','accident_site']]
+    
+
+Out[7]:
+
+| claim_day_of_week | accident_site  
+---|---|---  
+0 | Friday | Local  
+1 | Thursday | Highway  
+2 | Tuesday | Local  
+3 | Thursday | Local  
+4 | Tuesday | Highway  
+... | ... | ...  
+17993 | Saturday | Local  
+17994 | Monday | Local  
+17995 | Saturday | Local  
+17996 | Friday | Highway  
+17997 | Monday | Parking Lot  
+  
+17998 rows Ã 2 columns
+
+In [8]:
+
+    
+    
+    data.dtypes
+    
+
+Out[8]:
+
+    
+    
+    claim_number                 int64
+    age_of_driver                int64
+    gender                      object
+    marital_status             float64
+    safty_rating                 int64
+    annual_income                int64
+    high_education_ind           int64
+    address_change_ind           int64
+    living_status               object
+    zip_code                     int64
+    claim_date                  object
+    claim_day_of_week           object
+    accident_site               object
+    past_num_of_claims           int64
+    witness_present_ind        float64
+    liab_prct                    int64
+    channel                     object
+    policy_report_filed_ind      int64
+    claim_est_payout           float64
+    age_of_vehicle             float64
+    vehicle_category            object
+    vehicle_price              float64
+    vehicle_color               object
+    vehicle_weight             float64
+    fraud                        int64
+    dtype: object
+
+In [9]:
+
+    
+    
+    data.accident_site.unique()
+    
+
+Out[9]:
+
+    
+    
+    array(['Local', 'Highway', 'Parking Lot'], dtype=object)
+
+In [10]:
+
+    
+    
+    data.channel.dtypes
+    
+
+Out[10]:
+
+    
+    
+    dtype('O')
+
+In [11]:
+
+    
+    
+    data.head()
+    
+
+Out[11]:
+
+| claim_number | age_of_driver | gender | marital_status | safty_rating | annual_income | high_education_ind | address_change_ind | living_status | zip_code | ... | liab_prct | channel | policy_report_filed_ind | claim_est_payout | age_of_vehicle | vehicle_category | vehicle_price | vehicle_color | vehicle_weight | fraud  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 46 | M | 1.0 | 85 | 38301 | 1 | 1 | Rent | 80006 | ... | 74 | Broker | 0 | 7530.940993 | 9.0 | Compact | 12885.45235 | white | 16161.33381 | 0  
+1 | 3 | 21 | F | 0.0 | 75 | 30445 | 0 | 1 | Rent | 15021 | ... | 79 | Online | 0 | 2966.024895 | 4.0 | Large | 29429.45218 | white | 28691.96422 | 0  
+2 | 4 | 49 | F | 0.0 | 87 | 38923 | 0 | 1 | Own | 20158 | ... | 0 | Broker | 0 | 6283.888333 | 3.0 | Compact | 21701.18195 | white | 22090.94758 | 1  
+3 | 5 | 58 | F | 1.0 | 58 | 40605 | 1 | 0 | Own | 15024 | ... | 99 | Broker | 1 | 6169.747994 | 4.0 | Medium | 13198.27344 | other | 38329.58106 | 1  
+4 | 6 | 38 | M | 1.0 | 95 | 36380 | 1 | 0 | Rent | 50034 | ... | 7 | Broker | 0 | 4541.387150 | 7.0 | Medium | 38060.21122 | gray | 25876.56319 | 0  
+  
+5 rows Ã 25 columns
+
+In [12]:
+
+    
+    
+    data[(data.channel=="Online")&(data.age_of_driver >40)& (data.gender=="F")&(data.fraud==1)].groupby("accident_site").count().iloc[:,0].sort_values(ascending=False)
+    
+
+Out[12]:
+
+    
+    
+    accident_site
+    Local          23
+    Highway        14
+    Parking Lot    12
+    Name: claim_number, dtype: int64
+
+In [13]:
+
+    
+    
+    y = data.fraud
+    
+    y.head()
+    
+
+Out[13]:
+
+    
+    
+    0    0
+    1    0
+    2    1
+    3    1
+    4    0
+    Name: fraud, dtype: int64
+
+In [14]:
+
+    
+    
+    x = data.iloc[:,:-1]
+    x.head()
+    
+
+Out[14]:
+
+| claim_number | age_of_driver | gender | marital_status | safty_rating | annual_income | high_education_ind | address_change_ind | living_status | zip_code | ... | witness_present_ind | liab_prct | channel | policy_report_filed_ind | claim_est_payout | age_of_vehicle | vehicle_category | vehicle_price | vehicle_color | vehicle_weight  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 46 | M | 1.0 | 85 | 38301 | 1 | 1 | Rent | 80006 | ... | 0.0 | 74 | Broker | 0 | 7530.940993 | 9.0 | Compact | 12885.45235 | white | 16161.33381  
+1 | 3 | 21 | F | 0.0 | 75 | 30445 | 0 | 1 | Rent | 15021 | ... | 1.0 | 79 | Online | 0 | 2966.024895 | 4.0 | Large | 29429.45218 | white | 28691.96422  
+2 | 4 | 49 | F | 0.0 | 87 | 38923 | 0 | 1 | Own | 20158 | ... | 0.0 | 0 | Broker | 0 | 6283.888333 | 3.0 | Compact | 21701.18195 | white | 22090.94758  
+3 | 5 | 58 | F | 1.0 | 58 | 40605 | 1 | 0 | Own | 15024 | ... | 0.0 | 99 | Broker | 1 | 6169.747994 | 4.0 | Medium | 13198.27344 | other | 38329.58106  
+4 | 6 | 38 | M | 1.0 | 95 | 36380 | 1 | 0 | Rent | 50034 | ... | 1.0 | 7 | Broker | 0 | 4541.387150 | 7.0 | Medium | 38060.21122 | gray | 25876.56319  
+  
+5 rows Ã 24 columns
+
+In [15]:
+
+    
+    
+    from sklearn.model_selection import train_test_split
+    x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=0.3)
+    
+
+In [16]:
+
+    
+    
+    x.head()
+    
+
+Out[16]:
+
+| claim_number | age_of_driver | gender | marital_status | safty_rating | annual_income | high_education_ind | address_change_ind | living_status | zip_code | ... | witness_present_ind | liab_prct | channel | policy_report_filed_ind | claim_est_payout | age_of_vehicle | vehicle_category | vehicle_price | vehicle_color | vehicle_weight  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 46 | M | 1.0 | 85 | 38301 | 1 | 1 | Rent | 80006 | ... | 0.0 | 74 | Broker | 0 | 7530.940993 | 9.0 | Compact | 12885.45235 | white | 16161.33381  
+1 | 3 | 21 | F | 0.0 | 75 | 30445 | 0 | 1 | Rent | 15021 | ... | 1.0 | 79 | Online | 0 | 2966.024895 | 4.0 | Large | 29429.45218 | white | 28691.96422  
+2 | 4 | 49 | F | 0.0 | 87 | 38923 | 0 | 1 | Own | 20158 | ... | 0.0 | 0 | Broker | 0 | 6283.888333 | 3.0 | Compact | 21701.18195 | white | 22090.94758  
+3 | 5 | 58 | F | 1.0 | 58 | 40605 | 1 | 0 | Own | 15024 | ... | 0.0 | 99 | Broker | 1 | 6169.747994 | 4.0 | Medium | 13198.27344 | other | 38329.58106  
+4 | 6 | 38 | M | 1.0 | 95 | 36380 | 1 | 0 | Rent | 50034 | ... | 1.0 | 7 | Broker | 0 | 4541.387150 | 7.0 | Medium | 38060.21122 | gray | 25876.56319  
+  
+5 rows Ã 24 columns
+
+In [17]:
+
+    
+    
+    data.iloc[:,10:-10]
+    
+
+Out[17]:
+
+| claim_date | claim_day_of_week | accident_site | past_num_of_claims | witness_present_ind  
+---|---|---|---|---|---  
+0 | 12/16/2016 | Friday | Local | 1 | 0.0  
+1 | 2/12/2015 | Thursday | Highway | 1 | 1.0  
+2 | 12/6/2016 | Tuesday | Local | 0 | 0.0  
+3 | 5/5/2016 | Thursday | Local | 3 | 0.0  
+4 | 10/27/2015 | Tuesday | Highway | 0 | 1.0  
+... | ... | ... | ... | ... | ...  
+17993 | 3/28/2015 | Saturday | Local | 0 | 0.0  
+17994 | 1/5/2015 | Monday | Local | 1 | 0.0  
+17995 | 9/10/2016 | Saturday | Local | 2 | 0.0  
+17996 | 12/25/2015 | Friday | Highway | 1 | 1.0  
+17997 | 9/26/2016 | Monday | Parking Lot | 1 | 1.0  
+  
+17998 rows Ã 5 columns
+
+In [18]:
+
+    
+    
+    nom =[2,8,11,12,16,22]
+    ord = [20]
+    
+
+In [19]:
+
+    
+    
+    from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
+    from sklearn.compose import make_column_transformer
+    
+    trans = make_column_transformer((OneHotEncoder(sparse=False),nom),
+                                   (OrdinalEncoder(), ord),
+                                   remainder= 'passthrough')
+                                      
+    
+
+In [20]:
+
+    
+    
+    import pandas as pd
+    
+
+In [21]:
+
+    
+    
+    data.columns
+    
+
+Out[21]:
+
+    
+    
+    Index(['claim_number', 'age_of_driver', 'gender', 'marital_status',
+           'safty_rating', 'annual_income', 'high_education_ind',
+           'address_change_ind', 'living_status', 'zip_code', 'claim_date',
+           'claim_day_of_week', 'accident_site', 'past_num_of_claims',
+           'witness_present_ind', 'liab_prct', 'channel',
+           'policy_report_filed_ind', 'claim_est_payout', 'age_of_vehicle',
+           'vehicle_category', 'vehicle_price', 'vehicle_color', 'vehicle_weight',
+           'fraud'],
+          dtype='object')
+
+In [22]:
+
+    
+    
+    x = data.drop(columns = ['policy_report_filed_ind'])
+    
+
+In [23]:
+
+    
+    
+    x.claim_date=pd.to_datetime(x.claim_date,dayfirst=False)
+    
+
+In [24]:
+
+    
+    
+    x[['month']] = pd.DataFrame(x.claim_date.dt.month)
+    x[['day']] = pd.DataFrame(x.claim_date.dt.day)
+    x[['year']] = pd.DataFrame(x.claim_date.dt.year)
+    
+
+In [25]:
+
+    
+    
+    x.head()
+    
+
+Out[25]:
+
+| claim_number | age_of_driver | gender | marital_status | safty_rating | annual_income | high_education_ind | address_change_ind | living_status | zip_code | ... | claim_est_payout | age_of_vehicle | vehicle_category | vehicle_price | vehicle_color | vehicle_weight | fraud | month | day | year  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 46 | M | 1.0 | 85 | 38301 | 1 | 1 | Rent | 80006 | ... | 7530.940993 | 9.0 | Compact | 12885.45235 | white | 16161.33381 | 0 | 12 | 16 | 2016  
+1 | 3 | 21 | F | 0.0 | 75 | 30445 | 0 | 1 | Rent | 15021 | ... | 2966.024895 | 4.0 | Large | 29429.45218 | white | 28691.96422 | 0 | 2 | 12 | 2015  
+2 | 4 | 49 | F | 0.0 | 87 | 38923 | 0 | 1 | Own | 20158 | ... | 6283.888333 | 3.0 | Compact | 21701.18195 | white | 22090.94758 | 1 | 12 | 6 | 2016  
+3 | 5 | 58 | F | 1.0 | 58 | 40605 | 1 | 0 | Own | 15024 | ... | 6169.747994 | 4.0 | Medium | 13198.27344 | other | 38329.58106 | 1 | 5 | 5 | 2016  
+4 | 6 | 38 | M | 1.0 | 95 | 36380 | 1 | 0 | Rent | 50034 | ... | 4541.387150 | 7.0 | Medium | 38060.21122 | gray | 25876.56319 | 0 | 10 | 27 | 2015  
+  
+5 rows Ã 27 columns
+
+In [26]:
+
+    
+    
+    x = data.drop(columns = ['claim_date'])
+    
+    x.head()
+    
+
+Out[26]:
+
+| claim_number | age_of_driver | gender | marital_status | safty_rating | annual_income | high_education_ind | address_change_ind | living_status | zip_code | ... | liab_prct | channel | policy_report_filed_ind | claim_est_payout | age_of_vehicle | vehicle_category | vehicle_price | vehicle_color | vehicle_weight | fraud  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 46 | M | 1.0 | 85 | 38301 | 1 | 1 | Rent | 80006 | ... | 74 | Broker | 0 | 7530.940993 | 9.0 | Compact | 12885.45235 | white | 16161.33381 | 0  
+1 | 3 | 21 | F | 0.0 | 75 | 30445 | 0 | 1 | Rent | 15021 | ... | 79 | Online | 0 | 2966.024895 | 4.0 | Large | 29429.45218 | white | 28691.96422 | 0  
+2 | 4 | 49 | F | 0.0 | 87 | 38923 | 0 | 1 | Own | 20158 | ... | 0 | Broker | 0 | 6283.888333 | 3.0 | Compact | 21701.18195 | white | 22090.94758 | 1  
+3 | 5 | 58 | F | 1.0 | 58 | 40605 | 1 | 0 | Own | 15024 | ... | 99 | Broker | 1 | 6169.747994 | 4.0 | Medium | 13198.27344 | other | 38329.58106 | 1  
+4 | 6 | 38 | M | 1.0 | 95 | 36380 | 1 | 0 | Rent | 50034 | ... | 7 | Broker | 0 | 4541.387150 | 7.0 | Medium | 38060.21122 | gray | 25876.56319 | 0  
+  
+5 rows Ã 24 columns
+
+In [27]:
+
+    
+    
+    y = data[['policy_report_filed_ind']]
+    
+    y.head()
+    
+
+Out[27]:
+
+| policy_report_filed_ind  
+---|---  
+0 | 0  
+1 | 0  
+2 | 0  
+3 | 1  
+4 | 0  
+  
+In [28]:
+
+    
+    
+    from sklearn.model_selection import train_test_split
+    x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=0.3)
+    
+
+In [29]:
+
+    
+    
+    x.head()
+    
+
+Out[29]:
+
+| claim_number | age_of_driver | gender | marital_status | safty_rating | annual_income | high_education_ind | address_change_ind | living_status | zip_code | ... | liab_prct | channel | policy_report_filed_ind | claim_est_payout | age_of_vehicle | vehicle_category | vehicle_price | vehicle_color | vehicle_weight | fraud  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 46 | M | 1.0 | 85 | 38301 | 1 | 1 | Rent | 80006 | ... | 74 | Broker | 0 | 7530.940993 | 9.0 | Compact | 12885.45235 | white | 16161.33381 | 0  
+1 | 3 | 21 | F | 0.0 | 75 | 30445 | 0 | 1 | Rent | 15021 | ... | 79 | Online | 0 | 2966.024895 | 4.0 | Large | 29429.45218 | white | 28691.96422 | 0  
+2 | 4 | 49 | F | 0.0 | 87 | 38923 | 0 | 1 | Own | 20158 | ... | 0 | Broker | 0 | 6283.888333 | 3.0 | Compact | 21701.18195 | white | 22090.94758 | 1  
+3 | 5 | 58 | F | 1.0 | 58 | 40605 | 1 | 0 | Own | 15024 | ... | 99 | Broker | 1 | 6169.747994 | 4.0 | Medium | 13198.27344 | other | 38329.58106 | 1  
+4 | 6 | 38 | M | 1.0 | 95 | 36380 | 1 | 0 | Rent | 50034 | ... | 7 | Broker | 0 | 4541.387150 | 7.0 | Medium | 38060.21122 | gray | 25876.56319 | 0  
+  
+5 rows Ã 24 columns
+
+In [30]:
+
+    
+    
+    x = data.drop(columns = ['claim_date'])
+    
+    x.head()
+    
+
+Out[30]:
+
+| claim_number | age_of_driver | gender | marital_status | safty_rating | annual_income | high_education_ind | address_change_ind | living_status | zip_code | ... | liab_prct | channel | policy_report_filed_ind | claim_est_payout | age_of_vehicle | vehicle_category | vehicle_price | vehicle_color | vehicle_weight | fraud  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 46 | M | 1.0 | 85 | 38301 | 1 | 1 | Rent | 80006 | ... | 74 | Broker | 0 | 7530.940993 | 9.0 | Compact | 12885.45235 | white | 16161.33381 | 0  
+1 | 3 | 21 | F | 0.0 | 75 | 30445 | 0 | 1 | Rent | 15021 | ... | 79 | Online | 0 | 2966.024895 | 4.0 | Large | 29429.45218 | white | 28691.96422 | 0  
+2 | 4 | 49 | F | 0.0 | 87 | 38923 | 0 | 1 | Own | 20158 | ... | 0 | Broker | 0 | 6283.888333 | 3.0 | Compact | 21701.18195 | white | 22090.94758 | 1  
+3 | 5 | 58 | F | 1.0 | 58 | 40605 | 1 | 0 | Own | 15024 | ... | 99 | Broker | 1 | 6169.747994 | 4.0 | Medium | 13198.27344 | other | 38329.58106 | 1  
+4 | 6 | 38 | M | 1.0 | 95 | 36380 | 1 | 0 | Rent | 50034 | ... | 7 | Broker | 0 | 4541.387150 | 7.0 | Medium | 38060.21122 | gray | 25876.56319 | 0  
+  
+5 rows Ã 24 columns
+
+In [31]:
+
+    
+    
+    y = data[['policy_report_filed_ind']]
+    
+    y.head()
+    
+
+Out[31]:
+
+| policy_report_filed_ind  
+---|---  
+0 | 0  
+1 | 0  
+2 | 0  
+3 | 1  
+4 | 0  
+  
+In [32]:
+
+    
+    
+    from sklearn.model_selection import train_test_split
+    x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=0.3)
+    
+
+In [33]:
+
+    
+    
+    x.head()
+    
+
+Out[33]:
+
+| claim_number | age_of_driver | gender | marital_status | safty_rating | annual_income | high_education_ind | address_change_ind | living_status | zip_code | ... | liab_prct | channel | policy_report_filed_ind | claim_est_payout | age_of_vehicle | vehicle_category | vehicle_price | vehicle_color | vehicle_weight | fraud  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 46 | M | 1.0 | 85 | 38301 | 1 | 1 | Rent | 80006 | ... | 74 | Broker | 0 | 7530.940993 | 9.0 | Compact | 12885.45235 | white | 16161.33381 | 0  
+1 | 3 | 21 | F | 0.0 | 75 | 30445 | 0 | 1 | Rent | 15021 | ... | 79 | Online | 0 | 2966.024895 | 4.0 | Large | 29429.45218 | white | 28691.96422 | 0  
+2 | 4 | 49 | F | 0.0 | 87 | 38923 | 0 | 1 | Own | 20158 | ... | 0 | Broker | 0 | 6283.888333 | 3.0 | Compact | 21701.18195 | white | 22090.94758 | 1  
+3 | 5 | 58 | F | 1.0 | 58 | 40605 | 1 | 0 | Own | 15024 | ... | 99 | Broker | 1 | 6169.747994 | 4.0 | Medium | 13198.27344 | other | 38329.58106 | 1  
+4 | 6 | 38 | M | 1.0 | 95 | 36380 | 1 | 0 | Rent | 50034 | ... | 7 | Broker | 0 | 4541.387150 | 7.0 | Medium | 38060.21122 | gray | 25876.56319 | 0  
+  
+5 rows Ã 24 columns
+
+In [34]:
+
+    
+    
+    nom_cols =[2,8,10,11,15,21]
+    ord_cols = [19]
+    num_cols=[0,3,4,5,6,7,9,12,13,14,16,17,18,20,22]
+    #Kbin_cols=[0,1,4]
+    binarizer_cols=[1]
+    
+
+In [35]:
+
+    
+    
+    from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder,KBinsDiscretizer,Binarizer
+    from sklearn.compose import make_column_transformer
+    from sklearn import set_config
+    from sklearn.preprocessing import StandardScaler
+    
+    trans = make_column_transformer((OneHotEncoder(sparse=False),nom_cols),
+                                     (OrdinalEncoder(), ord_cols),(StandardScaler(),num_cols)
+                                     ,(Binarizer(threshold=55),binarizer_cols),remainder= 'passthrough')
+    set_config(display= 'diagram')
+    trans
+    
+
+Out[35]:
+
+ColumnTransformer
+
+    
+    
+    ColumnTransformer(remainder='passthrough',
+                      transformers=[('onehotencoder', OneHotEncoder(sparse=False),
+                                     [2, 8, 10, 11, 15, 21]),
+                                    ('ordinalencoder', OrdinalEncoder(), [19]),
+                                    ('standardscaler', StandardScaler(),
+                                     [0, 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17, 18,
+                                      20, 22]),
+                                    ('binarizer', Binarizer(threshold=55), [1])])
+
+onehotencoder
+
+    
+    
+    [2, 8, 10, 11, 15, 21]
+
+OneHotEncoder
+
+    
+    
+    OneHotEncoder(sparse=False)
+
+ordinalencoder
+
+    
+    
+    [19]
+
+OrdinalEncoder
+
+    
+    
+    OrdinalEncoder()
+
+standardscaler
+
+    
+    
+    [0, 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17, 18, 20, 22]
+
+StandardScaler
+
+    
+    
+    StandardScaler()
+
+binarizer
+
+    
+    
+    [1]
+
+Binarizer
+
+    
+    
+    Binarizer(threshold=55)
+
+In [36]:
+
+    
+    
+    from sklearn.neighbors import KNeighborsClassifier
+    algorithm = KNeighborsClassifier(5) #
+    algorithm
+    
+
+Out[36]:
+
+KNeighborsClassifier
+
+    
+    
+    KNeighborsClassifier()
+
+In [37]:
+
+    
+    
+    from sklearn.pipeline import make_pipeline
+    pipe = make_pipeline(trans,algorithm)
+    pipe
+    
+
+Out[37]:
+
+Pipeline
+
+    
+    
+    Pipeline(steps=[('columntransformer',
+                     ColumnTransformer(remainder='passthrough',
+                                       transformers=[('onehotencoder',
+                                                      OneHotEncoder(sparse=False),
+                                                      [2, 8, 10, 11, 15, 21]),
+                                                     ('ordinalencoder',
+                                                      OrdinalEncoder(), [19]),
+                                                     ('standardscaler',
+                                                      StandardScaler(),
+                                                      [0, 3, 4, 5, 6, 7, 9, 12, 13,
+                                                       14, 16, 17, 18, 20, 22]),
+                                                     ('binarizer',
+                                                      Binarizer(threshold=55),
+                                                      [1])])),
+                    ('kneighborsclassifier', KNeighborsClassifier())])
+
+columntransformer: ColumnTransformer
+
+    
+    
+    ColumnTransformer(remainder='passthrough',
+                      transformers=[('onehotencoder', OneHotEncoder(sparse=False),
+                                     [2, 8, 10, 11, 15, 21]),
+                                    ('ordinalencoder', OrdinalEncoder(), [19]),
+                                    ('standardscaler', StandardScaler(),
+                                     [0, 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17, 18,
+                                      20, 22]),
+                                    ('binarizer', Binarizer(threshold=55), [1])])
+
+onehotencoder
+
+    
+    
+    [2, 8, 10, 11, 15, 21]
+
+OneHotEncoder
+
+    
+    
+    OneHotEncoder(sparse=False)
+
+ordinalencoder
+
+    
+    
+    [19]
+
+OrdinalEncoder
+
+    
+    
+    OrdinalEncoder()
+
+standardscaler
+
+    
+    
+    [0, 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17, 18, 20, 22]
+
+StandardScaler
+
+    
+    
+    StandardScaler()
+
+binarizer
+
+    
+    
+    [1]
+
+Binarizer
+
+    
+    
+    Binarizer(threshold=55)
+
+KNeighborsClassifier
+
+    
+    
+    KNeighborsClassifier()
+
+In [38]:
+
+    
+    
+    pipe.fit(x_train,y_train)
+    
+    
+    
+    /opt/conda/lib/python3.7/site-packages/sklearn/pipeline.py:335: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples, ), for example using ravel().
+      self._final_estimator.fit(Xt, y, **fit_params_last_step)
+    
+
+Out[38]:
+
+Pipeline
+
+    
+    
+    Pipeline(steps=[('columntransformer',
+                     ColumnTransformer(remainder='passthrough',
+                                       transformers=[('onehotencoder',
+                                                      OneHotEncoder(sparse=False),
+                                                      [2, 8, 10, 11, 15, 21]),
+                                                     ('ordinalencoder',
+                                                      OrdinalEncoder(), [19]),
+                                                     ('standardscaler',
+                                                      StandardScaler(),
+                                                      [0, 3, 4, 5, 6, 7, 9, 12, 13,
+                                                       14, 16, 17, 18, 20, 22]),
+                                                     ('binarizer',
+                                                      Binarizer(threshold=55),
+                                                      [1])])),
+                    ('kneighborsclassifier', KNeighborsClassifier())])
+
+columntransformer: ColumnTransformer
+
+    
+    
+    ColumnTransformer(remainder='passthrough',
+                      transformers=[('onehotencoder', OneHotEncoder(sparse=False),
+                                     [2, 8, 10, 11, 15, 21]),
+                                    ('ordinalencoder', OrdinalEncoder(), [19]),
+                                    ('standardscaler', StandardScaler(),
+                                     [0, 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17, 18,
+                                      20, 22]),
+                                    ('binarizer', Binarizer(threshold=55), [1])])
+
+onehotencoder
+
+    
+    
+    [2, 8, 10, 11, 15, 21]
+
+OneHotEncoder
+
+    
+    
+    OneHotEncoder(sparse=False)
+
+ordinalencoder
+
+    
+    
+    [19]
+
+OrdinalEncoder
+
+    
+    
+    OrdinalEncoder()
+
+standardscaler
+
+    
+    
+    [0, 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17, 18, 20, 22]
+
+StandardScaler
+
+    
+    
+    StandardScaler()
+
+binarizer
+
+    
+    
+    [1]
+
+Binarizer
+
+    
+    
+    Binarizer(threshold=55)
+
+KNeighborsClassifier
+
+    
+    
+    KNeighborsClassifier()
+
+In [39]:
+
+    
+    
+    pred = pipe.predict(x_test)
+    pred
+    
+
+Out[39]:
+
+    
+    
+    array([0, 1, 0, ..., 1, 0, 0])
+
+In [40]:
+
+    
+    
+    from sklearn.metrics import accuracy_score
+    accuracy_score(pred,y_test)*100
+    
+
+Out[40]:
+
+    
+    
+    99.72222222222223
+
+In [41]:
+
+    
+    
+    from sklearn.svm import SVC
+    model1=SVC(kernel='linear')
+    pipe_1 = make_pipeline(trans,algorithm)
+    pipe_1
+    pipe_1.fit(x_train,y_train)
+    pred_1=pipe.predict(x_test)
+    accuracy_score(pred_1,y_test)*100
+    
+    
+    
+    /opt/conda/lib/python3.7/site-packages/sklearn/pipeline.py:335: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples, ), for example using ravel().
+      self._final_estimator.fit(Xt, y, **fit_params_last_step)
+    
+
+Out[41]:
+
+    
+    
+    99.72222222222223
+
+In [42]:
+
+    
+    
+    from imblearn.over_sampling import RandomOverSampler
+    over= RandomOverSampler()
+    o_x , o_y = over.fit_resample(x,y)
+    o_y.value_counts()
+    
+
+Out[42]:
+
+    
+    
+    policy_report_filed_ind
+    0                          10811
+    1                          10811
+    dtype: int64
+
+In [43]:
+
+    
+    
+    from imblearn.over_sampling import SMOTE
+    over= RandomOverSampler()
+    o_x , o_y = over.fit_resample(x,y)
+    o_y.value_counts()
+    
+
+Out[43]:
+
+    
+    
+    policy_report_filed_ind
+    0                          10811
+    1                          10811
+    dtype: int64
+
+In [44]:
+
+    
+    
+    from imblearn.pipeline import make_pipeline
+    s = SMOTE()
+    n_pipe = make_pipeline(trans,s,algorithm)
+    n_pipe
+    
+
+Out[44]:
+
+Pipeline
+
+    
+    
+    Pipeline(steps=[('columntransformer',
+                     ColumnTransformer(remainder='passthrough',
+                                       transformers=[('onehotencoder',
+                                                      OneHotEncoder(sparse=False),
+                                                      [2, 8, 10, 11, 15, 21]),
+                                                     ('ordinalencoder',
+                                                      OrdinalEncoder(), [19]),
+                                                     ('standardscaler',
+                                                      StandardScaler(),
+                                                      [0, 3, 4, 5, 6, 7, 9, 12, 13,
+                                                       14, 16, 17, 18, 20, 22]),
+                                                     ('binarizer',
+                                                      Binarizer(threshold=55),
+                                                      [1])])),
+                    ('smote', SMOTE()),
+                    ('kneighborsclassifier', KNeighborsClassifier())])
+
+columntransformer: ColumnTransformer
+
+    
+    
+    ColumnTransformer(remainder='passthrough',
+                      transformers=[('onehotencoder', OneHotEncoder(sparse=False),
+                                     [2, 8, 10, 11, 15, 21]),
+                                    ('ordinalencoder', OrdinalEncoder(), [19]),
+                                    ('standardscaler', StandardScaler(),
+                                     [0, 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17, 18,
+                                      20, 22]),
+                                    ('binarizer', Binarizer(threshold=55), [1])])
+
+onehotencoder
+
+    
+    
+    [2, 8, 10, 11, 15, 21]
+
+OneHotEncoder
+
+    
+    
+    OneHotEncoder(sparse=False)
+
+ordinalencoder
+
+    
+    
+    [19]
+
+OrdinalEncoder
+
+    
+    
+    OrdinalEncoder()
+
+standardscaler
+
+    
+    
+    [0, 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17, 18, 20, 22]
+
+StandardScaler
+
+    
+    
+    StandardScaler()
+
+binarizer
+
+    
+    
+    [1]
+
+Binarizer
+
+    
+    
+    Binarizer(threshold=55)
+
+SMOTE
+
+    
+    
+    SMOTE()
+
+KNeighborsClassifier
+
+    
+    
+    KNeighborsClassifier()
+
+In [45]:
+
+    
+    
+    accuracy_score(pred,y_test)*100
+    
+
+Out[45]:
+
+    
+    
+    99.72222222222223
+
+In [46]:
+
+    
+    
+    from sklearn.linear_model import LogisticRegression as lr
+    algorithm_2 = lr(solver='liblinear')
+    pipe_2 = make_pipeline(trans,algorithm_2)
+    pipe_2
+    
+
+Out[46]:
+
+Pipeline
+
+    
+    
+    Pipeline(steps=[('columntransformer',
+                     ColumnTransformer(remainder='passthrough',
+                                       transformers=[('onehotencoder',
+                                                      OneHotEncoder(sparse=False),
+                                                      [2, 8, 10, 11, 15, 21]),
+                                                     ('ordinalencoder',
+                                                      OrdinalEncoder(), [19]),
+                                                     ('standardscaler',
+                                                      StandardScaler(),
+                                                      [0, 3, 4, 5, 6, 7, 9, 12, 13,
+                                                       14, 16, 17, 18, 20, 22]),
+                                                     ('binarizer',
+                                                      Binarizer(threshold=55),
+                                                      [1])])),
+                    ('logisticregression', LogisticRegression(solver='liblinear'))])
+
+columntransformer: ColumnTransformer
+
+    
+    
+    ColumnTransformer(remainder='passthrough',
+                      transformers=[('onehotencoder', OneHotEncoder(sparse=False),
+                                     [2, 8, 10, 11, 15, 21]),
+                                    ('ordinalencoder', OrdinalEncoder(), [19]),
+                                    ('standardscaler', StandardScaler(),
+                                     [0, 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17, 18,
+                                      20, 22]),
+                                    ('binarizer', Binarizer(threshold=55), [1])])
+
+onehotencoder
+
+    
+    
+    [2, 8, 10, 11, 15, 21]
+
+OneHotEncoder
+
+    
+    
+    OneHotEncoder(sparse=False)
+
+ordinalencoder
+
+    
+    
+    [19]
+
+OrdinalEncoder
+
+    
+    
+    OrdinalEncoder()
+
+standardscaler
+
+    
+    
+    [0, 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17, 18, 20, 22]
+
+StandardScaler
+
+    
+    
+    StandardScaler()
+
+binarizer
+
+    
+    
+    [1]
+
+Binarizer
+
+    
+    
+    Binarizer(threshold=55)
+
+LogisticRegression
+
+    
+    
+    LogisticRegression(solver='liblinear')
+
+In [47]:
+
+    
+    
+    pipe_2.fit(x_train,y_train)
+    
+    
+    
+    /opt/conda/lib/python3.7/site-packages/sklearn/utils/validation.py:72: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples, ), for example using ravel().
+      return f(**kwargs)
+    
+
+Out[47]:
+
+Pipeline
+
+    
+    
+    Pipeline(steps=[('columntransformer',
+                     ColumnTransformer(remainder='passthrough',
+                                       transformers=[('onehotencoder',
+                                                      OneHotEncoder(sparse=False),
+                                                      [2, 8, 10, 11, 15, 21]),
+                                                     ('ordinalencoder',
+                                                      OrdinalEncoder(), [19]),
+                                                     ('standardscaler',
+                                                      StandardScaler(),
+                                                      [0, 3, 4, 5, 6, 7, 9, 12, 13,
+                                                       14, 16, 17, 18, 20, 22]),
+                                                     ('binarizer',
+                                                      Binarizer(threshold=55),
+                                                      [1])])),
+                    ('logisticregression', LogisticRegression(solver='liblinear'))])
+
+columntransformer: ColumnTransformer
+
+    
+    
+    ColumnTransformer(remainder='passthrough',
+                      transformers=[('onehotencoder', OneHotEncoder(sparse=False),
+                                     [2, 8, 10, 11, 15, 21]),
+                                    ('ordinalencoder', OrdinalEncoder(), [19]),
+                                    ('standardscaler', StandardScaler(),
+                                     [0, 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17, 18,
+                                      20, 22]),
+                                    ('binarizer', Binarizer(threshold=55), [1])])
+
+onehotencoder
+
+    
+    
+    [2, 8, 10, 11, 15, 21]
+
+OneHotEncoder
+
+    
+    
+    OneHotEncoder(sparse=False)
+
+ordinalencoder
+
+    
+    
+    [19]
+
+OrdinalEncoder
+
+    
+    
+    OrdinalEncoder()
+
+standardscaler
+
+    
+    
+    [0, 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17, 18, 20, 22]
+
+StandardScaler
+
+    
+    
+    StandardScaler()
+
+binarizer
+
+    
+    
+    [1]
+
+Binarizer
+
+    
+    
+    Binarizer(threshold=55)
+
+LogisticRegression
+
+    
+    
+    LogisticRegression(solver='liblinear')
+
+In [48]:
+
+    
+    
+    pred_2 = pipe_2.predict(x_test)
+    pred_2
+    
+
+Out[48]:
+
+    
+    
+    array([0, 1, 0, ..., 1, 0, 0])
+
+In [49]:
+
+    
+    
+    accuracy_score(pred_1,y_test)*100
+    
+
+Out[49]:
+
+    
+    
+    99.72222222222223
+
+In [50]:
+
+    
+    
+    x.head()
+    
+
+Out[50]:
+
+| claim_number | age_of_driver | gender | marital_status | safty_rating | annual_income | high_education_ind | address_change_ind | living_status | zip_code | ... | liab_prct | channel | policy_report_filed_ind | claim_est_payout | age_of_vehicle | vehicle_category | vehicle_price | vehicle_color | vehicle_weight | fraud  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 46 | M | 1.0 | 85 | 38301 | 1 | 1 | Rent | 80006 | ... | 74 | Broker | 0 | 7530.940993 | 9.0 | Compact | 12885.45235 | white | 16161.33381 | 0  
+1 | 3 | 21 | F | 0.0 | 75 | 30445 | 0 | 1 | Rent | 15021 | ... | 79 | Online | 0 | 2966.024895 | 4.0 | Large | 29429.45218 | white | 28691.96422 | 0  
+2 | 4 | 49 | F | 0.0 | 87 | 38923 | 0 | 1 | Own | 20158 | ... | 0 | Broker | 0 | 6283.888333 | 3.0 | Compact | 21701.18195 | white | 22090.94758 | 1  
+3 | 5 | 58 | F | 1.0 | 58 | 40605 | 1 | 0 | Own | 15024 | ... | 99 | Broker | 1 | 6169.747994 | 4.0 | Medium | 13198.27344 | other | 38329.58106 | 1  
+4 | 6 | 38 | M | 1.0 | 95 | 36380 | 1 | 0 | Rent | 50034 | ... | 7 | Broker | 0 | 4541.387150 | 7.0 | Medium | 38060.21122 | gray | 25876.56319 | 0  
+  
+5 rows Ã 24 columns
+
+In [51]:
+
+    
+    
+    from sklearn.preprocessing import StandardScaler                   #For one column only 
+    import seaborn as sns
+    s=StandardScaler()
+    x.vehicle_price=pd.DataFrame(s.fit_transform(x[['vehicle_price']]))
+    sns.distplot(x.vehicle_price)
+    
+    
+    
+    /opt/conda/lib/python3.7/site-packages/seaborn/distributions.py:2619: FutureWarning: `distplot` is a deprecated function and will be removed in a future version. Please adapt your code to use either `displot` (a figure-level function with similar flexibility) or `histplot` (an axes-level function for histograms).
+      warnings.warn(msg, FutureWarning)
+    
+
+Out[51]:
+
+    
+    
+    <AxesSubplot:xlabel='vehicle_price', ylabel='Density'>
+
+![](__results___files/__results___50_2.png)
+
+In [52]:
+
+    
+    
+    data.annual_income.min()
+    
+
+Out[52]:
+
+    
+    
+    -1
+
+In [53]:
+
+    
+    
+    data.annual_income.max()
+    
+
+Out[53]:
+
+    
+    
+    54333
+
+In [54]:
+
+    
+    
+    from sklearn.preprocessing import MinMaxScaler
+    m= MinMaxScaler()
+    data['annual_income']=m.fit_transform(data[['annual_income']])
+    
+
+In [55]:
+
+    
+    
+    data.annual_income.min()
+    
+
+Out[55]:
+
+    
+    
+    0.0
+
+In [56]:
+
+    
+    
+    data.annual_income.max()
+    
+
+Out[56]:
+
+    
+    
+    1.0
+
+In [57]:
+
+    
+    
+    x.head()
+    
+
+Out[57]:
+
+| claim_number | age_of_driver | gender | marital_status | safty_rating | annual_income | high_education_ind | address_change_ind | living_status | zip_code | ... | liab_prct | channel | policy_report_filed_ind | claim_est_payout | age_of_vehicle | vehicle_category | vehicle_price | vehicle_color | vehicle_weight | fraud  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 46 | M | 1.0 | 85 | 38301 | 1 | 1 | Rent | 80006 | ... | 74 | Broker | 0 | 7530.940993 | 9.0 | Compact | -0.851150 | white | 16161.33381 | 0  
+1 | 3 | 21 | F | 0.0 | 75 | 30445 | 0 | 1 | Rent | 15021 | ... | 79 | Online | 0 | 2966.024895 | 4.0 | Large | 0.528885 | white | 28691.96422 | 0  
+2 | 4 | 49 | F | 0.0 | 87 | 38923 | 0 | 1 | Own | 20158 | ... | 0 | Broker | 0 | 6283.888333 | 3.0 | Compact | -0.115777 | white | 22090.94758 | 1  
+3 | 5 | 58 | F | 1.0 | 58 | 40605 | 1 | 0 | Own | 15024 | ... | 99 | Broker | 1 | 6169.747994 | 4.0 | Medium | -0.825056 | other | 38329.58106 | 1  
+4 | 6 | 38 | M | 1.0 | 95 | 36380 | 1 | 0 | Rent | 50034 | ... | 7 | Broker | 0 | 4541.387150 | 7.0 | Medium | 1.248829 | gray | 25876.56319 | 0  
+  
+5 rows Ã 24 columns
+
+**How many males who prderd online live on rent?**
+
+In [58]:
+
+    
+    
+    x[(x.gender=='M')&(x.channel=='Online')&(x.living_status=='Rent')].count()[1]
+    
+
+Out[58]:
+
+    
+    
+    936
+
+In [59]:
+
+    
+    
+    x[(x.gender=='M')&(x.channel=='Online')&(x.living_status=='Rent')].count()
+    
+
+Out[59]:
+
+    
+    
+    claim_number               936
+    age_of_driver              936
+    gender                     936
+    marital_status             936
+    safty_rating               936
+    annual_income              936
+    high_education_ind         936
+    address_change_ind         936
+    living_status              936
+    zip_code                   936
+    claim_day_of_week          936
+    accident_site              936
+    past_num_of_claims         936
+    witness_present_ind        936
+    liab_prct                  936
+    channel                    936
+    policy_report_filed_ind    936
+    claim_est_payout           936
+    age_of_vehicle             936
+    vehicle_category           936
+    vehicle_price              936
+    vehicle_color              936
+    vehicle_weight             936
+    fraud                      936
+    dtype: int64
+
+**2.What is the average annual income of fraudsters?**
+
+In [60]:
+
+    
+    
+    x[(x.fraud==1)].mean()[4]
+    
+    
+    
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:1: FutureWarning: Dropping of nuisance columns in DataFrame reductions (with 'numeric_only=None') is deprecated; in a future version this will raise TypeError.  Select only valid columns before calling the reduction.
+      """Entry point for launching an IPython kernel.
+    
+
+Out[60]:
+
+    
+    
+    37054.23330965909
+
+**3.which gender has done most fraud?**
+
+In [61]:
+
+    
+    
+    x[(x.gender=='F')&(x.fraud==1)].count()
+    
+
+Out[61]:
+
+    
+    
+    claim_number               1492
+    age_of_driver              1492
+    gender                     1492
+    marital_status             1492
+    safty_rating               1492
+    annual_income              1492
+    high_education_ind         1492
+    address_change_ind         1492
+    living_status              1492
+    zip_code                   1492
+    claim_day_of_week          1492
+    accident_site              1492
+    past_num_of_claims         1492
+    witness_present_ind        1492
+    liab_prct                  1492
+    channel                    1492
+    policy_report_filed_ind    1492
+    claim_est_payout           1492
+    age_of_vehicle             1492
+    vehicle_category           1492
+    vehicle_price              1492
+    vehicle_color              1492
+    vehicle_weight             1492
+    fraud                      1492
+    dtype: int64
+
+In [62]:
+
+    
+    
+    data[(data.fraud==1)].groupby('gender').count().iloc[:,0]
+    
+
+Out[62]:
+
+    
+    
+    gender
+    F    1492
+    M    1324
+    Name: claim_number, dtype: int64
+
+**Married or unmarried fraud more ?**
+
+In [63]:
+
+    
+    
+    data[(data.fraud==1)].groupby('marital_status').count()
+    
+
+Out[63]:
+
+| claim_number | age_of_driver | gender | safty_rating | annual_income | high_education_ind | address_change_ind | living_status | zip_code | claim_date | ... | liab_prct | channel | policy_report_filed_ind | claim_est_payout | age_of_vehicle | vehicle_category | vehicle_price | vehicle_color | vehicle_weight | fraud  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+marital_status |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |   
+0.0 | 1041 | 1041 | 1041 | 1041 | 1041 | 1041 | 1041 | 1041 | 1041 | 1041 | ... | 1041 | 1041 | 1041 | 1041 | 1041 | 1041 | 1041 | 1041 | 1041 | 1041  
+1.0 | 1775 | 1775 | 1775 | 1775 | 1775 | 1775 | 1775 | 1775 | 1775 | 1775 | ... | 1775 | 1775 | 1775 | 1775 | 1775 | 1775 | 1775 | 1775 | 1775 | 1775  
+  
+2 rows Ã 24 columns
+
+In [64]:
+
+    
+    
+    x.head(2)
+    
+
+Out[64]:
+
+| claim_number | age_of_driver | gender | marital_status | safty_rating | annual_income | high_education_ind | address_change_ind | living_status | zip_code | ... | liab_prct | channel | policy_report_filed_ind | claim_est_payout | age_of_vehicle | vehicle_category | vehicle_price | vehicle_color | vehicle_weight | fraud  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 46 | M | 1.0 | 85 | 38301 | 1 | 1 | Rent | 80006 | ... | 74 | Broker | 0 | 7530.940993 | 9.0 | Compact | -0.851150 | white | 16161.33381 | 0  
+1 | 3 | 21 | F | 0.0 | 75 | 30445 | 0 | 1 | Rent | 15021 | ... | 79 | Online | 0 | 2966.024895 | 4.0 | Large | 0.528885 | white | 28691.96422 | 0  
+  
+2 rows Ã 24 columns
+
+**Which vehicle category taken from broker have average claim estimate payout
+more than 7000?**
+
+In [65]:
+
+    
+    
+    data[data.channel=="Broker"].groupby('vehicle_category').mean()[["claim_est_payout"]]>4999
+    
+
+Out[65]:
+
+| claim_est_payout  
+---|---  
+vehicle_category |   
+Compact | True  
+Large | False  
+Medium | False  
+  
+**What percentage of men and women are fraud?**
+
+In [66]:
+
+    
+    
+    data[data.fraud==1].gender.value_counts(normalize=True)[0]
+    
+
+Out[66]:
+
+    
+    
+    0.5298295454545454
+
+In [67]:
+
+    
+    
+    data.head(2)
+    
+
+Out[67]:
+
+| claim_number | age_of_driver | gender | marital_status | safty_rating | annual_income | high_education_ind | address_change_ind | living_status | zip_code | ... | liab_prct | channel | policy_report_filed_ind | claim_est_payout | age_of_vehicle | vehicle_category | vehicle_price | vehicle_color | vehicle_weight | fraud  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 46 | M | 1.0 | 85 | 0.704936 | 1 | 1 | Rent | 80006 | ... | 74 | Broker | 0 | 7530.940993 | 9.0 | Compact | 12885.45235 | white | 16161.33381 | 0  
+1 | 3 | 21 | F | 0.0 | 75 | 0.560349 | 0 | 1 | Rent | 15021 | ... | 79 | Online | 0 | 2966.024895 | 4.0 | Large | 29429.45218 | white | 28691.96422 | 0  
+  
+2 rows Ã 25 columns
+
+In [68]:
+
+    
+    
+    data[data.fraud==1].groupby('gender').count().iloc[:1,0]
+    
+
+Out[68]:
+
+    
+    
+    gender
+    F    1492
+    Name: claim_number, dtype: int64
+

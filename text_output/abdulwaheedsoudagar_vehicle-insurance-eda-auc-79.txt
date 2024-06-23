@@ -1,0 +1,679 @@
+Kindly upvote if you like this notebook.  
+Any issues or mistake kindly let me know in comments, happy to correct.
+
+In [1]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 5GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/health-insurance-cross-sell-prediction/sample_submission.csv
+    /kaggle/input/health-insurance-cross-sell-prediction/test.csv
+    /kaggle/input/health-insurance-cross-sell-prediction/train.csv
+    
+
+In [2]:
+
+    
+    
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    from sklearn.preprocessing import LabelEncoder, StandardScaler 
+    from sklearn.model_selection import train_test_split, GridSearchCV
+    from sklearn.ensemble import RandomForestClassifier
+    from xgboost import XGBClassifier
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import confusion_matrix,classification_report
+    from imblearn.over_sampling import SMOTE
+    from sklearn.metrics import roc_auc_score,accuracy_score
+    
+    pd.set_option('display.max_rows', 500)
+    pd.set_option('display.max_columns', 500)
+    
+
+In [3]:
+
+    
+    
+    insurance_df = pd.read_csv('/kaggle/input/health-insurance-cross-sell-prediction/train.csv')
+    
+
+In [4]:
+
+    
+    
+    insurance_df.columns
+    
+
+Out[4]:
+
+    
+    
+    Index(['id', 'Gender', 'Age', 'Driving_License', 'Region_Code',
+           'Previously_Insured', 'Vehicle_Age', 'Vehicle_Damage', 'Annual_Premium',
+           'Policy_Sales_Channel', 'Vintage', 'Response'],
+          dtype='object')
+
+**Data Analysis**
+
+In [5]:
+
+    
+    
+    insurance_df.dtypes
+    
+
+Out[5]:
+
+    
+    
+    id                        int64
+    Gender                   object
+    Age                       int64
+    Driving_License           int64
+    Region_Code             float64
+    Previously_Insured        int64
+    Vehicle_Age              object
+    Vehicle_Damage           object
+    Annual_Premium          float64
+    Policy_Sales_Channel    float64
+    Vintage                   int64
+    Response                  int64
+    dtype: object
+
+In [6]:
+
+    
+    
+    insurance_df.isnull().sum()
+    
+
+Out[6]:
+
+    
+    
+    id                      0
+    Gender                  0
+    Age                     0
+    Driving_License         0
+    Region_Code             0
+    Previously_Insured      0
+    Vehicle_Age             0
+    Vehicle_Damage          0
+    Annual_Premium          0
+    Policy_Sales_Channel    0
+    Vintage                 0
+    Response                0
+    dtype: int64
+
+In [7]:
+
+    
+    
+    insurance_df.shape
+    
+
+Out[7]:
+
+    
+    
+    (381109, 12)
+
+In [8]:
+
+    
+    
+    categorical_columns=[]
+    continuous_columns=[]
+    for col in insurance_df.columns:
+        if insurance_df[col].dtype!='object':
+            continuous_columns.append(col)
+        else:
+            categorical_columns.append(col)
+    
+
+In [9]:
+
+    
+    
+    continuous_columns
+    
+
+Out[9]:
+
+    
+    
+    ['id',
+     'Age',
+     'Driving_License',
+     'Region_Code',
+     'Previously_Insured',
+     'Annual_Premium',
+     'Policy_Sales_Channel',
+     'Vintage',
+     'Response']
+
+In [10]:
+
+    
+    
+    plt.figure(figsize=(16,16))
+    for i, col in enumerate(['id','Age','Region_Code','Annual_Premium','Policy_Sales_Channel','Vintage']):
+        plt.subplot(4,4,i+1)
+        sns.boxplot(insurance_df[col])
+        plt.tight_layout()
+    
+
+![](__results___files/__results___11_0.png)
+
+In [11]:
+
+    
+    
+    insurance_df.loc[insurance_df.Annual_Premium> 400000,'Annual_Premium']=400000
+    
+    
+    
+    I don't see much outliers except in Annual_Premium, We will replace premium values greater than 400000 with 400000
+
+In [12]:
+
+    
+    
+    insurance_df['Gender'].value_counts()
+    
+
+Out[12]:
+
+    
+    
+    Male      206089
+    Female    175020
+    Name: Gender, dtype: int64
+
+In [13]:
+
+    
+    
+    fig, ax =plt.subplots(1,2,figsize=(15,5))
+    sns.countplot(data=insurance_df,x='Gender',hue='Vehicle_Damage',ax=ax[0])
+    sns.countplot(data=insurance_df,x='Gender',hue='Previously_Insured',ax=ax[1])
+    fig.show()
+    
+
+![](__results___files/__results___15_0.png)
+
+We clearly see that male have more vehicle damage than female, even then male
+don't have insurance.
+
+In [14]:
+
+    
+    
+    fig, ax =plt.subplots(1,2,figsize=(15,5))
+    sns.countplot(data=insurance_df,x='Gender',hue='Vehicle_Age',ax=ax[0])
+    sns.countplot(data=insurance_df,x='Previously_Insured',hue='Vehicle_Damage',ax=ax[1])
+    fig.show()
+    
+
+![](__results___files/__results___17_0.png)
+
+I see most of the vehicles are new(less than two years). People have't got
+insuranced for new vehicles.  
+It is surprsing that many vehicles within 2 years have got so much damage.
+
+In [15]:
+
+    
+    
+    fig, ax =plt.subplots(1,2,figsize=(15,5))
+    # fig, ax = plt.subplots() 
+    sns.countplot(data=insurance_df,x='Gender',hue='Previously_Insured',ax=ax[0])
+    sns.countplot(data=insurance_df,x='Gender',hue='Vehicle_Damage',ax=ax[1])
+    fig.show()
+    
+
+![](__results___files/__results___19_0.png)
+
+In [16]:
+
+    
+    
+    plt.figure(figsize=(20,9))
+    sns.FacetGrid(insurance_df, hue = 'Response',
+                 height = 6,xlim = (0,150)).map(sns.kdeplot, 'Age', shade = True,bw=2).add_legend()
+    
+
+Out[16]:
+
+    
+    
+    <seaborn.axisgrid.FacetGrid at 0x7f0d856fadd0>
+    
+    
+    <Figure size 1440x648 with 0 Axes>
+
+![](__results___files/__results___20_2.png)
+
+Age is almost normally distributed for people who are interested in buying
+insurance. People with age nearly 30 are more interested in buying insurance.  
+I think young people doesn't like to get insurance.
+
+In [17]:
+
+    
+    
+    plt.figure(figsize=(20,9))
+    sns.FacetGrid(insurance_df, hue = 'Gender',
+                 height = 6,xlim = (0,150)).map(sns.kdeplot, 'Age', shade = True,bw=2).add_legend()
+    
+
+Out[17]:
+
+    
+    
+    <seaborn.axisgrid.FacetGrid at 0x7f0d85895c90>
+    
+    
+    <Figure size 1440x648 with 0 Axes>
+
+![](__results___files/__results___22_2.png)
+
+I see no much signifiant difference in age vs gender
+
+In [18]:
+
+    
+    
+    plt.figure(figsize=(15,5))
+    sns.boxplot(y='Age', x ='Gender', hue="Previously_Insured", data=insurance_df)
+    
+
+Out[18]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f0d85885690>
+
+![](__results___files/__results___24_1.png)
+
+Females have got insurance at young age.
+
+In [19]:
+
+    
+    
+    plt.figure(figsize=(15,5))
+    sns.violinplot(y='Age', x ='Gender', hue="Response", data=insurance_df)
+    
+
+Out[19]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f0d85a3dfd0>
+
+![](__results___files/__results___26_1.png)
+
+As I said previously young doesn't like to get insurance, when we drill down
+further we see that
+
+  * People who like to get insurence their age is normally distributed. The mean age of both are nearly 45 years.
+  * Both young male and female doesn't like to buy insurance, distributed is right skewed.
+  * But the mean age of male and female, who is not interested to buy insurance, has huge difference.
+
+**With this we move to modelling**
+
+In [20]:
+
+    
+    
+    le = LabelEncoder()
+    insurance_df['Gender'] = le.fit_transform(insurance_df['Gender'])
+    insurance_df['Driving_License'] = le.fit_transform(insurance_df['Driving_License'])
+    insurance_df['Previously_Insured'] = le.fit_transform(insurance_df['Previously_Insured'])
+    insurance_df['Vehicle_Damage'] = le.fit_transform(insurance_df['Vehicle_Damage'])
+    insurance_df['Driving_License'] = le.fit_transform(insurance_df['Driving_License'])
+    insurance_df['Vehicle_Age'] = le.fit_transform(insurance_df['Vehicle_Age'])
+    
+
+In [21]:
+
+    
+    
+    insurance_df=insurance_df[['Gender', 'Age', 'Driving_License', 'Region_Code',
+           'Previously_Insured', 'Vehicle_Age', 'Vehicle_Damage', 'Annual_Premium',
+           'Policy_Sales_Channel', 'Vintage', 'Response']]
+    
+
+In [22]:
+
+    
+    
+    plt.figure(figsize=(12,12))
+    sns.heatmap(insurance_df.corr())
+    
+
+Out[22]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f0d85a53990>
+
+![](__results___files/__results___31_1.png)
+
+I see
+
+In [23]:
+
+    
+    
+    def evaluation_stats(model,X_train, X_test, y_train, y_test,algo,is_feature=False):
+        print('Train Accuracy')
+        y_pred_train = model.predict(X_train)                           
+        print(accuracy_score(y_train, y_pred_train))
+        print('Validation Accuracy')
+        y_pred_test = model.predict(X_test)                           
+        print(accuracy_score(y_test, y_pred_test))
+        print("\n")
+        print("Train AUC Score")
+        print(roc_auc_score(y_train, y_pred_train))
+        print("Test AUC Score")
+        print(roc_auc_score(y_test, y_pred_test))
+        
+        if is_feature:
+            plot_feature_importance(rf_model.feature_importances_,X.columns,algo)
+    
+    def training(model,X_train, y_train):
+        return model.fit(X_train, y_train)
+    
+    def plot_feature_importance(importance,names,model_type):
+        feature_importance = np.array(importance)
+        feature_names = np.array(names)
+    
+        #Create a DataFrame using a Dictionary
+        data={'feature_names':feature_names,'feature_importance':feature_importance}
+        fi_df = pd.DataFrame(data)
+    
+        #Sort the DataFrame in order decreasing feature importance
+        fi_df.sort_values(by=['feature_importance'], ascending=False,inplace=True)
+        #Define size of bar plot
+        plt.figure(figsize=(10,8))
+        #Plot Searborn bar chart
+        sns.barplot(x=fi_df['feature_importance'], y=fi_df['feature_names'])
+        #Add chart labels
+        plt.title(model_type + ' FEATURE IMPORTANCE')
+        plt.xlabel('FEATURE IMPORTANCE')
+        plt.ylabel('FEATURE NAMES')
+    
+
+In [24]:
+
+    
+    
+    insurance_df.columns
+    
+
+Out[24]:
+
+    
+    
+    Index(['Gender', 'Age', 'Driving_License', 'Region_Code', 'Previously_Insured',
+           'Vehicle_Age', 'Vehicle_Damage', 'Annual_Premium',
+           'Policy_Sales_Channel', 'Vintage', 'Response'],
+          dtype='object')
+
+In [25]:
+
+    
+    
+    insurance_df['Response'].value_counts()
+    
+
+Out[25]:
+
+    
+    
+    0    334399
+    1     46710
+    Name: Response, dtype: int64
+
+Data is highly imbalanced, but still we will try to train few models without
+over sampling
+
+In [26]:
+
+    
+    
+    X = insurance_df.drop(["Response"], axis=1)
+    y = insurance_df["Response"]
+    
+
+In [27]:
+
+    
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.30, random_state = 101)
+    
+
+In [28]:
+
+    
+    
+    rf_model = training(RandomForestClassifier(),X_train,y_train)
+    evaluation_stats(rf_model,X_train, X_test, y_train, y_test,'RANDOM FOREST')
+    
+    
+    
+    Train Accuracy
+    0.9998875461060965
+    Validation Accuracy
+    0.8661628751104231
+    
+    
+    Train AUC Score
+    0.9996209133740084
+    Test AUC Score
+    0.5442470178683095
+    
+
+This RF with out oversampling clearly over fits, Train accuracy and AUC is
+very high. Model is not able to generalization.
+
+In [29]:
+
+    
+    
+    xbg_model = training(XGBClassifier(),X_train,y_train)
+    evaluation_stats(xbg_model,X_train, X_test, y_train, y_test,'XGB')
+    
+    
+    
+    Train Accuracy
+    0.8809263202087144
+    Validation Accuracy
+    0.877095851591404
+    
+    
+    Train AUC Score
+    0.5221713110444541
+    Test AUC Score
+    0.5097873413185225
+    
+
+XBG is not completely overfitting, but AUC is low
+
+**Now we will try with over sampling**
+
+In [30]:
+
+    
+    
+    sm = SMOTE(random_state=101)
+    X_res, y_res = sm.fit_resample(X_train, y_train)
+    
+
+In [31]:
+
+    
+    
+    rf_model = training(RandomForestClassifier(),X_res, y_res)
+    evaluation_stats(rf_model,X_res, X_test, y_res, y_test,'RANDOM FOREST')
+    
+    
+    
+    Train Accuracy
+    0.999816249524599
+    Validation Accuracy
+    0.8193959749153787
+    
+    
+    Train AUC Score
+    0.9998162495245989
+    Test AUC Score
+    0.6481299199501626
+    
+
+Model is overfitting to train dataset, but it is performing good on validation
+dataset.  
+This is little tricky
+
+In [32]:
+
+    
+    
+    xbg_model = training(XGBClassifier(),X_train,y_train)
+    evaluation_stats(xbg_model,X_res, X_test, y_res, y_test,'XGB')
+    
+    
+    
+    Train Accuracy
+    0.5143304004478384
+    Validation Accuracy
+    0.877095851591404
+    
+    
+    Train AUC Score
+    0.5143304004478384
+    Test AUC Score
+    0.5097873413185225
+    
+
+Lets check with adding parameters to the model
+
+In [47]:
+
+    
+    
+    rf_model = training(RandomForestClassifier(criterion='entropy',n_estimators=200,max_depth=3),X_res, y_res)
+    evaluation_stats(rf_model,X_res, X_test, y_res, y_test,'RANDOM FOREST')
+    
+    
+    
+    Train Accuracy
+    0.8046604248481922
+    Validation Accuracy
+    0.7058854398992417
+    
+    
+    Train AUC Score
+    0.8046604248481922
+    Test AUC Score
+    0.7906836997873946
+    
+
+This model is not over fitting on the train dataset AUC is quiet decent enough
+
+In [34]:
+
+    
+    
+    xbg_model = training(XGBClassifier(n_estimators=1000,max_depth=10),X_res, y_res)
+    evaluation_stats(xbg_model,X_res, X_test, y_res, y_test,'XGB',is_feature=False)
+    
+    
+    
+    Train Accuracy
+    0.9898531278176853
+    Validation Accuracy
+    0.8437196609902653
+    
+    
+    Train AUC Score
+    0.9898531278176853
+    Test AUC Score
+    0.6014468942311159
+    
+
+Over fitting
+
+In [42]:
+
+    
+    
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.linear_model import LogisticRegression
+    clf = make_pipeline(StandardScaler(), LogisticRegression())
+    clf.fit(X_res, y_res)
+    evaluation_stats(clf,X_train, X_test, y_train, y_test,'LR',is_feature=False)
+    
+    
+    
+    Train Accuracy
+    0.6833410801571356
+    Validation Accuracy
+    0.6821477613637358
+    
+    
+    Train AUC Score
+    0.7459671318470793
+    Test AUC Score
+    0.7458953492219538
+    
+
+I think this is also good model, it is not completely overfitting, accuracy is
+.68 but AUC is .74
+
+**RF with parameters criterion = entropy ,n_estimators = 200 and max_depth = 3
+were giving best results, that is AUC of 79%**
+
+In [ ]:
+
+    
+    
+     
+    
+
+In [ ]:
+
+    
+    
+     
+    
+
+In [ ]:
+
+    
+    
+     
+    
+

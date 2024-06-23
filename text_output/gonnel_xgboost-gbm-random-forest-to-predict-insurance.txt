@@ -1,0 +1,415 @@
+**Author: Nelson Gonzabato**
+
+**Introduction:**
+
+In this kernel we explore what features are important predictors for how much
+a person will be charged. When I initially ran this kernel I was new to
+machine learning and basically didn't know much about metrics. I therefore
+used my metric as accuracy and trained "AgeGroup". Today as I look back I'm
+grateful for the comments in the code for they help me understand what was
+done and why. Today(10/25/2018) I'll redo this under regression analysis where
+it should be accurately placed. Away from that short talk and back to our data
+set, we'll explore the data initially to find out a few underlying "facts" .
+
+**Please let me know what you liked and what can be improved. Also if you
+liked it, feel free to share or upvote. It just might stimulate some neurons
+in the substantia nigra.**
+
+**Loading the Data and Packages.**
+
+In [1]:
+
+    
+    
+    #Predicting Insurance Charges
+    insure<-read.csv("../input/insurance.csv")
+    shh<-suppressMessages
+    shh(library(tidyverse))
+    shh(library(caret))
+    shh(library(Amelia))   
+    shh(library(GGally))
+    
+
+**Visualizing Missing Data**
+
+In [2]:
+
+    
+    
+    missmap(insure,col=c("indianred3","steelblue3"),main="Who's Skipping Insurance?",
+           x.cex=0.7,y.cex=0.3)
+    
+
+![](__results___files/__results___4_0.png)
+
+The great news is that our dataset contains no missing values. Now after many
+moons and some ML practice, I finally recognise that our target variable is
+"charges" and not "AgeGroup" as in my previous kernels. One could argue that
+we could predict AgeGroup based on charges but I honestly believe this to be a
+clumsy approach. I'll therefore proceed with predicting charges. Oh, what
+practice can do!
+
+**Visualizing our Data**
+
+In [3]:
+
+    
+    
+    insure<-as.tibble(insure)
+    #View structure of the dataset
+    str(insure)
+    levels(insure$sex)<-c("F","M")
+    #Create Agegroup column
+    insure %>% 
+      select_if(is.numeric) %>% 
+      map_dbl(~max(.x))
+    
+    
+    
+    Classes âtbl_dfâ, âtblâ and 'data.frame':	1338 obs. of  7 variables:
+     $ age     : int  19 18 28 33 32 31 46 37 37 60 ...
+     $ sex     : Factor w/ 2 levels "female","male": 1 2 2 2 2 1 1 1 2 1 ...
+     $ bmi     : num  27.9 33.8 33 22.7 28.9 ...
+     $ children: int  0 1 3 0 0 0 1 3 2 0 ...
+     $ smoker  : Factor w/ 2 levels "no","yes": 2 1 1 1 1 1 1 1 1 1 ...
+     $ region  : Factor w/ 4 levels "northeast","northwest",..: 4 3 3 2 2 3 3 2 1 2 ...
+     $ charges : num  16885 1726 4449 21984 3867 ...
+    
+
+age
+
+    64
+bmi
+
+    53.13
+children
+
+    5
+charges
+
+    63770.42801
+
+In [4]:
+
+    
+    
+    #Minimum age is 18 and maximum is 64
+    insure<-insure %>% 
+      mutate(Agegroup=as.factor(findInterval(age,c(18,35,50,80))))
+    levels(insure$Agegroup)<-c("Youth","Mid Aged","Old")
+    levels(insure$smoker)<-c("N","Y")
+    levels(insure$region)<-c("NE","NW","SE","SW")
+    #Visualise distribution of charges by agegroup,sex and region
+     insure %>% 
+       ggplot(aes(region,charges,fill=sex))+geom_boxplot()+facet_grid(~Agegroup)+
+       ggtitle("Insurance Charge distribution by Age, Sex and region")+
+      scale_fill_manual(values=c("whitesmoke","steelblue"))
+    
+
+![](__results___files/__results___9_1.png)
+
+From the above graph, it appears that those above 50 years old are likely to
+pay more and living in the North East saves you some money spent on insurance
+charges. However, we see a lot of points that lie out of this general trend.
+Most people would filter these out, but we'll "zoom in" to see who these
+really are.
+
+In [5]:
+
+    
+    
+    insure %>% 
+       filter(charges>=30000) %>% 
+       ggplot(aes(region,charges,fill=sex))+geom_boxplot()+facet_grid(~Agegroup)+
+       ggtitle("Outlier Charges") +
+    scale_fill_manual(values=c("whitesmoke","steelblue"))
+    
+
+![](__results___files/__results___11_1.png)
+
+From the above plot we can make a few "observations"
+
+  1. Females are charged more
+  2. Charges are region specific 
+
+**Looking at the Outliers**
+
+In [6]:
+
+    
+    
+    suppressMessages(print(
+        insure %>% 
+    filter(charges>=30000) %>% 
+    ggpairs(columns=c(1,6,7),aes(fill=sex))+
+    labs(title="Correlation between age and charges for Outliers")+
+    theme(plot.title=element_text(hjust=0.5,color="navy")) 
+    ))
+    
+
+![](__results___files/__results___14_0.png)
+
+**The above plot suggests a fairly low correlation between age and charges for
+our outliers. What about such factors as bmi and smoking?**
+
+In [7]:
+
+    
+    
+    suppressMessages(print(
+    insure %>% 
+    filter(charges>=30000) %>% 
+        select_if(is.numeric) %>% 
+    ggcorr(low = "magenta", mid = "goldenrod", high = "navy",label=T,
+           label_color="whitesmoke")+
+    labs(title="Correlation Plot for Numeric Data")+
+    theme(plot.title=element_text(hjust=0.5,color="navy")) 
+    )
+    )
+    
+
+![](__results___files/__results___16_0.png)
+
+What about correlation for the entire data set?
+
+In [8]:
+
+    
+    
+    suppressMessages(print(
+    insure %>% 
+     select_if(is.numeric) %>% 
+    ggcorr(low = "magenta", mid = "goldenrod", high = "navy",label=T,
+           label_color="gray4",palette="RdBu")+
+    labs(title="Correlation Plot for Numeric Data")+
+    theme(plot.title=element_text(hjust=0.5,color="navy")) 
+    )
+    )
+    
+
+![](__results___files/__results___18_0.png)
+
+Again, we see a very low correlation for these outliers and also for the
+entire data set although there seems to be a pretty strong correlation between
+charges and bmi and charges and age . Could we safely remove these from
+analysis?! Let's first take "zoom in" on the data for the North Eastern region
+
+What about Correlation based on Age and Smoking?
+
+In [9]:
+
+    
+    
+    shh(print(insure %>% 
+    select(smoker,charges,age) %>% 
+    ggpairs(aes(col=smoker))))
+    
+
+![](__results___files/__results___21_0.png)
+
+The idea is that the charge distribution is such that there are higher charges
+for smokers than non-smokers.
+
+There appears to be a linear trend in the data. We can see that for the
+charges below 20,000;there is a strong linear correlation between charges and
+age. There is one outlier in this data. Let's take a look at what's special
+about this person.
+
+In [10]:
+
+    
+    
+    insure %>% 
+    filter(charges>=50000)
+    
+
+age| sex| bmi| children| smoker| region| charges| Agegroup  
+---|---|---|---|---|---|---|---  
+28 | M | 36.400 | 1 | Y | SW | 51194.56| Youth   
+54 | F | 47.410 | 0 | Y | SE | 63770.43| Old   
+31 | F | 38.095 | 1 | Y | NE | 58571.07| Youth   
+33 | F | 35.530 | 0 | Y | NW | 55135.40| Youth   
+60 | M | 32.800 | 0 | Y | SW | 52590.83| Old   
+52 | M | 34.485 | 3 | Y | NW | 60021.40| Old   
+45 | M | 30.360 | 0 | Y | SE | 62592.87| Mid Aged  
+  
+Surprisingly(or not!), the outliers are young people with between 0 and 3
+children. Since BMI is not a true indicator of health from a scientific point
+of view but we are rather interested in the adiposity, I'll decide not to take
+this into account. They all have one thinng in common: They're all smokers. We
+can therefore argue for smoking as having the greatest influence on charges
+especially considering the most charged individual is of mid age with an
+almost normal BMI and no children!!! For this kernel, I'll not isolate them in
+the modeling but it is interesting to note.
+
+**Set Up Models**
+
+In [11]:
+
+    
+    
+    #Divide the dataset into a training and validation set for some machine learning predictions
+     trainds<-createDataPartition(insure$Agegroup,p=0.8,list=F)
+     validate<-insure[-trainds,] 
+     trainds<-insure[trainds,]  
+    #Set metric and control
+     control<-trainControl(method="cv",number=10)
+     metric<-"RMSE" 
+     #Set up models 
+     set.seed(233)
+     fit.knn<-train(charges~.,data=trainds,method="knn",trControl=control,metric=metric) 
+     set.seed(233)
+     fit.svm<-train(charges~.,data=trainds,method="svmRadial",trControl=control,metric=metric) 
+     set.seed(233)
+     fit.gbm<-train(charges~.,data=trainds,method="gbm",trControl=control,metric=metric,
+                   verbose=F) 
+     set.seed(233)
+     fit.xgb<-train(charges~.,data=trainds,method="xgbTree",trControl=control,metric=metric,
+                   verbose=F) 
+    set.seed(233) 
+    fit.rf<-train(charges~.,data=trainds,method="xgbTree",trControl=control,metric=metric,
+                   verbose=F) 
+    results<-resamples(list(knn=fit.knn,svm=fit.svm,xgb=fit.xgb,gbm=fit.gbm,rf=fit.rf))
+    
+
+Visualize model "Accuracies"
+
+In [12]:
+
+    
+    
+    dotplot(results,main="Model Training Results")
+    
+
+![](__results___files/__results___29_1.png)
+
+We see that the best model is the xgboost model. We therefore print the
+model(s) to find the one which works best.
+
+**Model Details**
+
+**Gradient Boosting: Model Details**
+
+In [13]:
+
+    
+    
+    getTrainPerf(fit.gbm)
+    
+
+TrainRMSE| TrainRsquared| TrainMAE| method  
+---|---|---|---  
+4436.483 | 0.8570243| 2510.103 | gbm   
+  
+**XGBoost model details**
+
+In [14]:
+
+    
+    
+    getTrainPerf(fit.xgb)
+    
+
+TrainRMSE| TrainRsquared| TrainMAE| method  
+---|---|---|---  
+4430.422 | 0.8563545| 2507.025 | xgbTree   
+  
+**Support Vector Machine Model Details**
+
+In [15]:
+
+    
+    
+    getTrainPerf(fit.svm)
+    
+
+TrainRMSE| TrainRsquared| TrainMAE| method  
+---|---|---|---  
+4695.956 | 0.8425873| 2511.4 | svmRadial  
+  
+**RandomForest Model Details and Feature Importance**
+
+In [16]:
+
+    
+    
+    getTrainPerf(fit.rf)
+    
+
+TrainRMSE| TrainRsquared| TrainMAE| method  
+---|---|---|---  
+4430.422 | 0.8563545| 2507.025 | xgbTree   
+  
+In [17]:
+
+    
+    
+    plot(varImp(fit.rf),main="Model Feature Importance-Random Forest")
+    
+
+![](__results___files/__results___40_1.png)
+
+We can see that the most important feature is whether a person smokes. As
+expected, the BMI and Age are also high up in the feature importance hierachy
+possibly due to the high correlation with disease states. Think lung cancer,
+diabetes, Alzheimer's and hypertension.
+
+We see that the XGB algorithm has an R squared of 0.86 and so does the GBM.
+The SVM does not do so bad at 0.82. I'll choose the GBM as I love it(for
+practice purposes).
+
+**How does our model do on unseen data?**
+
+**Validation** For purposes of this tutorial, I'll only execute one moedl(my
+favorite) model to see how well it does.
+
+In [18]:
+
+    
+    
+    #Choose the GBM  model
+     predicted<-predict(fit.gbm,validate)
+    plot(fit.gbm,main="GBM")
+    
+
+![](__results___files/__results___45_1.png)
+
+In [19]:
+
+    
+    
+    require(Metrics)#Credit to user Kostas Voul
+    test_perf<-rmse(validate$charges,predicted) 
+    paste0("RSE is ",rse(validate$charges,predicted))
+    paste0("RMSE is ",test_perf)
+    
+    
+    
+    Loading required package: Metrics
+    
+    Attaching package: âMetricsâ
+    
+    The following objects are masked from âpackage:caretâ:
+    
+        precision, recall
+    
+    
+
+'RSE is 0.150112348351805'
+
+'RMSE is 4818.29539730109'
+
+**We see that our model does a pretty good job on our "unseen" data.**
+
+We can could go on to tune our parameters until we get a better model or
+remove the outliers and use only the most important features. For purposes of
+this kernel, I will not do parameter tuning as this is basically just a
+workflow.
+
+Future Steps and Lessons:
+
+  1. I was able to successfully update this kernel with the right parameters.
+  2. Improve our models via tuning.
+  3. Validate on Test Data set 
+  4. Build a model on the most important features **Thank You for viewing and let me know if it helped. You can upvote as it keeps most of us going. Thank You!**
+

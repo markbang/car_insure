@@ -1,0 +1,541 @@
+In [1]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/insurance-premium-prediction/insurance.csv
+    
+
+In [2]:
+
+    
+    
+    !pip install sklearn
+    import sklearn
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import mean_squared_error
+    
+    
+    
+    Requirement already satisfied: sklearn in /opt/conda/lib/python3.7/site-packages (0.0)
+    
+    Requirement already satisfied: scikit-learn in /opt/conda/lib/python3.7/site-packages (from sklearn) (0.23.2)
+    
+    Requirement already satisfied: numpy>=1.13.3 in /opt/conda/lib/python3.7/site-packages (from scikit-learn->sklearn) (1.19.5)
+    
+    Requirement already satisfied: joblib>=0.11 in /opt/conda/lib/python3.7/site-packages (from scikit-learn->sklearn) (1.0.1)
+    
+    Requirement already satisfied: threadpoolctl>=2.0.0 in /opt/conda/lib/python3.7/site-packages (from scikit-learn->sklearn) (2.1.0)
+    
+    Requirement already satisfied: scipy>=0.19.1 in /opt/conda/lib/python3.7/site-packages (from scikit-learn->sklearn) (1.6.3)
+    
+    WARNING: Running pip as root will break packages and permissions. You should install packages reliably by using venv: https://pip.pypa.io/warnings/venv
+    
+    
+
+In [3]:
+
+    
+    
+    df = pd.read_csv('/kaggle/input/insurance-premium-prediction/insurance.csv')
+    
+
+In [4]:
+
+    
+    
+    df
+    
+
+Out[4]:
+
+| age | sex | bmi | children | smoker | region | expenses  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.9 | 0 | yes | southwest | 16884.92  
+1 | 18 | male | 33.8 | 1 | no | southeast | 1725.55  
+2 | 28 | male | 33.0 | 3 | no | southeast | 4449.46  
+3 | 33 | male | 22.7 | 0 | no | northwest | 21984.47  
+4 | 32 | male | 28.9 | 0 | no | northwest | 3866.86  
+... | ... | ... | ... | ... | ... | ... | ...  
+1333 | 50 | male | 31.0 | 3 | no | northwest | 10600.55  
+1334 | 18 | female | 31.9 | 0 | no | northeast | 2205.98  
+1335 | 18 | female | 36.9 | 0 | no | southeast | 1629.83  
+1336 | 21 | female | 25.8 | 0 | no | southwest | 2007.95  
+1337 | 61 | female | 29.1 | 0 | yes | northwest | 29141.36  
+  
+1338 rows Ã 7 columns
+
+In [ ]:
+
+    
+    
+     
+    
+
+In [5]:
+
+    
+    
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    plt.subplot(1,1,1)
+    sns.countplot(x='sex',data=df)
+    #plt.subplot(1,2,2)
+    #sns.scatterplot(data=df, x="expenses", y="gender")
+    
+
+Out[5]:
+
+    
+    
+    <AxesSubplot:xlabel='sex', ylabel='count'>
+
+![](__results___files/__results___5_1.png)
+
+We have almost similar counts of males and females in our dataset
+
+In [6]:
+
+    
+    
+    f = plt.figure(figsize=(10,3))
+    f.add_subplot(121)
+    sns.countplot(x='children',data=df)
+    f.add_subplot(122)
+    sns.scatterplot(data=df, x="expenses", y="children")
+    
+
+Out[6]:
+
+    
+    
+    <AxesSubplot:xlabel='expenses', ylabel='children'>
+
+![](__results___files/__results___7_1.png)
+
+The number of persons having more than 3 children is comparatively lesser than
+those have less than 3 children, no trend is being observed that people with
+lesser children have lesser medical expense
+
+In [7]:
+
+    
+    
+    f = plt.figure(figsize=(10,3))
+    f.add_subplot(121)
+    sns.countplot(x='smoker',data=df)
+    f.add_subplot(122)
+    sns.scatterplot(data=df, x="expenses", y="smoker")
+    
+
+Out[7]:
+
+    
+    
+    <AxesSubplot:xlabel='expenses', ylabel='smoker'>
+
+![](__results___files/__results___9_1.png)
+
+Even though the data has way more number of non smokers than the number of
+smokers, it is observed that smokers have higher medical expenses, this
+feature would definitely be useful while predicting premium.
+
+In [8]:
+
+    
+    
+    sns.countplot(x='region',data=df)
+    
+
+Out[8]:
+
+    
+    
+    <AxesSubplot:xlabel='region', ylabel='count'>
+
+![](__results___files/__results___11_1.png)
+
+In [9]:
+
+    
+    
+    sns.scatterplot(data=df, x="expenses", y="region")
+    
+
+Out[9]:
+
+    
+    
+    <AxesSubplot:xlabel='expenses', ylabel='region'>
+
+![](__results___files/__results___12_1.png)
+
+The dataset has almost same number of people for each region, No trend can be
+established between different regions and expenses.
+
+In [10]:
+
+    
+    
+    f = plt.figure(figsize=(10,3))
+    f.add_subplot(121)
+    sns.lineplot(x='age',y='expenses',data=df)
+    f.add_subplot(122)
+    sns.lineplot(x='bmi',y='expenses',data=df)
+    
+
+Out[10]:
+
+    
+    
+    <AxesSubplot:xlabel='bmi', ylabel='expenses'>
+
+![](__results___files/__results___14_1.png)
+
+The trend above shows that medical expenses are lower with lesser age
+
+In [11]:
+
+    
+    
+    sns.lineplot(x='bmi',y='expenses',data=df)
+    
+
+Out[11]:
+
+    
+    
+    <AxesSubplot:xlabel='bmi', ylabel='expenses'>
+
+![](__results___files/__results___16_1.png)
+
+No particular trend can be established between bmi and expenses
+
+In [12]:
+
+    
+    
+    from sklearn.preprocessing import LabelEncoder
+    label = LabelEncoder()
+    df.iloc[:,1] = label.fit_transform(df.iloc[:,1])
+    df.iloc[:,5] = label.fit_transform(df.iloc[:,5])
+    df.iloc[:,4] = label.fit_transform(df.iloc[:,4])
+    
+
+In [13]:
+
+    
+    
+    import matplotlib.pyplot as plt
+    corr = df.corr()
+    # Generate a mask for the upper triangle
+    mask = np.triu(np.ones_like(corr, dtype=bool))
+    # Set up the matplotlib figure
+    f, ax = plt.subplots(figsize=(11, 9))
+    # Generate a custom diverging colormap
+    cmap = sns.diverging_palette(230, 20, as_cmap=True)
+    
+    # Draw the heatmap with the mask and correct aspect ratio
+    sns.heatmap(corr, mask=mask, cmap=cmap, vmax=.3, center=0,
+                square=True, linewidths=.5, cbar_kws={"shrink": .5})
+    
+
+Out[13]:
+
+    
+    
+    <AxesSubplot:>
+
+![](__results___files/__results___19_1.png)
+
+The highest correlation can be observed between expenses and age; smoker and
+age BMI and expenses display a good correlation too. Let us further use these
+to see how they perform to predict medical expenses.
+
+In [14]:
+
+    
+    
+    sns.pairplot(df)
+    
+
+Out[14]:
+
+    
+    
+    <seaborn.axisgrid.PairGrid at 0x7f3a12578f50>
+
+![](__results___files/__results___21_1.png)
+
+In [15]:
+
+    
+    
+    X = df[['bmi','age','smoker','children']]
+    Y = df['expenses']
+    
+
+In [16]:
+
+    
+    
+    X_train,X_test,y_train,y_test = sklearn.model_selection.train_test_split(X,Y,test_size=0.25)
+    
+
+In [17]:
+
+    
+    
+    from sklearn.tree import DecisionTreeRegressor
+    from sklearn.model_selection import cross_val_score
+    regressor = DecisionTreeRegressor(random_state=0)
+    #cross_val_score(regressor, X_train, y_train, cv=10)
+    regressor.fit(X_train, y_train)
+    y_predict = regressor.predict(X_test)
+    mse_dt = mean_squared_error(y_test,y_predict,squared=False)
+    print(mse_dt)
+    
+    
+    
+    6900.60117589873
+    
+
+In [18]:
+
+    
+    
+    from sklearn.linear_model import LinearRegression
+    regressor = LinearRegression()
+    #cross_val_score(regressor, X_train, y_train, cv=10)
+    regressor.fit(X_train, y_train)
+    y_predict = regressor.predict(X_test)
+    mse_dt = mean_squared_error(y_test,y_predict,squared=False)
+    print(mse_dt)
+    
+    
+    
+    5908.41334052373
+    
+
+In [19]:
+
+    
+    
+    import pickle
+    pickle.dump(regressor, open('model.pkl','wb'))
+    
+    model = pickle.load(open('model.pkl','rb'))
+    
+
+In [20]:
+
+    
+    
+    !pip install gradio
+    import gradio as gr
+    
+    def greet(bmi,age,smoker,children):
+        if smoker:
+            is_smoker = 1
+        else: 
+            is_smoker = 0
+        X_test = pd.DataFrame.from_dict({'bmi':[bmi],'age':[age],'smoker':[is_smoker],'children':[children]}) 
+        print(X_test)
+        y_predict = regressor.predict(X_test)
+        print(y_predict)
+        return y_predict[0]     
+    
+    iface = gr.Interface(
+      fn=greet, 
+      inputs=['text','text','checkbox','text'], 
+      outputs="number")
+    iface.launch(share=True)
+    
+    
+    
+    Collecting gradio
+    
+      Downloading gradio-2.2.8-py3-none-any.whl (2.2 MB)
+    
+         |ââââââââââââââââââââââââââââââââ| 2.2 MB 2.0 MB/s 
+    
+    Requirement already satisfied: requests in /opt/conda/lib/python3.7/site-packages (from gradio) (2.25.1)
+    
+    Requirement already satisfied: Flask>=1.1.1 in /opt/conda/lib/python3.7/site-packages (from gradio) (2.0.1)
+    
+    Collecting paramiko
+    
+      Downloading paramiko-2.7.2-py2.py3-none-any.whl (206 kB)
+    
+         |ââââââââââââââââââââââââââââââââ| 206 kB 68.8 MB/s 
+    
+    Requirement already satisfied: numpy in /opt/conda/lib/python3.7/site-packages (from gradio) (1.19.5)
+    
+    Collecting Flask-Login
+    
+      Downloading Flask_Login-0.5.0-py2.py3-none-any.whl (16 kB)
+    
+    Requirement already satisfied: scipy in /opt/conda/lib/python3.7/site-packages (from gradio) (1.6.3)
+    
+    Collecting ffmpy
+    
+      Downloading ffmpy-0.3.0.tar.gz (4.8 kB)
+    
+    Collecting flask-cachebuster
+    
+      Downloading Flask-CacheBuster-1.0.0.tar.gz (3.1 kB)
+    
+    Requirement already satisfied: pillow in /opt/conda/lib/python3.7/site-packages (from gradio) (8.2.0)
+    
+    Collecting Flask-Cors>=3.0.8
+    
+      Downloading Flask_Cors-3.0.10-py2.py3-none-any.whl (14 kB)
+    
+    Collecting analytics-python
+    
+      Downloading analytics_python-1.4.0-py2.py3-none-any.whl (15 kB)
+    
+    Collecting pycryptodome
+    
+      Downloading pycryptodome-3.10.1-cp35-abi3-manylinux2010_x86_64.whl (1.9 MB)
+    
+         |ââââââââââââââââââââââââââââââââ| 1.9 MB 28.3 MB/s 
+    
+    Collecting markdown2
+    
+      Downloading markdown2-2.4.0-py2.py3-none-any.whl (34 kB)
+    
+    Requirement already satisfied: matplotlib in /opt/conda/lib/python3.7/site-packages (from gradio) (3.4.2)
+    
+    Requirement already satisfied: pandas in /opt/conda/lib/python3.7/site-packages (from gradio) (1.2.4)
+    
+    Requirement already satisfied: click>=7.1.2 in /opt/conda/lib/python3.7/site-packages (from Flask>=1.1.1->gradio) (7.1.2)
+    
+    Requirement already satisfied: Jinja2>=3.0 in /opt/conda/lib/python3.7/site-packages (from Flask>=1.1.1->gradio) (3.0.1)
+    
+    Requirement already satisfied: itsdangerous>=2.0 in /opt/conda/lib/python3.7/site-packages (from Flask>=1.1.1->gradio) (2.0.1)
+    
+    Requirement already satisfied: Werkzeug>=2.0 in /opt/conda/lib/python3.7/site-packages (from Flask>=1.1.1->gradio) (2.0.1)
+    
+    Requirement already satisfied: Six in /opt/conda/lib/python3.7/site-packages (from Flask-Cors>=3.0.8->gradio) (1.15.0)
+    
+    Requirement already satisfied: MarkupSafe>=2.0 in /opt/conda/lib/python3.7/site-packages (from Jinja2>=3.0->Flask>=1.1.1->gradio) (2.0.1)
+    
+    Requirement already satisfied: python-dateutil>2.1 in /opt/conda/lib/python3.7/site-packages (from analytics-python->gradio) (2.8.1)
+    
+    Collecting monotonic>=1.5
+    
+      Downloading monotonic-1.6-py2.py3-none-any.whl (8.2 kB)
+    
+    Collecting backoff==1.10.0
+    
+      Downloading backoff-1.10.0-py2.py3-none-any.whl (31 kB)
+    
+    Requirement already satisfied: certifi>=2017.4.17 in /opt/conda/lib/python3.7/site-packages (from requests->gradio) (2021.5.30)
+    
+    Requirement already satisfied: urllib3<1.27,>=1.21.1 in /opt/conda/lib/python3.7/site-packages (from requests->gradio) (1.26.5)
+    
+    Requirement already satisfied: chardet<5,>=3.0.2 in /opt/conda/lib/python3.7/site-packages (from requests->gradio) (4.0.0)
+    
+    Requirement already satisfied: idna<3,>=2.5 in /opt/conda/lib/python3.7/site-packages (from requests->gradio) (2.10)
+    
+    Requirement already satisfied: kiwisolver>=1.0.1 in /opt/conda/lib/python3.7/site-packages (from matplotlib->gradio) (1.3.1)
+    
+    Requirement already satisfied: pyparsing>=2.2.1 in /opt/conda/lib/python3.7/site-packages (from matplotlib->gradio) (2.4.7)
+    
+    Requirement already satisfied: cycler>=0.10 in /opt/conda/lib/python3.7/site-packages (from matplotlib->gradio) (0.10.0)
+    
+    Requirement already satisfied: pytz>=2017.3 in /opt/conda/lib/python3.7/site-packages (from pandas->gradio) (2021.1)
+    
+    Requirement already satisfied: cryptography>=2.5 in /opt/conda/lib/python3.7/site-packages (from paramiko->gradio) (3.4.7)
+    
+    Collecting bcrypt>=3.1.3
+    
+      Downloading bcrypt-3.2.0-cp36-abi3-manylinux2010_x86_64.whl (63 kB)
+    
+         |ââââââââââââââââââââââââââââââââ| 63 kB 2.3 MB/s 
+    
+    Collecting pynacl>=1.0.1
+    
+      Downloading PyNaCl-1.4.0-cp35-abi3-manylinux1_x86_64.whl (961 kB)
+    
+         |ââââââââââââââââââââââââââââââââ| 961 kB 68.2 MB/s 
+    
+    Requirement already satisfied: cffi>=1.1 in /opt/conda/lib/python3.7/site-packages (from bcrypt>=3.1.3->paramiko->gradio) (1.14.5)
+    
+    Requirement already satisfied: pycparser in /opt/conda/lib/python3.7/site-packages (from cffi>=1.1->bcrypt>=3.1.3->paramiko->gradio) (2.20)
+    
+    Building wheels for collected packages: ffmpy, flask-cachebuster
+    
+      Building wheel for ffmpy (setup.py) ... - \ done
+    
+      Created wheel for ffmpy: filename=ffmpy-0.3.0-py3-none-any.whl size=4709 sha256=1bbc55f7cc9b9692cd429f00e65b2ef05abe063bd147cb2a4d30d169263a033d
+    
+      Stored in directory: /root/.cache/pip/wheels/13/e4/6c/e8059816e86796a597c6e6b0d4c880630f51a1fcfa0befd5e6
+    
+      Building wheel for flask-cachebuster (setup.py) ... - \ done
+    
+      Created wheel for flask-cachebuster: filename=Flask_CacheBuster-1.0.0-py3-none-any.whl size=3372 sha256=106b007a0ca9da572ec6019505256119c6191991dca67eba5ed6229ac5f30701
+    
+      Stored in directory: /root/.cache/pip/wheels/28/c0/c4/44687421dab41455be93112bd1b0dee1f3c5a9aa27bee63708
+    
+    Successfully built ffmpy flask-cachebuster
+    
+    Installing collected packages: pynacl, monotonic, bcrypt, backoff, pycryptodome, paramiko, markdown2, Flask-Login, Flask-Cors, flask-cachebuster, ffmpy, analytics-python, gradio
+    
+    Successfully installed Flask-Cors-3.0.10 Flask-Login-0.5.0 analytics-python-1.4.0 backoff-1.10.0 bcrypt-3.2.0 ffmpy-0.3.0 flask-cachebuster-1.0.0 gradio-2.2.8 markdown2-2.4.0 monotonic-1.6 paramiko-2.7.2 pycryptodome-3.10.1 pynacl-1.4.0
+    
+    WARNING: Running pip as root will break packages and permissions. You should install packages reliably by using venv: https://pip.pypa.io/warnings/venv
+    
+    Running locally at: http://127.0.0.1:7860/
+    This share link will expire in 24 hours. If you need a permanent link, visit: https://gradio.app/introducing-hosted (NEW!)
+    Running on External URL: https://38401.gradio.app
+    Interface loading below...
+    
+
+Out[20]:
+
+    
+    
+    (<Flask 'gradio.networking'>,
+     'http://127.0.0.1:7860/',
+     'https://38401.gradio.app')
+
+In [21]:
+
+    
+    
+    greet(23,23,1,4)
+    
+    
+    
+       bmi  age  smoker  children
+    0   23   23       1         4
+    [26511.76578844]
+    
+
+Out[21]:
+
+    
+    
+    26511.765788438977
+

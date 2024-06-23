@@ -1,0 +1,764 @@
+In [2]:
+
+    
+    
+    #importing necessary libraries
+    import numpy as np
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    from sklearn.preprocessing import LabelEncoder #for feature engineering 
+    from sklearn.model_selection import train_test_split
+    from sklearn.linear_model import LinearRegression
+    from sklearn.tree import DecisionTreeRegressor
+    from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor 
+    from sklearn.metrics import mean_squared_error, mean_absolute_error # forâ£evaluating ml models
+    
+
+**Dataset**
+
+In [3]:
+
+    
+    
+    #loading the dataset
+    df=pd.read_csv("/kaggle/input/ushealthinsurancedataset/insurance.csv")
+    df
+    
+
+Out[3]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+... | ... | ... | ... | ... | ... | ... | ...  
+1333 | 50 | male | 30.970 | 3 | no | northwest | 10600.54830  
+1334 | 18 | female | 31.920 | 0 | no | northeast | 2205.98080  
+1335 | 18 | female | 36.850 | 0 | no | southeast | 1629.83350  
+1336 | 21 | female | 25.800 | 0 | no | southwest | 2007.94500  
+1337 | 61 | female | 29.070 | 0 | yes | northwest | 29141.36030  
+  
+1338 rows Ã 7 columns
+
+In [4]:
+
+    
+    
+    #first 5 rows
+    df.head()
+    
+
+Out[4]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+  
+In [5]:
+
+    
+    
+    #last 5 rows
+    df.tail()
+    
+
+Out[5]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+1333 | 50 | male | 30.97 | 3 | no | northwest | 10600.5483  
+1334 | 18 | female | 31.92 | 0 | no | northeast | 2205.9808  
+1335 | 18 | female | 36.85 | 0 | no | southeast | 1629.8335  
+1336 | 21 | female | 25.80 | 0 | no | southwest | 2007.9450  
+1337 | 61 | female | 29.07 | 0 | yes | northwest | 29141.3603  
+  
+In [6]:
+
+    
+    
+    # checking the data types and null values
+    df.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 1338 entries, 0 to 1337
+    Data columns (total 7 columns):
+     #   Column    Non-Null Count  Dtype  
+    ---  ------    --------------  -----  
+     0   age       1338 non-null   int64  
+     1   sex       1338 non-null   object 
+     2   bmi       1338 non-null   float64
+     3   children  1338 non-null   int64  
+     4   smoker    1338 non-null   object 
+     5   region    1338 non-null   object 
+     6   charges   1338 non-null   float64
+    dtypes: float64(2), int64(2), object(3)
+    memory usage: 73.3+ KB
+    
+
+In [7]:
+
+    
+    
+    # checking unique values
+    df.nunique()
+    
+
+Out[7]:
+
+    
+    
+    age           47
+    sex            2
+    bmi          548
+    children       6
+    smoker         2
+    region         4
+    charges     1337
+    dtype: int64
+
+In [8]:
+
+    
+    
+    # checking duplicate values
+    df.duplicated().value_counts()
+    
+
+Out[8]:
+
+    
+    
+    False    1337
+    True        1
+    Name: count, dtype: int64
+
+In [9]:
+
+    
+    
+    # droping duplicate values
+    df.drop_duplicates(inplace=True)
+    
+
+In [10]:
+
+    
+    
+    # rows, columns
+    df.shape
+    
+
+Out[10]:
+
+    
+    
+    (1337, 7)
+
+In [11]:
+
+    
+    
+    #rows*columns
+    df.size
+    
+
+Out[11]:
+
+    
+    
+    9359
+
+**Exploratory Data Analysis**
+
+Check for outliers
+
+In [12]:
+
+    
+    
+    # Visualize box plots for numerical columns 
+    df.boxplot(column=['age', 'bmi', 'children', 'charges']) 
+    plt.title('Box plot of Numerical Columns')
+    plt.show()
+    
+
+![](__results___files/__results___12_0.png)
+
+In [13]:
+
+    
+    
+    # Handling outliers
+    # Remove outliers based on a specific threshold
+    df_cleaned = df[(df['charges'] < 21000) & (df['bmi'] < 46)]
+    
+
+In [14]:
+
+    
+    
+    # visualize boxplot after removing outliers
+    df_cleaned.boxplot(column=['age', 'bmi', 'children', 'charges'])
+    plt.title('Box plot of Numerical Columns')
+    plt.show()
+    
+
+![](__results___files/__results___14_0.png)
+
+In [15]:
+
+    
+    
+    # Get summary statistics
+    df_cleaned.describe()
+    
+
+Out[15]:
+
+| age | bmi | children | charges  
+---|---|---|---|---  
+count | 1068.000000 | 1068.000000 | 1068.000000 | 1068.000000  
+mean | 38.371723 | 30.091910 | 1.076779 | 8159.150438  
+std | 13.943164 | 5.856569 | 1.221375 | 4929.643963  
+min | 18.000000 | 15.960000 | 0.000000 | 1121.873900  
+25% | 26.000000 | 25.840000 | 0.000000 | 4038.478863  
+50% | 38.000000 | 29.830000 | 1.000000 | 7441.277000  
+75% | 50.000000 | 33.933750 | 2.000000 | 11539.380487  
+max | 64.000000 | 45.900000 | 5.000000 | 20984.093600  
+  
+In [16]:
+
+    
+    
+    # Calculate the total charges by region
+    charges_by_region = df_cleaned.groupby('region')['charges'].sum()
+    
+    # Create a bar chart
+    plt.bar(charges_by_region.index, charges_by_region.values, color='grey')
+    
+    # Add labels and title
+    plt.xlabel('Region')
+    
+    plt.ylabel('Total Charges')
+    plt.title('Total Charges by Region')
+    
+    # Rotate x-axis labels for better visibility (optional)
+    plt.xticks(rotation=45)
+    
+    # Display the chart
+    plt.show()
+    
+
+![](__results___files/__results___16_0.png)
+
+In [17]:
+
+    
+    
+    smokers_by_region = df_cleaned.groupby('region')['smoker'].value_counts().unstack().fillna(0)
+    smokers_by_region.plot(kind='barh')
+    plt.xlabel('Count')
+    plt.ylabel('Region')
+    plt.title('Count of Smokers by Region')
+    plt.legend(title='Smoker', loc='upper right')
+    plt.show()
+    
+
+![](__results___files/__results___17_0.png)
+
+In [18]:
+
+    
+    
+    smoker_counts = df_cleaned['smoker'].value_counts() 
+    plt.pie(smoker_counts, labels=smoker_counts.index, autopct='%1.1f%%') 
+    plt.title('Distribution of Smokers')
+    plt.show()
+    
+
+![](__results___files/__results___18_0.png)
+
+In [19]:
+
+    
+    
+    sns.violinplot(x=df_cleaned['children'], y=df_cleaned['charges'])
+    
+    plt.xlabel('Number of Children')
+    plt.ylabel('Charges')
+    
+    plt.title('Charges by Number of Children')
+    plt.show()
+    
+
+![](__results___files/__results___19_0.png)
+
+In [20]:
+
+    
+    
+    sns.countplot(x='sex', data=df_cleaned)
+    plt.xlabel('Sex')
+    plt.ylabel('Count')
+    plt.title('Distribution of Sex')
+    plt.show()
+    
+
+![](__results___files/__results___20_0.png)
+
+In [21]:
+
+    
+    
+    # distribution of age using histogram
+    df_cleaned['age'].plot(kind='hist', bins=20)
+    
+    plt.xlabel('Age')
+    plt.title('Distribution of Age')
+    
+    plt.show()
+    
+
+![](__results___files/__results___21_0.png)
+
+In [22]:
+
+    
+    
+    # distribution of BMI using histogram
+    df_cleaned['bmi'].plot(kind='hist', bins=20, color='r')
+    plt.xlabel('BMI')
+    plt.title('Distribution of BMI')
+    plt.show()
+    
+
+![](__results___files/__results___22_0.png)
+
+In [23]:
+
+    
+    
+    # relationship between age and charges using scatterplot
+    df_cleaned.plot(kind='scatter', x='age', y='charges', color='g')
+    plt.xlabel('Age')
+    plt.ylabel('Charges')
+    plt.title('Relationship between Age and Charges')
+    plt.show()
+    
+
+![](__results___files/__results___23_0.png)
+
+There is a linearly increasing relationship between age and insurance charges.
+Older people are tend to be charged more
+
+In [24]:
+
+    
+    
+    # charges distribution for smokers vs non-smokers using boxplot
+    df_cleaned.boxplot(column='charges', by='smoker')
+    plt.xlabel('Smoker')
+    plt.ylabel('Charges')
+    plt.title('Charges Distribution for Smokers and Non-Smokers')
+    plt.show()
+    
+
+![](__results___files/__results___25_0.png)
+
+Unsurprisingly, smokers are charged way higher than non-smokers
+
+**Feature Engineering**
+
+Creating new feature such as Age groups
+
+In [25]:
+
+    
+    
+    df_cleaned['age_group'] = pd.cut(df_cleaned['age'], bins=[0, 25, 40, 60, df_cleaned['age'].max()], labels=['Young', 'Adult', 'Middle-aged', 'Senior'])
+    df_cleaned.sample(5)
+    
+    
+    
+    /tmp/ipykernel_32/3710811165.py:1: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame.
+    Try using .loc[row_indexer,col_indexer] = value instead
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+      df_cleaned['age_group'] = pd.cut(df_cleaned['age'], bins=[0, 25, 40, 60, df_cleaned['age'].max()], labels=['Young', 'Adult', 'Middle-aged', 'Senior'])
+    
+
+Out[25]:
+
+| age | sex | bmi | children | smoker | region | charges | age_group  
+---|---|---|---|---|---|---|---|---  
+824 | 60 | male | 24.320 | 0 | no | northwest | 12523.60480 | Middle-aged  
+1316 | 19 | female | 20.600 | 0 | no | southwest | 1731.67700 | Young  
+548 | 25 | female | 28.595 | 0 | no | northeast | 3213.62205 | Young  
+334 | 43 | female | 35.720 | 2 | no | northeast | 19144.57652 | Middle-aged  
+462 | 62 | female | 38.095 | 2 | no | northeast | 15230.32405 | Senior  
+  
+**Feature encoding** \- Handling categorical variables
+
+One-hot encoding for the 'region' column
+
+In [26]:
+
+    
+    
+    df_encoded = pd.get_dummies(df_cleaned, columns=['region'], prefix='region', dtype=int)
+    df_encoded.sample(5)
+    
+
+Out[26]:
+
+| age | sex | bmi | children | smoker | charges | age_group | region_northeast | region_northwest | region_southeast | region_southwest  
+---|---|---|---|---|---|---|---|---|---|---|---  
+10 | 25 | male | 26.22 | 0 | no | 2721.3208 | Young | 1 | 0 | 0 | 0  
+985 | 44 | female | 25.80 | 1 | no | 7624.6300 | Middle-aged | 0 | 0 | 0 | 1  
+1335 | 18 | female | 36.85 | 0 | no | 1629.8335 | Young | 0 | 0 | 1 | 0  
+620 | 30 | male | 31.40 | 1 | no | 3659.3460 | Adult | 0 | 0 | 0 | 1  
+1119 | 30 | female | 19.95 | 3 | no | 5693.4305 | Adult | 0 | 1 | 0 | 0  
+  
+Label encoding for the 'smoker', 'sex' column
+
+In [27]:
+
+    
+    
+    label_encoder = LabelEncoder()
+    df_encoded['smoker_encoded'] = label_encoder.fit_transform(df_encoded['smoker'])
+    df_encoded.sample(5)
+    
+
+Out[27]:
+
+| age | sex | bmi | children | smoker | charges | age_group | region_northeast | region_northwest | region_southeast | region_southwest | smoker_encoded  
+---|---|---|---|---|---|---|---|---|---|---|---|---  
+785 | 35 | female | 27.700 | 3 | no | 6414.17800 | Adult | 0 | 0 | 0 | 1 | 0  
+453 | 20 | male | 29.735 | 0 | no | 1769.53165 | Young | 0 | 1 | 0 | 0 | 0  
+17 | 23 | male | 23.845 | 0 | no | 2395.17155 | Young | 1 | 0 | 0 | 0 | 0  
+1128 | 34 | male | 32.800 | 1 | no | 14358.36437 | Adult | 0 | 0 | 0 | 1 | 0  
+822 | 18 | female | 31.130 | 0 | no | 1621.88270 | Young | 0 | 0 | 1 | 0 | 0  
+  
+In [28]:
+
+    
+    
+    df_encoded['sex_encoded'] = label_encoder.fit_transform(df_encoded['sex'])
+    df_encoded.sample(5)
+    
+
+Out[28]:
+
+| age | sex | bmi | children | smoker | charges | age_group | region_northeast | region_northwest | region_southeast | region_southwest | smoker_encoded | sex_encoded  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+417 | 36 | female | 22.600 | 2 | yes | 18608.26200 | Adult | 0 | 0 | 0 | 1 | 1 | 0  
+249 | 29 | male | 28.975 | 1 | no | 4040.55825 | Adult | 1 | 0 | 0 | 0 | 0 | 1  
+834 | 36 | male | 33.820 | 1 | no | 5377.45780 | Adult | 0 | 1 | 0 | 0 | 0 | 1  
+79 | 41 | female | 32.965 | 0 | no | 6571.02435 | Middle-aged | 0 | 1 | 0 | 0 | 0 | 0  
+163 | 32 | female | 29.800 | 2 | no | 5152.13400 | Adult | 0 | 0 | 0 | 1 | 0 | 0  
+  
+In [29]:
+
+    
+    
+    df_encoded = df_encoded[[x for x in df_encoded.columns if x not in ['smoker', 'sex']]]
+    df_encoded.sample(5)
+    
+
+Out[29]:
+
+| age | bmi | children | charges | age_group | region_northeast | region_northwest | region_southeast | region_southwest | smoker_encoded | sex_encoded  
+---|---|---|---|---|---|---|---|---|---|---|---  
+389 | 24 | 30.21 | 3 | 4618.0799 | Young | 0 | 1 | 0 | 0 | 0 | 0  
+104 | 34 | 27.50 | 1 | 5003.8530 | Adult | 0 | 0 | 0 | 1 | 0 | 0  
+89 | 55 | 26.98 | 0 | 11082.5772 | Middle-aged | 0 | 1 | 0 | 0 | 0 | 0  
+1097 | 22 | 33.77 | 0 | 1674.6323 | Young | 0 | 0 | 1 | 0 | 0 | 1  
+527 | 51 | 25.80 | 1 | 9861.0250 | Middle-aged | 0 | 0 | 0 | 1 | 0 | 0  
+  
+**Correlation Analysis**
+
+In [30]:
+
+    
+    
+    numr_cols = [x for x in df_encoded.columns if x not in ['age_group']]
+    corr_matrix = df_encoded[numr_cols].corr()
+    
+    # Visualize correlation matrix
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(corr_matrix, annot=True, cmap="coolwarm") 
+    plt.title("Correlation Matrix")
+    plt.show()
+    
+    # Identify relevant features based on correlation
+    threshold = 0.3
+    relevant_features = corr_matrix[(corr_matrix['charges'].abs() > threshold) & (corr_matrix.index != 'charges')].index.tolist() 
+    print("Relevant features based on correlation:") 
+    print(relevant_features)
+    
+
+![](__results___files/__results___38_0.png)
+
+    
+    
+    Relevant features based on correlation:
+    ['age', 'smoker_encoded']
+    
+
+Only age and smoking turned out to be relevant feature based on correlation
+analysis
+
+**Modelling**
+
+In [31]:
+
+    
+    
+    # Select the relevant features
+    X = df_encoded[['age', 'smoker_encoded']]
+    y = df_encoded['charges']
+    
+    # Split the data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+
+In [32]:
+
+    
+    
+    # Decision Tree
+    dt_model = DecisionTreeRegressor()
+    dt_model.fit(X_train, y_train)
+    dt_predictions = dt_model.predict(X_test)
+    dt_mse = mean_squared_error(y_test, dt_predictions)
+    dt_mae = mean_absolute_error(y_test, dt_predictions)
+    
+    # Plot actual vs. predicted values for Decision Tree
+    plt.figure(figsize=(8, 4))
+    plt.scatter(y_test, dt_predictions, color='green', label='Decision Tree')
+    plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red', linestyle='--')
+    plt.title('Decision Tree: Actual vs. Predicted') 
+    plt.xlabel('Actual')
+    plt.ylabel('Predicted')
+    plt.legend()
+    plt.show()
+    
+    # Random Forest
+    rf_model = RandomForestRegressor()
+    rf_model.fit(X_train, y_train)
+    rf_predictions = rf_model.predict(X_test)
+    rf_mse = mean_squared_error(y_test, rf_predictions)
+    rf_mae = mean_absolute_error(y_test, rf_predictions)
+    
+    # Plot actual vs. predicted values for Random Forest
+    plt.figure(figsize=(8, 4))
+    plt.scatter(y_test, rf_predictions, color='orange', label='Random Forest')
+    plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red', linestyle='--')
+    plt.title('Random Forest: Actual vs. Predicted') 
+    plt.xlabel('Actual')
+    plt.ylabel('Predicted')
+    plt.legend()
+    plt.show()
+    
+    # Gradient Boosting
+    gb_model = GradientBoostingRegressor()
+    gb_model.fit(X_train, y_train)
+    gb_predictions = gb_model.predict(X_test)
+    gb_mse = mean_squared_error(y_test, gb_predictions)
+    gb_mae = mean_absolute_error(y_test, gb_predictions)
+    
+    # Plot actual vs. predicted values for Gradient Boosting
+    plt.figure(figsize=(8, 4))
+    plt.scatter(y_test, gb_predictions, color='purple', label='Gradient Boosting')
+    plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red', linestyle='--')
+    plt.title('Gradient Boosting: Actual vs. Predicted') 
+    plt.xlabel('Actual')
+    plt.ylabel('Predicted')
+    plt.legend()
+    plt.show()
+    
+
+![](__results___files/__results___42_0.png)
+
+![](__results___files/__results___42_1.png)
+
+![](__results___files/__results___42_2.png)
+
+In [33]:
+
+    
+    
+    # Print the evaluation metrics
+    print("Decision Tree - MSE: ", dt_mse)
+    print("Decision Tree - MAE: ", dt_mae)
+    print("Random Forest - MSE: ", rf_mse)
+    print("Random Forest - MAE: ", rf_mae)
+    print("Gradient Boosting - MSE: ", gb_mse)
+    print("Gradient Boosting - MAE: ", gb_mae)
+    
+    
+    
+    Decision Tree - MSE:  5728632.311218643
+    Decision Tree - MAE:  1275.0243094744608
+    Random Forest - MSE:  5679860.656198035
+    Random Forest - MAE:  1270.6541891171098
+    Gradient Boosting - MSE:  5620075.226137549
+    Gradient Boosting - MAE:  1234.973946903902
+    
+
+**Feature Importance**
+
+In [34]:
+
+    
+    
+    # Decision Tree
+    print("Decision Tree:")
+    
+    # Feature importances
+    importance = dt_model.feature_importances_ 
+    
+    for i, feature in enumerate(X.columns):
+        print(f"{feature}: {importance[i]}") 
+    
+    print()
+    
+    # Random Forest
+    print("Random Forest:")
+    
+    # Feature importances
+    importance = rf_model.feature_importances_
+    
+    for i, feature in enumerate(X.columns): 
+        print(f"{feature}: {importance[i]}")
+    
+    print()
+    
+    # Gradient Boosting
+    print("Gradient Boosting:")
+    
+    # Feature importances
+    importance = gb_model.feature_importances_ 
+    for i, feature in enumerate(X.columns):
+        print(f"{feature}: {importance[i]}")
+    
+    
+    
+    Decision Tree:
+    age: 0.6283321204573397
+    smoker_encoded: 0.3716678795426604
+    
+    Random Forest:
+    age: 0.6137278580525228
+    smoker_encoded: 0.3862721419474773
+    
+    Gradient Boosting:
+    age: 0.619925223587121
+    smoker_encoded: 0.380074776412879
+    
+
+Age has higher importance than smoking in all three models.
+
+**Inference on sample data**
+
+In [35]:
+
+    
+    
+    # Example input for prediction
+    new_data = pd.DataFrame({'age': [30], 'smoker_encoded': [1]})
+    
+    # Decision Tree
+    dt_predictions = dt_model.predict(new_data)
+    print("Decision Tree Predictions:", dt_predictions)
+    
+    # Random Forest
+    rf_predictions = rf_model.predict(new_data)
+    print("Random Forest Predictions:", rf_predictions)
+    
+    # Gradient Boosting
+    gb_predictions = gb_model.predict(new_data)
+    print("Gradient Boosting Predictions:", gb_predictions)
+    
+    
+    
+    Decision Tree Predictions: [19323.2621875]
+    Random Forest Predictions: [19329.91421542]
+    Gradient Boosting Predictions: [18919.38558574]
+    
+
+In [36]:
+
+    
+    
+    # Example input for prediction
+    new_data = pd.DataFrame({'age': [35], 'smoker_encoded': [0]}) # Gradient Boosting
+    gb_predictions = gb_model.predict(new_data)
+    print("Gradient Boosting Predictions:", gb_predictions)
+    
+    
+    
+    Gradient Boosting Predictions: [6169.09883742]
+    
+
+In [37]:
+
+    
+    
+    # Example input for prediction
+    new_data = pd.DataFrame({'age': [35], 'smoker_encoded': [1]}) # Gradient Boosting
+    gb_predictions = gb_model.predict(new_data)
+    print("Gradient Boosting Predictions:", gb_predictions)
+    
+    
+    
+    Gradient Boosting Predictions: [19735.06590245]
+    
+
+In [38]:
+
+    
+    
+    # Example input for prediction
+    new_data = pd.DataFrame({'age': [67], 'smoker_encoded': [0]}) # Gradient Boosting
+    gb_predictions = gb_model.predict(new_data)
+    print("Gradient Boosting Predictions:", gb_predictions)
+    
+    
+    
+    Gradient Boosting Predictions: [14685.8553561]
+    
+
+In [39]:
+
+    
+    
+    # Example input for prediction
+    new_data = pd.DataFrame({'age': [67], 'smoker_encoded': [1]}) # Gradient Boosting
+    gb_predictions = gb_model.predict(new_data)
+    print("Gradient Boosting Predictions:", gb_predictions)
+    
+    
+    
+    Gradient Boosting Predictions: [19151.9711604]
+    
+
+In [ ]:
+
+    
+    
+     
+    
+

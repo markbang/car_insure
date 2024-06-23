@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+
+<meta name="date" content="2018-03-12" />
+
+<title>Basic Prediction of Medical Cost using Linear Regression</title>
+
+<script src="__results___files/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="__results___files/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="__results___files/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="__results___files/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="__results___files/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="__results___files/navigation-1.1/tabsets.js"></script>
+<script src="__results___files/navigation-1.1/codefolding.js"></script>
+
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+div.sourceCode { overflow-x: auto; }
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; line-height: 100%; background-color: #f8f8f8; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+td.sourceCode { padding-left: 5px; }
+pre, code { background-color: #f8f8f8; }
+code > span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code > span.dt { color: #204a87; } /* DataType */
+code > span.dv { color: #0000cf; } /* DecVal */
+code > span.bn { color: #0000cf; } /* BaseN */
+code > span.fl { color: #0000cf; } /* Float */
+code > span.ch { color: #4e9a06; } /* Char */
+code > span.st { color: #4e9a06; } /* String */
+code > span.co { color: #8f5902; font-style: italic; } /* Comment */
+code > span.ot { color: #8f5902; } /* Other */
+code > span.al { color: #ef2929; } /* Alert */
+code > span.fu { color: #000000; } /* Function */
+code > span.er { color: #a40000; font-weight: bold; } /* Error */
+code > span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+code > span.cn { color: #000000; } /* Constant */
+code > span.sc { color: #000000; } /* SpecialChar */
+code > span.vs { color: #4e9a06; } /* VerbatimString */
+code > span.ss { color: #4e9a06; } /* SpecialString */
+code > span.im { } /* Import */
+code > span.va { color: #000000; } /* Variable */
+code > span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code > span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code > span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+code > span.ex { } /* Extension */
+code > span.at { color: #c4a000; } /* Attribute */
+code > span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code > span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code > span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code > span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+div.sourceCode {
+  overflow-x: visible;
+}
+</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+
+<base target="_blank" /><base target="_blank" /><script src="https://www.kaggle.com/static/assets/runtime.js?v=35c938006ccfc4af6367" async defer></script><script src="https://www.kaggle.com/static/assets/notebookviewer.js?v=eda0273068463e0177a9" async defer></script><script src="https://www.kaggle.com/static/assets/vendor.js?v=69fd11c4c59457d101f6" async defer></script><link href="https://www.kaggle.com/static/assets/notebookviewer.css?v=672a90fadacdb89ed3d3" type="text/css" rel="stylesheet" /><link href="https://www.kaggle.com/static/assets/vendor.css?v=dne" type="text/css" rel="stylesheet" /></head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+  height: auto;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+</style>
+
+
+
+<div class="container-fluid main-container">
+
+<!-- tabsets -->
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
+
+
+
+
+
+
+<div class="fluid-row" id="header">
+
+<div class="btn-group pull-right">
+<button type="button" class="btn btn-default btn-xs dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">Basic Prediction of Medical Cost using Linear Regression</h1>
+<h4 class="date"><em>March 12, 2018</em></h4>
+
+</div>
+
+<div id="TOC">
+<ul>
+<li><a href="#intro">1. Intro</a></li>
+<li><a href="#reshape-datasets">2. Reshape datasets</a><ul>
+<li><a href="#import-dataset-libraries">2-1) Import dataset &amp; libraries</a></li>
+<li><a href="#remove-region-columns">2-2) Remove âregionâ columns</a></li>
+<li><a href="#convert-factor-to-numeric">2-3) Convert Factor to Numeric</a></li>
+<li><a href="#add-columns-to-distinguish-between-low-charges-and-high-charges-standard-meancharges">2-4) Add columns to distinguish between low charges and high charges (standard : mean(charges))</a></li>
+<li><a href="#check-the-correlation-coefficient-except-group">2-5) Check the Correlation Coefficient (except: group)</a></li>
+</ul></li>
+<li><a href="#visualize-to-see-the-total-corr-you-have-to-remove-group-columns-ins-7">3. Visualize (To see the total corr, you have to remove group columns : ins[-7])</a><ul>
+<li><a href="#using-chart.correlation">3-1) Using chart.Correlation</a></li>
+<li><a href="#using-pairs.pannels">3-2) Using pairs.pannels</a></li>
+<li><a href="#using-ggpairs">3-3) Using ggpairs</a></li>
+<li><a href="#visualize-including-group-view-in-different-colors-according-to-group">3-4) Visualize including group (View in different colors according to group)</a></li>
+</ul></li>
+<li><a href="#full-analysis">4. Full Analysis</a><ul>
+<li><a href="#the-valuecolumns-that-most-influences-charges">4-1) The value(columns) that most influences charges</a></li>
+<li><a href="#regression-analysis">4-2) Regression Analysis</a></li>
+</ul></li>
+<li><a href="#detailed-analysis">5. Detailed Analysis</a><ul>
+<li><a href="#how-do-you-make-a-model-if-you-want-to-give-a-higher-penalty-to-an-obesesmoke-person">5-1) How do you make a model if you want to give a higher penalty to an obese&amp;smoke person?</a></li>
+<li><a href="#combine-multiple-variance-and-predict-the-best-combination-to-help-raise-the-premiums">5-2) Combine multiple variance and predict the best combination (to help raise the premiums)</a></li>
+</ul></li>
+<li><a href="#analysis-conclusion">6. Analysis Conclusion</a></li>
+<li><a href="#prediction-function">7. Prediction Function</a></li>
+<li><a href="#end.">8. End.</a></li>
+</ul>
+</div>
+
+<div id="intro" class="section level2">
+<h2>1. Intro</h2>
+<p>This is an initial data analysis of regression with R.</p>
+<div id="purpose" class="section level5">
+<h5>Purpose</h5>
+<p>To make their own profits, the insurance company(insurer) must collect more premiums than the amount paid to the insured person.</p>
+<p>For this, the insurance company invests a lot of time and money in creating a model that accurately predicts health care costs.</p>
+</div>
+</div>
+<div id="reshape-datasets" class="section level2">
+<h2>2. Reshape datasets</h2>
+<div id="import-dataset-libraries" class="section level3">
+<h3>2-1) Import dataset &amp; libraries</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">insurance &lt;-<span class="st"> </span><span class="kw">read.csv</span>(<span class="st">&quot;../input/insurance.csv&quot;</span>)
+
+<span class="kw">options</span>(<span class="dt">warn=</span><span class="op">-</span><span class="dv">1</span>)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">str</span>(insurance)</code></pre></div>
+<pre><code>## &#39;data.frame&#39;:    1338 obs. of  7 variables:
+##  $ age     : int  19 18 28 33 32 31 46 37 37 60 ...
+##  $ sex     : Factor w/ 2 levels &quot;female&quot;,&quot;male&quot;: 1 2 2 2 2 1 1 1 2 1 ...
+##  $ bmi     : num  27.9 33.8 33 22.7 28.9 ...
+##  $ children: int  0 1 3 0 0 0 1 3 2 0 ...
+##  $ smoker  : Factor w/ 2 levels &quot;no&quot;,&quot;yes&quot;: 2 1 1 1 1 1 1 1 1 1 ...
+##  $ region  : Factor w/ 4 levels &quot;northeast&quot;,&quot;northwest&quot;,..: 4 3 3 2 2 3 3 2 1 2 ...
+##  $ charges : num  16885 1726 4449 21984 3867 ...</code></pre>
+</div>
+<div id="remove-region-columns" class="section level3">
+<h3>2-2) Remove âregionâ columns</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">insurance<span class="op">$</span>region &lt;-<span class="st"> </span><span class="ot">NULL</span></code></pre></div>
+</div>
+<div id="convert-factor-to-numeric" class="section level3">
+<h3>2-3) Convert Factor to Numeric</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">ins &lt;-<span class="st"> </span>insurance
+
+ins<span class="op">$</span>sex &lt;-<span class="st"> </span><span class="kw">as.numeric</span>(ins<span class="op">$</span>sex)
+
+ins<span class="op">$</span>smoker &lt;-<span class="st"> </span><span class="kw">as.numeric</span>(ins<span class="op">$</span>smoker)</code></pre></div>
+</div>
+<div id="add-columns-to-distinguish-between-low-charges-and-high-charges-standard-meancharges" class="section level3">
+<h3>2-4) Add columns to distinguish between low charges and high charges (standard : mean(charges))</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">ins<span class="op">$</span>group &lt;-<span class="st"> </span><span class="kw">ifelse</span>(ins<span class="op">$</span>charges <span class="op">&gt;</span><span class="st"> </span><span class="kw">mean</span>(ins<span class="op">$</span>charges), <span class="st">&quot;high&quot;</span>, <span class="st">&quot;low&quot;</span>)</code></pre></div>
+</div>
+<div id="check-the-correlation-coefficient-except-group" class="section level3">
+<h3>2-5) Check the Correlation Coefficient (except: group)</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">cor</span>(ins[<span class="op">-</span><span class="dv">7</span>])</code></pre></div>
+<pre><code>##                  age         sex         bmi   children       smoker
+## age       1.00000000 -0.02085587 0.109271882 0.04246900 -0.025018752
+## sex      -0.02085587  1.00000000 0.046371151 0.01716298  0.076184817
+## bmi       0.10927188  0.04637115 1.000000000 0.01275890  0.003750426
+## children  0.04246900  0.01716298 0.012758901 1.00000000  0.007673120
+## smoker   -0.02501875  0.07618482 0.003750426 0.00767312  1.000000000
+## charges   0.29900819  0.05729206 0.198340969 0.06799823  0.787251430
+##             charges
+## age      0.29900819
+## sex      0.05729206
+## bmi      0.19834097
+## children 0.06799823
+## smoker   0.78725143
+## charges  1.00000000</code></pre>
+</div>
+</div>
+<div id="visualize-to-see-the-total-corr-you-have-to-remove-group-columns-ins-7" class="section level2">
+<h2>3. Visualize (To see the total corr, you have to remove group columns : ins[-7])</h2>
+<div id="using-chart.correlation" class="section level3">
+<h3>3-1) Using chart.Correlation</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">library</span>(PerformanceAnalytics)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">chart.Correlation</span>(ins[<span class="op">-</span><span class="dv">7</span>], <span class="dt">histogram=</span><span class="ot">TRUE</span>, <span class="dt">pch=</span><span class="dv">1</span>, <span class="dt">main=</span><span class="st">&quot;Insurance Scatterplot Matrix&quot;</span>)</code></pre></div>
+<p><img src="__results___files/figure-html/chart-1.png" width="1152" /></p>
+</div>
+<div id="using-pairs.pannels" class="section level3">
+<h3>3-2) Using pairs.pannels</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">library</span>(psych)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">pairs.panels</span>(ins[<span class="op">-</span><span class="dv">7</span>], <span class="dt">pch=</span><span class="dv">1</span>, <span class="dt">lm=</span><span class="ot">TRUE</span>, <span class="dt">cex.cor=</span><span class="dv">1</span>, <span class="dt">smoother=</span>F, <span class="dt">stars =</span> T, <span class="dt">main=</span><span class="st">&quot;Insurance Scatterplot Matrix&quot;</span>)</code></pre></div>
+<p><img src="__results___files/figure-html/panels-1.png" width="1152" /></p>
+</div>
+<div id="using-ggpairs" class="section level3">
+<h3>3-3) Using ggpairs</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">library</span>(GGally)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">ggpairs</span>(ins[<span class="op">-</span><span class="dv">7</span>])</code></pre></div>
+<p><img src="__results___files/figure-html/ggpairs-1.png" width="1152" /></p>
+</div>
+<div id="visualize-including-group-view-in-different-colors-according-to-group" class="section level3">
+<h3>3-4) Visualize including group (View in different colors according to group)</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">library</span>(ggplot2)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">ggpairs</span>(ins, <span class="kw">aes</span>(<span class="dt">color=</span>group, <span class="dt">alpha=</span><span class="fl">0.75</span>), <span class="dt">lower=</span><span class="kw">list</span>(<span class="dt">continuous=</span><span class="st">&quot;smooth&quot;</span>))<span class="op">+</span><span class="st"> </span><span class="kw">theme_bw</span>()</code></pre></div>
+<p><img src="__results___files/figure-html/group_ggpairs-1.png" width="1152" /></p>
+</div>
+</div>
+<div id="full-analysis" class="section level2">
+<h2>4. Full Analysis</h2>
+<div id="the-valuecolumns-that-most-influences-charges" class="section level3">
+<h3>4-1) The value(columns) that most influences charges</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">cor</span>(ins[<span class="op">-</span><span class="dv">7</span>])[,<span class="st">&quot;charges&quot;</span>]        <span class="co"># correlation coefficient</span></code></pre></div>
+<pre><code>##        age        sex        bmi   children     smoker    charges 
+## 0.29900819 0.05729206 0.19834097 0.06799823 0.78725143 1.00000000</code></pre>
+<p>==&gt; smoker(0.7872) &gt;&gt;&gt; age(0.299) &gt;&gt; bmi(0.1983)</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">ggcorr</span>(ins[<span class="op">-</span><span class="dv">7</span>], <span class="dt">name =</span> <span class="st">&quot;corr&quot;</span>, <span class="dt">label =</span> <span class="ot">TRUE</span>)<span class="op">+</span>
+
+<span class="st">  </span><span class="kw">theme</span>(<span class="dt">legend.position=</span><span class="st">&quot;none&quot;</span>)</code></pre></div>
+<p><img src="__results___files/figure-html/unnamed-chunk-12-1.png" width="1152" /></p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">library</span>(<span class="st">&quot;factoextra&quot;</span>)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">my_data &lt;-<span class="st"> </span>ins[, <span class="kw">c</span>(<span class="dv">1</span>,<span class="dv">3</span>,<span class="dv">4</span>,<span class="dv">5</span>)];
+
+res.pca &lt;-<span class="st"> </span><span class="kw">prcomp</span>(my_data, <span class="dt">scale =</span> <span class="ot">TRUE</span>)
+
+<span class="kw">fviz_pca_biplot</span>(res.pca, <span class="dt">col.ind =</span> ins<span class="op">$</span>group, <span class="dt">col=</span><span class="st">&quot;black&quot;</span>,
+
+                <span class="dt">palette =</span> <span class="st">&quot;jco&quot;</span>, <span class="dt">geom =</span> <span class="st">&quot;point&quot;</span>, <span class="dt">repel=</span><span class="ot">TRUE</span>,
+
+                <span class="dt">legend.title=</span><span class="st">&quot;Charges&quot;</span>)</code></pre></div>
+<p><img src="__results___files/figure-html/unnamed-chunk-14-1.png" width="1152" /></p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">fviz_pca_biplot</span>(res.pca, 
+
+                <span class="dt">geom.ind =</span> <span class="st">&quot;point&quot;</span>, 
+
+                <span class="dt">col.ind =</span> ins<span class="op">$</span>group,
+
+                <span class="dt">pointsize =</span> <span class="dv">2</span>,
+
+                <span class="dt">palette =</span> <span class="st">&quot;jco&quot;</span>,
+
+                <span class="dt">addEllipses =</span> <span class="ot">TRUE</span>,
+
+                <span class="dt">label=</span><span class="st">&quot;var&quot;</span>,
+
+                <span class="dt">col.var=</span><span class="st">&quot;black&quot;</span>,
+
+                <span class="dt">repel=</span><span class="ot">TRUE</span>,
+
+                <span class="dt">legend.title=</span><span class="st">&quot;Charges&quot;</span>)</code></pre></div>
+<p><img src="__results___files/figure-html/unnamed-chunk-14-2.png" width="1152" /></p>
+</div>
+<div id="regression-analysis" class="section level3">
+<h3>4-2) Regression Analysis</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">lm</span>(charges<span class="op">~</span>., <span class="dt">data=</span>insurance)   </code></pre></div>
+<pre><code>## 
+## Call:
+## lm(formula = charges ~ ., data = insurance)
+## 
+## Coefficients:
+## (Intercept)          age      sexmale          bmi     children  
+##    -12052.5        257.7       -128.6        322.4        474.4  
+##   smokeryes  
+##     23823.4</code></pre>
+<ul>
+<li><p>Smokers increases helath care costs(charges) by $23,823 per year.</p></li>
+<li><p>As the number of children increases, helath care costs(charges) can be increased by $474.</p></li>
+</ul>
+<p>â&gt; guess: The increase in dependents can increase the cost of care such as hospital care,</p>
+<pre><code>          immunization, and physical examinations every year.)</code></pre>
+<ul>
+<li>The higher the age, the higher the medical costs.</li>
+</ul>
+</div>
+</div>
+<div id="detailed-analysis" class="section level2">
+<h2>5. Detailed Analysis</h2>
+<div id="how-do-you-make-a-model-if-you-want-to-give-a-higher-penalty-to-an-obesesmoke-person" class="section level3">
+<h3>5-1) How do you make a model if you want to give a higher penalty to an obese&amp;smoke person?</h3>
+<p>If âbmiâ exceeds 30, Letâs categorized as obesity</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">insurance<span class="op">$</span>obese &lt;-<span class="st"> </span><span class="kw">as.factor</span>(<span class="kw">ifelse</span>(ins<span class="op">$</span>bmi <span class="op">&gt;=</span><span class="dv">30</span>, <span class="st">&quot;yes&quot;</span>, <span class="st">&quot;no&quot;</span>))</code></pre></div>
+</div>
+<div id="combine-multiple-variance-and-predict-the-best-combination-to-help-raise-the-premiums" class="section level3">
+<h3>5-2) Combine multiple variance and predict the best combination (to help raise the premiums)</h3>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">lm</span>(charges <span class="op">~</span><span class="st"> </span>obese <span class="op">*</span><span class="st"> </span>smoker, <span class="dt">data=</span>insurance)</code></pre></div>
+<pre><code>## 
+## Call:
+## lm(formula = charges ~ obese * smoker, data = insurance)
+## 
+## Coefficients:
+##        (Intercept)            obeseyes           smokeryes  
+##             7977.0               865.7             13386.2  
+## obeseyes:smokeryes  
+##            19329.1</code></pre>
+<ul>
+<li><p>obesity increases health care costs by $865, and smoking increases health care costs by $13,386.</p></li>
+<li><p>But the both components are applied, (if smoking and obesity are together),</p>
+<p>It can be expected that medical expenses will increase the most with $19,329.</p></li>
+</ul>
+</div>
+</div>
+<div id="analysis-conclusion" class="section level2">
+<h2>6. Analysis Conclusion</h2>
+<ul>
+<li><p>By predicting health care charges using linear regression methods, it is possible to impose different insurance premiums depending on the charges.</p></li>
+<li><p>As a result of the model comparison above(4), by using * rather than +, the prediction of the model became more similar to reality.</p></li>
+</ul>
+</div>
+<div id="prediction-function" class="section level2">
+<h2>7. Prediction Function</h2>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">pre_charges &lt;-<span class="st"> </span><span class="cf">function</span>(m, a, b, c){
+
+    pre_new &lt;-<span class="st"> </span><span class="kw">predict</span>(m, <span class="kw">data.frame</span>(<span class="dt">age=</span>a, <span class="dt">bmi=</span>b, <span class="dt">children=</span>c))
+
+    msg &lt;-<span class="st"> </span><span class="kw">paste</span>(<span class="st">&quot;age: &quot;</span>,a,<span class="st">&quot;, bmi: &quot;</span>,b,<span class="st">&quot;, children: &quot;</span>,c,<span class="st">&quot;   ==&gt; Expect Charges: $&quot;</span>,<span class="kw">round</span>(pre_new),<span class="dt">sep=</span><span class="st">&quot;&quot;</span>)
+
+    <span class="kw">print</span>(msg)
+
+}</code></pre></div>
+<ul>
+<li>example) age = 19, bmi = 27.9, children = 0</li>
+</ul>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">model &lt;-<span class="st"> </span><span class="kw">lm</span>(charges <span class="op">~</span><span class="st"> </span>age<span class="op">+</span>bmi<span class="op">+</span>children, <span class="dt">data=</span>insurance)
+
+<span class="kw">pre_charges</span>(model, <span class="dv">19</span>, <span class="fl">27.9</span>, <span class="dv">0</span>)</code></pre></div>
+<pre><code>## [1] &quot;age: 19, bmi: 27.9, children: 0   ==&gt; Expect Charges: $6909&quot;</code></pre>
+</div>
+<div id="end." class="section level2">
+<h2>8. End.</h2>
+<p>Upvotes and Comments are fully Welcomed :-)</p>
+<p>Want to see my <strong>Classification</strong> kernel, click <a href="https://www.kaggle.com/mirichoi0218/classification-breast-cancer-or-not-with-15-ml">here : Breast Cancer or Not (with 15 ML)</a></p>
+<p>Thank you for watching!</p>
+</div>
+
+
+
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,254 @@
+In [1]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/auto-insurance-in-sweden-small-dataset/insurance.csv
+    
+
+In [2]:
+
+    
+    
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    
+
+In [3]:
+
+    
+    
+    df = pd.read_csv('../input/auto-insurance-in-sweden-small-dataset/insurance.csv', skiprows=4)
+    
+
+In [4]:
+
+    
+    
+    df.head()
+    
+
+Out[4]:
+
+| Y = total payment for all the claims in thousands of Swedish Kronor  
+---|---  
+108 | 392.5  
+19 | 46.2  
+13 | 15.7  
+124 | 422.2  
+40 | 119.4  
+  
+In [5]:
+
+    
+    
+    df.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    Int64Index: 63 entries, 108 to 26
+    Data columns (total 1 columns):
+     #   Column                                                               Non-Null Count  Dtype  
+    ---  ------                                                               --------------  -----  
+     0   Y = total payment for all the claims in thousands of Swedish Kronor  63 non-null     float64
+    dtypes: float64(1)
+    memory usage: 1008.0 bytes
+    
+
+In [6]:
+
+    
+    
+    df.describe()
+    
+
+Out[6]:
+
+| Y = total payment for all the claims in thousands of Swedish Kronor  
+---|---  
+count | 63.000000  
+mean | 98.187302  
+std | 87.327553  
+min | 0.000000  
+25% | 38.850000  
+50% | 73.400000  
+75% | 140.000000  
+max | 422.200000  
+  
+In [7]:
+
+    
+    
+    df.shape
+    
+
+Out[7]:
+
+    
+    
+    (63, 1)
+
+In [8]:
+
+    
+    
+    # Changing Column names
+    
+
+In [9]:
+
+    
+    
+    df.rename(columns={'Y = total payment for all the claims in thousands of Swedish Kronor': 'Payments'}, inplace=True)
+    
+
+In [10]:
+
+    
+    
+    df['Claims'] = df.index
+    df.reset_index(drop=True, inplace=True)
+    
+
+In [11]:
+
+    
+    
+    df.head()
+    
+
+Out[11]:
+
+| Payments | Claims  
+---|---|---  
+0 | 392.5 | 108  
+1 | 46.2 | 19  
+2 | 15.7 | 13  
+3 | 422.2 | 124  
+4 | 119.4 | 40  
+  
+In [12]:
+
+    
+    
+    plt.scatter(x=df['Claims'], y=df['Payments'])
+    plt.show()
+    
+
+![](__results___files/__results___11_0.png)
+
+In [13]:
+
+    
+    
+    sns.regplot(x="Claims", y="Payments", data=df)
+    
+
+Out[13]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f5d7a631a50>
+
+![](__results___files/__results___12_1.png)
+
+In [14]:
+
+    
+    
+    from sklearn.model_selection import train_test_split
+    from sklearn.linear_model import LinearRegression
+    
+
+In [15]:
+
+    
+    
+    x = df['Claims'].values
+    y = df['Payments'].values
+    
+
+In [16]:
+
+    
+    
+    x = x.reshape(-1,1)
+    
+
+In [17]:
+
+    
+    
+    x_train, x_test, y_train, y_test = train_test_split(x, y , test_size=0.33, random_state=42)
+    
+
+In [18]:
+
+    
+    
+    model = LinearRegression().fit(x_train, y_train)
+    
+
+In [19]:
+
+    
+    
+    model.score(x_test, y_test)
+    
+
+Out[19]:
+
+    
+    
+    0.8870726295495153
+
+In [20]:
+
+    
+    
+    y_pred = model.predict(x_test)
+    
+
+In [21]:
+
+    
+    
+    plt.scatter(x=x_train, y=y_train)
+    plt.plot(x_test, y_pred, color="green")
+    
+
+Out[21]:
+
+    
+    
+    [<matplotlib.lines.Line2D at 0x7f5d7a6053d0>]
+
+![](__results___files/__results___20_1.png)
+
+In [ ]:
+
+    
+    
+     
+    
+

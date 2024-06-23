@@ -1,0 +1,1563 @@
+# **About Dataset**¶
+
+how much you pay for health insurance are not within your control.There are
+some factors that affect how much health insurance cost. This dataset contains
+person's information like age,sex,gender,bmi,region,smoke or not and we have
+to predict their medical insurance cost.In this notebook I will apply
+regression techniques of supervised learning to predict the medical insurance
+costs.
+
+In [1]:
+
+    
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    
+    
+    /kaggle/input/insurance/insurance.csv
+    
+
+# **Import Libraries**¶
+
+In [2]:
+
+    
+    
+    import matplotlib.pyplot as plt
+    import warnings
+    import seaborn as sns
+    from colorama import Fore, Back, Style 
+    from sklearn.model_selection import train_test_split
+    from sklearn.linear_model import LinearRegression
+    from sklearn.preprocessing import LabelEncoder
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.metrics import r2_score,mean_squared_error
+    
+    from plotly.offline import plot, iplot, init_notebook_mode
+    import plotly.graph_objs as go
+    from plotly.subplots import make_subplots
+    import plotly.express as px
+    from statsmodels.formula.api import ols
+    import plotly.graph_objs as gobj
+    
+    init_notebook_mode(connected=True)
+    warnings.filterwarnings("ignore")
+    import plotly.figure_factory as ff
+    
+    import xgboost
+    import lightgbm
+    
+
+# **Import Dataset**¶
+
+In [3]:
+
+    
+    
+    insurance_data = pd.read_csv('/kaggle/input/insurance/insurance.csv')
+    insurance_data.head()
+    
+
+Out[3]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+  
+# **Exploratory Data Analysis**¶
+
+**Let's check for missing values**
+
+In [4]:
+
+    
+    
+    insurance_data.isnull().sum()
+    
+
+Out[4]:
+
+    
+    
+    age         0
+    sex         0
+    bmi         0
+    children    0
+    smoker      0
+    region      0
+    charges     0
+    dtype: int64
+
+**Data summary**
+
+In [5]:
+
+    
+    
+    # description of the data
+    
+    insurance_data.describe()
+    
+
+Out[5]:
+
+| age | bmi | children | charges  
+---|---|---|---|---  
+count | 1338.000000 | 1338.000000 | 1338.000000 | 1338.000000  
+mean | 39.207025 | 30.663397 | 1.094918 | 13270.422265  
+std | 14.049960 | 6.098187 | 1.205493 | 12110.011237  
+min | 18.000000 | 15.960000 | 0.000000 | 1121.873900  
+25% | 27.000000 | 26.296250 | 0.000000 | 4740.287150  
+50% | 39.000000 | 30.400000 | 1.000000 | 9382.033000  
+75% | 51.000000 | 34.693750 | 2.000000 | 16639.912515  
+max | 64.000000 | 53.130000 | 5.000000 | 63770.428010  
+  
+  * Age is ranging from 18 to 64 ,with mean of 38.2 and standard deviation of 14.04
+  * bmi is ranging from 15.96 to 53.13 , with mean of 30.6 and standard deviation of 6.09
+  * charges is ranging from 1121 to 63770 , with mean of 13270 and standard deviation of 12110
+
+# Charge distribution¶
+
+In [6]:
+
+    
+    
+    charge_dist =[insurance_data['charges'].values]
+    group_labels = ['charges'] 
+    
+    fig = ff.create_distplot(charge_dist, group_labels)
+    fig.update_layout(title_text='Charge Distribution plot')
+    fig.show()
+    
+
+Maximum number of Costs/Charges are of 3000-8000
+
+In [7]:
+
+    
+    
+    fig = px.box(insurance_data, x='smoker', y='charges', points="all")
+    fig.update_layout(title_text="Charge Spread - Smoker and Non Smoker")
+    fig.show()
+    
+
+  * Charges for smoker ranges between 12.82k to 63.77k
+  * Charges for non smoker ranges between 1.1k to 36k
+
+**Charges Region wise**
+
+In [8]:
+
+    
+    
+    fig = px.box(insurance_data, x='region', y='charges', points="all")
+    fig.update_layout(title_text="Region wise Charge Spread")
+    fig.show()
+    
+
+  * Charges for Southwest Region ranges between 1.2k to 52.59k
+  * Charges for Southeast Region ranges between 1.1k to 63.77k
+  * Charges for Northwest Region ranges between 1.6k to 60.02k
+  * Charges for Northeast Region ranges between 1.6k to 58.57k
+
+In [9]:
+
+    
+    
+    fig = px.violin(insurance_data, y="charges", x="region", color='sex', box=True, points="all", hover_data=insurance_data.columns)
+    fig.update_layout(title_text="Analysis in Charges and Region on Sex Status")
+    fig.show()
+    
+
+  * Charges of Southwest Region for female 1.7k to 46k and for male is 1.2 to 52k
+  * Charges of Southeast Region for female 1.6k to 63k and for male is 1.1 to 62k
+  * Charges of Northwest Region for female 2.1k to 55k and for male is 1.6 to 60k
+  * Charges of Northeast Region for female 2.1k to 58k and for male is 1.7 to 48k
+
+In [10]:
+
+    
+    
+    fig = px.violin(insurance_data, y="charges", x="region", color='smoker', box=True, points="all", hover_data=insurance_data.columns)
+    fig.update_layout(title_text="Analysis in Charges and Region on Smoker Status")
+    fig.show()
+    
+
+  * Charges of Southwest Region for smoker 14k to 53k and for non-smoker is 1.2 to 36k
+  * Charges of Southeast Region for smoker 16k to 63k and for non-smoker is 1.1 to 36k
+  * Charges of Northwest Region for smoker 12k to 53k and for non-smoker is 1.6 to 32k
+  * Charges of Northeast Region for smoker 14k to 60k and for non-smoker is 1.6 to 33k
+
+**charges for childrens region wise**
+
+In [11]:
+
+    
+    
+    fig = px.violin(insurance_data, y="charges", x="region", color='children', box=True, points="all", hover_data=insurance_data.columns)
+    fig.update_layout(title_text="Analysis in Charges and Region on Children Status")
+    fig.show()
+    
+
+# Age Distribution¶
+
+In [12]:
+
+    
+    
+    # age distribution
+    
+    age_dist =[insurance_data["age"].values]
+    group_labels = ['age'] 
+    
+    fig = ff.create_distplot(age_dist, group_labels)
+    fig.update_layout(title_text='Age Distribution plot')
+    fig.show()
+    
+
+  * As you can see age is normally distrtibuted
+  * Maximum number of patients are of 18-20 age
+
+In [13]:
+
+    
+    
+    fig = px.box(insurance_data, y='age', points="all")
+    fig.update_layout(title_text="Age Spread")
+    fig.show()
+    
+
+Age is ranging from 18 to 64 ,with mean of 39
+
+**Gender wise age distribution**
+
+In [14]:
+
+    
+    
+    fig = px.box(insurance_data, x='sex', y='age', points="all")
+    fig.update_layout(title_text="Gender wise Age Spread - Male and Female")
+    fig.show()
+    
+
+Age is ranging from 18 to 64 ,with mean of 40 for female and 39 for male.
+
+In [15]:
+
+    
+    
+    fig = px.violin(insurance_data, y="age", x="sex", color='smoker', box=True, points="all", hover_data=insurance_data.columns)
+    fig.update_layout(title_text="Analysis in Age and sex on Smoker Status")
+    fig.show()
+    
+
+In [16]:
+
+    
+    
+    x1 = insurance_data[(insurance_data.sex == 'male')]["age"]
+    x2 = insurance_data[(insurance_data.sex == 'female')]["age"]
+    
+    group_labels = ['male', 'female']
+    colors = ['#F66095', '#A6ACEC']
+    fig = ff.create_distplot([x1, x2], group_labels, bin_size=.5,
+                             curve_type='normal',colors=colors)
+    
+    fig.update_layout(title_text='Age Distribution with Gender')
+    fig.show()
+    
+
+**Age distribution of Smoker vs Non-Smoker**
+
+In [17]:
+
+    
+    
+    fig = px.box(insurance_data, x='smoker', y='age', points='all')
+    fig.update_layout(title_text='Age Spread - Smoker and Non smoker')
+    fig.show()
+    
+
+Age is ranging from 18 to 64 ,with mean of 38 for smoker and 40 for non-
+smoker.
+
+In [18]:
+
+    
+    
+    x1 = insurance_data[(insurance_data.smoker == 'yes')]["age"]
+    x2 = insurance_data[(insurance_data.smoker == 'no')]["age"]
+    
+    group_labels = ['yes', 'no']
+    colors = ['#835AF1', '#7FA6EE']
+    fig = ff.create_distplot([x1, x2], group_labels, bin_size=.5, curve_type='normal',colors=colors)
+    
+    fig.update_layout(title_text='Age Distribution with Smoker and Non Smoker')
+    fig.show()
+    
+
+# **Age vs charges**¶
+
+**Age vs charges for smokers**
+
+In [19]:
+
+    
+    
+    fig = px.scatter(insurance_data[insurance_data.smoker=='yes'], x='age', y='charges')
+    fig.update_layout(title_text='Analysis in Age and Charges')
+    fig.show()
+    
+
+In [20]:
+
+    
+    
+    fig = px.density_contour(insurance_data[insurance_data.smoker=='yes'], x='age', y='charges', marginal_x='box', marginal_y='box')
+    fig.show()
+    
+
+**Age vs charges for smokers**
+
+In [21]:
+
+    
+    
+    fig = px.scatter(insurance_data[insurance_data.smoker=='no'], x='age', y='charges')
+    fig.update_layout(title_text='Analysis in Age and Charges')
+    fig.show()
+    
+
+In [22]:
+
+    
+    
+    fig = px.density_contour(insurance_data[insurance_data.smoker=='no'], x='age', y='charges', marginal_x='box', marginal_y='box')
+    fig.show()
+    
+
+# **BMI Analysis**¶
+
+**Age and BMI on sex status**
+
+In [23]:
+
+    
+    
+    fig = px.scatter(insurance_data, x='age', y='bmi', color='sex')
+    fig.update_layout(title_text='Analysis in Age and BMI on Sex Status')
+    fig.show()
+    
+
+**Charges and BMI on sex status**
+
+In [24]:
+
+    
+    
+    fig = px.scatter(insurance_data, x='bmi', y='charges', color='sex')
+    fig.update_layout(title_text='Analysis in Charges and BMI on Sex Status')
+    fig.show()
+    
+
+In [25]:
+
+    
+    
+    fig = px.density_contour(insurance_data, x='bmi', y='charges', marginal_x='box', marginal_y='box', color='sex')
+    fig.show()
+    
+
+# **Correlation matrix**¶
+
+In [26]:
+
+    
+    
+    plt.figure(figsize=(10,10))
+    sns.heatmap(insurance_data.corr(), vmin=-1, cmap='coolwarm', annot=True);
+    
+
+![](__results___files/__results___55_0.png)
+
+In [27]:
+
+    
+    
+    # Converting category labels into numerical using LabelEncoder
+    
+    #sex
+    le = LabelEncoder()
+    le.fit(insurance_data.sex.drop_duplicates()) 
+    insurance_data.sex = le.transform(insurance_data.sex)
+    # smoker or not
+    le.fit(insurance_data.smoker.drop_duplicates()) 
+    insurance_data.smoker = le.transform(insurance_data.smoker)
+    #region
+    le.fit(insurance_data.region.drop_duplicates()) 
+    insurance_data.region = le.transform(insurance_data.region)
+    
+
+# **Data Modelling**¶
+
+In [28]:
+
+    
+    
+    insurance_data.head()
+    
+
+Out[28]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | 0 | 27.900 | 0 | 1 | 3 | 16884.92400  
+1 | 18 | 1 | 33.770 | 1 | 0 | 2 | 1725.55230  
+2 | 28 | 1 | 33.000 | 3 | 0 | 2 | 4449.46200  
+3 | 33 | 1 | 22.705 | 0 | 0 | 1 | 21984.47061  
+4 | 32 | 1 | 28.880 | 0 | 0 | 1 | 3866.85520  
+  
+**Train Test split**
+
+In [29]:
+
+    
+    
+    X = insurance_data.drop(['charges','region', 'sex', 'children'], axis = 1)
+    y = insurance_data.charges
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state = 0)
+    
+
+**Linear Regression**
+
+In [30]:
+
+    
+    
+    linear_reg = LinearRegression()
+    linear_reg.fit(X_train,y_train)
+    y_test_pred = linear_reg.predict(X_test)
+    
+
+In [31]:
+
+    
+    
+    print(Fore.GREEN + "Accuracy of Linear Regression is : ",linear_reg.score(X_test,y_test))
+    
+    
+    
+    Accuracy of Linear Regression is :  0.7945500805653087
+    
+
+**Random Forest Regressor**
+
+In [32]:
+
+    
+    
+    random_reg = RandomForestRegressor(random_state = 2)
+    random_reg.fit(X_train,y_train)
+    random_test_pred = random_reg.predict(X_test)
+    
+
+In [33]:
+
+    
+    
+    print(Fore.GREEN + "Accuracy of Random Forest Regression is : ",random_reg.score(X_test,y_test))
+    
+    
+    
+    Accuracy of Random Forest Regression is :  0.8606137842394863
+    
+
+**Xboost Regressor**
+
+In [34]:
+
+    
+    
+    xgb_reg = xgboost.XGBRegressor(max_depth=2, random_state=1)
+    xgb_reg.fit(X_train,y_train)
+    xgb_test = xgb_reg.predict(X_test)
+    
+
+In [35]:
+
+    
+    
+    print(Fore.GREEN + "Accuracy of XGB Regression is : ",xgb_reg.score(X_test,y_test))
+    
+    
+    
+    Accuracy of XGB Regression is :  0.886542866976926
+    
+
+**Lightgbm**
+
+In [36]:
+
+    
+    
+    lgb_reg = lightgbm.LGBMRegressor(max_depth=2, random_state=1)
+    lgb_reg.fit(X_train,y_train)
+    lgb_test = lgb_reg.predict(X_test)
+    
+
+In [37]:
+
+    
+    
+    print(Fore.GREEN + "Accuracy of LGB Regression is : ",lgb_reg.score(X_test,y_test))
+    
+    
+    
+    Accuracy of LGB Regression is :  0.897954749238443
+    
+
+In [38]:
+
+    
+    
+    from catboost import CatBoostRegressor
+    catb_reg = CatBoostRegressor()
+    catb_reg.fit(X_train,y_train)
+    catb_test = catb_reg.predict(X_test)
+    
+    
+    
+    Learning rate set to 0.039503
+    0:	learn: 11638.5650216	total: 51.6ms	remaining: 51.5s
+    1:	learn: 11290.9029918	total: 52.7ms	remaining: 26.3s
+    2:	learn: 10993.0555460	total: 53.9ms	remaining: 17.9s
+    3:	learn: 10715.1854504	total: 54.5ms	remaining: 13.6s
+    4:	learn: 10403.0153835	total: 55.6ms	remaining: 11.1s
+    5:	learn: 10146.0583536	total: 56.1ms	remaining: 9.29s
+    6:	learn: 9862.8169394	total: 56.8ms	remaining: 8.05s
+    7:	learn: 9600.5105543	total: 57.8ms	remaining: 7.17s
+    8:	learn: 9337.1888819	total: 59ms	remaining: 6.49s
+    9:	learn: 9092.0381171	total: 60ms	remaining: 5.94s
+    10:	learn: 8848.0084462	total: 60.7ms	remaining: 5.45s
+    11:	learn: 8623.5011853	total: 61.7ms	remaining: 5.08s
+    12:	learn: 8405.9848742	total: 62.5ms	remaining: 4.74s
+    13:	learn: 8210.5091477	total: 63.5ms	remaining: 4.47s
+    14:	learn: 8016.7731055	total: 64.5ms	remaining: 4.23s
+    15:	learn: 7823.1030548	total: 65.1ms	remaining: 4s
+    16:	learn: 7654.5358067	total: 66.2ms	remaining: 3.83s
+    17:	learn: 7488.9799622	total: 66.9ms	remaining: 3.65s
+    18:	learn: 7325.8398645	total: 67.9ms	remaining: 3.5s
+    19:	learn: 7166.2558079	total: 68.7ms	remaining: 3.37s
+    20:	learn: 7028.7493988	total: 69.7ms	remaining: 3.25s
+    21:	learn: 6890.8887776	total: 70.8ms	remaining: 3.15s
+    22:	learn: 6780.7126282	total: 71.3ms	remaining: 3.03s
+    23:	learn: 6657.5112217	total: 72.1ms	remaining: 2.93s
+    24:	learn: 6544.2049666	total: 73ms	remaining: 2.85s
+    25:	learn: 6436.7047813	total: 73.7ms	remaining: 2.76s
+    26:	learn: 6339.0155583	total: 74.5ms	remaining: 2.68s
+    27:	learn: 6233.7789026	total: 75.3ms	remaining: 2.61s
+    28:	learn: 6132.7939945	total: 76.3ms	remaining: 2.56s
+    29:	learn: 6039.2776581	total: 77.4ms	remaining: 2.5s
+    30:	learn: 5953.7648196	total: 78.1ms	remaining: 2.44s
+    31:	learn: 5878.2002704	total: 78.7ms	remaining: 2.38s
+    32:	learn: 5802.4132171	total: 79.5ms	remaining: 2.33s
+    33:	learn: 5734.2722681	total: 80.2ms	remaining: 2.28s
+    34:	learn: 5667.3131762	total: 81.2ms	remaining: 2.24s
+    35:	learn: 5608.7079949	total: 81.9ms	remaining: 2.19s
+    36:	learn: 5544.8482403	total: 82.8ms	remaining: 2.15s
+    37:	learn: 5483.9735280	total: 83.7ms	remaining: 2.12s
+    38:	learn: 5437.1299434	total: 84.2ms	remaining: 2.07s
+    39:	learn: 5404.2306097	total: 84.6ms	remaining: 2.03s
+    40:	learn: 5354.9797557	total: 85.2ms	remaining: 1.99s
+    41:	learn: 5326.4281371	total: 85.6ms	remaining: 1.95s
+    42:	learn: 5279.6991303	total: 86.2ms	remaining: 1.92s
+    43:	learn: 5238.1523997	total: 87.3ms	remaining: 1.9s
+    44:	learn: 5198.2717235	total: 88.2ms	remaining: 1.87s
+    45:	learn: 5167.9496829	total: 88.7ms	remaining: 1.84s
+    46:	learn: 5140.9564637	total: 89.3ms	remaining: 1.81s
+    47:	learn: 5108.5586563	total: 90.4ms	remaining: 1.79s
+    48:	learn: 5074.0786665	total: 91.4ms	remaining: 1.77s
+    49:	learn: 5051.8803780	total: 92ms	remaining: 1.75s
+    50:	learn: 5020.7100375	total: 93ms	remaining: 1.73s
+    51:	learn: 4993.5525074	total: 94ms	remaining: 1.71s
+    52:	learn: 4969.9667226	total: 94.6ms	remaining: 1.69s
+    53:	learn: 4943.4868494	total: 95.5ms	remaining: 1.67s
+    54:	learn: 4921.2091356	total: 96.6ms	remaining: 1.66s
+    55:	learn: 4900.6566648	total: 97.4ms	remaining: 1.64s
+    56:	learn: 4886.4750103	total: 98ms	remaining: 1.62s
+    57:	learn: 4867.5099911	total: 99ms	remaining: 1.61s
+    58:	learn: 4847.7495782	total: 100ms	remaining: 1.59s
+    59:	learn: 4834.0486780	total: 101ms	remaining: 1.58s
+    60:	learn: 4817.3754494	total: 102ms	remaining: 1.57s
+    61:	learn: 4803.9119909	total: 103ms	remaining: 1.55s
+    62:	learn: 4787.6019080	total: 104ms	remaining: 1.54s
+    63:	learn: 4770.4360973	total: 105ms	remaining: 1.53s
+    64:	learn: 4759.2411396	total: 106ms	remaining: 1.52s
+    65:	learn: 4751.1902315	total: 106ms	remaining: 1.51s
+    66:	learn: 4738.8695026	total: 107ms	remaining: 1.5s
+    67:	learn: 4727.7848797	total: 109ms	remaining: 1.49s
+    68:	learn: 4723.4074002	total: 109ms	remaining: 1.47s
+    69:	learn: 4711.1398930	total: 110ms	remaining: 1.46s
+    70:	learn: 4707.3765981	total: 110ms	remaining: 1.45s
+    71:	learn: 4698.2073449	total: 112ms	remaining: 1.44s
+    72:	learn: 4693.3540348	total: 112ms	remaining: 1.42s
+    73:	learn: 4686.0490573	total: 113ms	remaining: 1.41s
+    74:	learn: 4676.4741450	total: 114ms	remaining: 1.4s
+    75:	learn: 4668.3778243	total: 115ms	remaining: 1.4s
+    76:	learn: 4662.9321609	total: 116ms	remaining: 1.39s
+    77:	learn: 4654.6515936	total: 117ms	remaining: 1.38s
+    78:	learn: 4647.9555750	total: 118ms	remaining: 1.37s
+    79:	learn: 4641.2414181	total: 119ms	remaining: 1.36s
+    80:	learn: 4636.8318225	total: 119ms	remaining: 1.35s
+    81:	learn: 4630.0833632	total: 120ms	remaining: 1.35s
+    82:	learn: 4623.5486923	total: 121ms	remaining: 1.34s
+    83:	learn: 4618.5318127	total: 122ms	remaining: 1.33s
+    84:	learn: 4614.0776603	total: 123ms	remaining: 1.32s
+    85:	learn: 4608.9578932	total: 124ms	remaining: 1.32s
+    86:	learn: 4605.2207964	total: 125ms	remaining: 1.31s
+    87:	learn: 4602.2587702	total: 125ms	remaining: 1.3s
+    88:	learn: 4598.5807421	total: 126ms	remaining: 1.29s
+    89:	learn: 4595.4580638	total: 127ms	remaining: 1.28s
+    90:	learn: 4592.1228445	total: 127ms	remaining: 1.27s
+    91:	learn: 4587.8210850	total: 128ms	remaining: 1.26s
+    92:	learn: 4584.6302908	total: 129ms	remaining: 1.26s
+    93:	learn: 4580.0186299	total: 130ms	remaining: 1.25s
+    94:	learn: 4577.6513476	total: 131ms	remaining: 1.25s
+    95:	learn: 4574.5473534	total: 132ms	remaining: 1.24s
+    96:	learn: 4570.1092158	total: 133ms	remaining: 1.24s
+    97:	learn: 4566.1411863	total: 134ms	remaining: 1.23s
+    98:	learn: 4562.4807501	total: 135ms	remaining: 1.23s
+    99:	learn: 4561.2152206	total: 135ms	remaining: 1.22s
+    100:	learn: 4559.5540898	total: 136ms	remaining: 1.21s
+    101:	learn: 4556.2707836	total: 137ms	remaining: 1.2s
+    102:	learn: 4555.1468335	total: 137ms	remaining: 1.2s
+    103:	learn: 4554.2572101	total: 138ms	remaining: 1.19s
+    104:	learn: 4552.3601123	total: 139ms	remaining: 1.18s
+    105:	learn: 4549.5130846	total: 140ms	remaining: 1.18s
+    106:	learn: 4547.8117282	total: 141ms	remaining: 1.17s
+    107:	learn: 4545.2004980	total: 142ms	remaining: 1.17s
+    108:	learn: 4540.2925025	total: 143ms	remaining: 1.17s
+    109:	learn: 4537.7298216	total: 144ms	remaining: 1.16s
+    110:	learn: 4532.4873680	total: 145ms	remaining: 1.16s
+    111:	learn: 4531.3175047	total: 146ms	remaining: 1.15s
+    112:	learn: 4526.6427945	total: 147ms	remaining: 1.15s
+    113:	learn: 4523.2580037	total: 148ms	remaining: 1.15s
+    114:	learn: 4520.9048684	total: 149ms	remaining: 1.15s
+    115:	learn: 4518.2641629	total: 150ms	remaining: 1.14s
+    116:	learn: 4516.0770336	total: 151ms	remaining: 1.14s
+    117:	learn: 4515.5235491	total: 151ms	remaining: 1.13s
+    118:	learn: 4514.5755881	total: 152ms	remaining: 1.13s
+    119:	learn: 4512.5750583	total: 153ms	remaining: 1.12s
+    120:	learn: 4510.1168853	total: 154ms	remaining: 1.12s
+    121:	learn: 4507.9722494	total: 155ms	remaining: 1.12s
+    122:	learn: 4505.6102968	total: 156ms	remaining: 1.11s
+    123:	learn: 4503.9902721	total: 157ms	remaining: 1.11s
+    124:	learn: 4502.9333418	total: 158ms	remaining: 1.1s
+    125:	learn: 4500.0897217	total: 159ms	remaining: 1.1s
+    126:	learn: 4497.9395727	total: 161ms	remaining: 1.1s
+    127:	learn: 4494.7137259	total: 162ms	remaining: 1.1s
+    128:	learn: 4493.7395176	total: 163ms	remaining: 1.1s
+    129:	learn: 4491.8388367	total: 165ms	remaining: 1.1s
+    130:	learn: 4491.2085273	total: 165ms	remaining: 1.09s
+    131:	learn: 4490.5230749	total: 166ms	remaining: 1.09s
+    132:	learn: 4488.6981465	total: 167ms	remaining: 1.08s
+    133:	learn: 4487.4469299	total: 168ms	remaining: 1.08s
+    134:	learn: 4486.8027424	total: 168ms	remaining: 1.08s
+    135:	learn: 4485.7861978	total: 169ms	remaining: 1.07s
+    136:	learn: 4482.7780908	total: 170ms	remaining: 1.07s
+    137:	learn: 4481.3175939	total: 171ms	remaining: 1.07s
+    138:	learn: 4479.7621359	total: 172ms	remaining: 1.06s
+    139:	learn: 4477.6634105	total: 173ms	remaining: 1.06s
+    140:	learn: 4476.3202312	total: 174ms	remaining: 1.06s
+    141:	learn: 4475.7936471	total: 175ms	remaining: 1.05s
+    142:	learn: 4474.1918487	total: 176ms	remaining: 1.05s
+    143:	learn: 4473.5538893	total: 177ms	remaining: 1.05s
+    144:	learn: 4473.0234543	total: 177ms	remaining: 1.04s
+    145:	learn: 4470.7349192	total: 178ms	remaining: 1.04s
+    146:	learn: 4469.6971847	total: 179ms	remaining: 1.04s
+    147:	learn: 4469.2258432	total: 180ms	remaining: 1.04s
+    148:	learn: 4467.4929471	total: 183ms	remaining: 1.04s
+    149:	learn: 4466.1577623	total: 188ms	remaining: 1.07s
+    150:	learn: 4463.8494385	total: 190ms	remaining: 1.07s
+    151:	learn: 4461.6017175	total: 191ms	remaining: 1.07s
+    152:	learn: 4461.5829241	total: 192ms	remaining: 1.06s
+    153:	learn: 4460.6110323	total: 193ms	remaining: 1.06s
+    154:	learn: 4458.7372365	total: 195ms	remaining: 1.06s
+    155:	learn: 4456.8849159	total: 196ms	remaining: 1.06s
+    156:	learn: 4456.4474015	total: 197ms	remaining: 1.06s
+    157:	learn: 4454.9515167	total: 198ms	remaining: 1.05s
+    158:	learn: 4454.0267733	total: 200ms	remaining: 1.05s
+    159:	learn: 4453.1831394	total: 201ms	remaining: 1.05s
+    160:	learn: 4452.1127509	total: 202ms	remaining: 1.05s
+    161:	learn: 4448.3239057	total: 204ms	remaining: 1.05s
+    162:	learn: 4447.2682762	total: 205ms	remaining: 1.05s
+    163:	learn: 4446.0733204	total: 207ms	remaining: 1.05s
+    164:	learn: 4442.8021694	total: 208ms	remaining: 1.05s
+    165:	learn: 4441.8828490	total: 210ms	remaining: 1.05s
+    166:	learn: 4439.2150572	total: 211ms	remaining: 1.05s
+    167:	learn: 4438.2429904	total: 212ms	remaining: 1.05s
+    168:	learn: 4435.4294250	total: 214ms	remaining: 1.05s
+    169:	learn: 4434.4217557	total: 215ms	remaining: 1.05s
+    170:	learn: 4433.8725357	total: 216ms	remaining: 1.05s
+    171:	learn: 4433.5158121	total: 217ms	remaining: 1.04s
+    172:	learn: 4431.8780294	total: 218ms	remaining: 1.04s
+    173:	learn: 4429.7497300	total: 220ms	remaining: 1.04s
+    174:	learn: 4427.6218198	total: 221ms	remaining: 1.04s
+    175:	learn: 4427.1286526	total: 222ms	remaining: 1.04s
+    176:	learn: 4423.7020514	total: 223ms	remaining: 1.04s
+    177:	learn: 4421.0624710	total: 224ms	remaining: 1.03s
+    178:	learn: 4420.6261485	total: 225ms	remaining: 1.03s
+    179:	learn: 4419.4950341	total: 226ms	remaining: 1.03s
+    180:	learn: 4418.1343415	total: 227ms	remaining: 1.03s
+    181:	learn: 4417.8052868	total: 228ms	remaining: 1.02s
+    182:	learn: 4415.6618663	total: 229ms	remaining: 1.02s
+    183:	learn: 4414.2010129	total: 230ms	remaining: 1.02s
+    184:	learn: 4411.8771812	total: 231ms	remaining: 1.02s
+    185:	learn: 4409.6462930	total: 232ms	remaining: 1.01s
+    186:	learn: 4407.6300861	total: 233ms	remaining: 1.01s
+    187:	learn: 4405.5308897	total: 234ms	remaining: 1.01s
+    188:	learn: 4405.1822056	total: 235ms	remaining: 1.01s
+    189:	learn: 4403.4688154	total: 236ms	remaining: 1s
+    190:	learn: 4401.6427860	total: 237ms	remaining: 1s
+    191:	learn: 4398.6094604	total: 238ms	remaining: 1s
+    192:	learn: 4397.1915225	total: 239ms	remaining: 999ms
+    193:	learn: 4395.1989070	total: 240ms	remaining: 996ms
+    194:	learn: 4393.2368469	total: 241ms	remaining: 994ms
+    195:	learn: 4392.3477760	total: 242ms	remaining: 992ms
+    196:	learn: 4391.4085201	total: 243ms	remaining: 990ms
+    197:	learn: 4389.7599140	total: 244ms	remaining: 988ms
+    198:	learn: 4388.9012432	total: 245ms	remaining: 986ms
+    199:	learn: 4386.1026923	total: 246ms	remaining: 984ms
+    200:	learn: 4383.4245827	total: 247ms	remaining: 982ms
+    201:	learn: 4381.3005373	total: 248ms	remaining: 980ms
+    202:	learn: 4378.4006461	total: 249ms	remaining: 978ms
+    203:	learn: 4376.2310147	total: 250ms	remaining: 976ms
+    204:	learn: 4375.6733447	total: 251ms	remaining: 975ms
+    205:	learn: 4372.9413123	total: 252ms	remaining: 972ms
+    206:	learn: 4369.6965749	total: 253ms	remaining: 971ms
+    207:	learn: 4366.9562212	total: 254ms	remaining: 969ms
+    208:	learn: 4366.0718045	total: 255ms	remaining: 967ms
+    209:	learn: 4365.0709432	total: 256ms	remaining: 965ms
+    210:	learn: 4363.9136623	total: 257ms	remaining: 963ms
+    211:	learn: 4360.6445644	total: 258ms	remaining: 961ms
+    212:	learn: 4356.7505193	total: 260ms	remaining: 959ms
+    213:	learn: 4355.2683023	total: 261ms	remaining: 957ms
+    214:	learn: 4352.8904263	total: 262ms	remaining: 956ms
+    215:	learn: 4351.0915878	total: 263ms	remaining: 954ms
+    216:	learn: 4349.8090880	total: 264ms	remaining: 952ms
+    217:	learn: 4348.5033601	total: 265ms	remaining: 950ms
+    218:	learn: 4346.2500464	total: 266ms	remaining: 948ms
+    219:	learn: 4343.4572317	total: 267ms	remaining: 946ms
+    220:	learn: 4341.0372538	total: 268ms	remaining: 945ms
+    221:	learn: 4336.9692196	total: 269ms	remaining: 943ms
+    222:	learn: 4333.2022758	total: 270ms	remaining: 942ms
+    223:	learn: 4331.0289679	total: 271ms	remaining: 940ms
+    224:	learn: 4328.1662369	total: 272ms	remaining: 938ms
+    225:	learn: 4326.5351744	total: 273ms	remaining: 936ms
+    226:	learn: 4323.3772461	total: 274ms	remaining: 934ms
+    227:	learn: 4322.3938242	total: 276ms	remaining: 933ms
+    228:	learn: 4320.4428117	total: 277ms	remaining: 931ms
+    229:	learn: 4319.4020290	total: 278ms	remaining: 930ms
+    230:	learn: 4316.9439123	total: 279ms	remaining: 929ms
+    231:	learn: 4315.1514307	total: 280ms	remaining: 927ms
+    232:	learn: 4311.5743057	total: 281ms	remaining: 925ms
+    233:	learn: 4310.6744377	total: 282ms	remaining: 923ms
+    234:	learn: 4309.8081032	total: 283ms	remaining: 922ms
+    235:	learn: 4305.0662116	total: 284ms	remaining: 920ms
+    236:	learn: 4302.9364579	total: 285ms	remaining: 919ms
+    237:	learn: 4300.4363462	total: 287ms	remaining: 917ms
+    238:	learn: 4298.7865062	total: 288ms	remaining: 916ms
+    239:	learn: 4296.6473278	total: 289ms	remaining: 914ms
+    240:	learn: 4294.4833524	total: 290ms	remaining: 912ms
+    241:	learn: 4292.4154126	total: 291ms	remaining: 910ms
+    242:	learn: 4291.3892528	total: 292ms	remaining: 908ms
+    243:	learn: 4288.3470079	total: 293ms	remaining: 907ms
+    244:	learn: 4287.3963346	total: 294ms	remaining: 905ms
+    245:	learn: 4285.6022808	total: 295ms	remaining: 904ms
+    246:	learn: 4284.9258600	total: 296ms	remaining: 902ms
+    247:	learn: 4283.7734312	total: 297ms	remaining: 901ms
+    248:	learn: 4283.5985701	total: 298ms	remaining: 898ms
+    249:	learn: 4283.1354516	total: 299ms	remaining: 896ms
+    250:	learn: 4281.4916352	total: 300ms	remaining: 895ms
+    251:	learn: 4279.2398051	total: 301ms	remaining: 893ms
+    252:	learn: 4278.3062288	total: 302ms	remaining: 891ms
+    253:	learn: 4276.7381971	total: 303ms	remaining: 889ms
+    254:	learn: 4275.5596172	total: 304ms	remaining: 887ms
+    255:	learn: 4274.6803493	total: 305ms	remaining: 886ms
+    256:	learn: 4272.9592734	total: 306ms	remaining: 884ms
+    257:	learn: 4268.8266160	total: 307ms	remaining: 883ms
+    258:	learn: 4266.9704747	total: 308ms	remaining: 881ms
+    259:	learn: 4264.0877861	total: 309ms	remaining: 879ms
+    260:	learn: 4262.2387141	total: 310ms	remaining: 878ms
+    261:	learn: 4261.3643727	total: 311ms	remaining: 876ms
+    262:	learn: 4258.9381961	total: 312ms	remaining: 874ms
+    263:	learn: 4257.9398251	total: 313ms	remaining: 872ms
+    264:	learn: 4254.6303467	total: 314ms	remaining: 871ms
+    265:	learn: 4252.0644192	total: 315ms	remaining: 869ms
+    266:	learn: 4249.9913357	total: 316ms	remaining: 867ms
+    267:	learn: 4248.7302670	total: 317ms	remaining: 865ms
+    268:	learn: 4247.8858789	total: 318ms	remaining: 863ms
+    269:	learn: 4246.1360865	total: 319ms	remaining: 862ms
+    270:	learn: 4245.2678338	total: 320ms	remaining: 860ms
+    271:	learn: 4244.5464388	total: 321ms	remaining: 859ms
+    272:	learn: 4242.9970768	total: 322ms	remaining: 857ms
+    273:	learn: 4240.5426407	total: 323ms	remaining: 855ms
+    274:	learn: 4238.4448197	total: 324ms	remaining: 854ms
+    275:	learn: 4237.9166273	total: 325ms	remaining: 852ms
+    276:	learn: 4235.8824234	total: 326ms	remaining: 850ms
+    277:	learn: 4232.9564337	total: 327ms	remaining: 849ms
+    278:	learn: 4232.3777274	total: 328ms	remaining: 847ms
+    279:	learn: 4231.2896177	total: 329ms	remaining: 846ms
+    280:	learn: 4229.9066476	total: 330ms	remaining: 845ms
+    281:	learn: 4229.2739557	total: 331ms	remaining: 843ms
+    282:	learn: 4228.6284893	total: 332ms	remaining: 842ms
+    283:	learn: 4227.0132890	total: 333ms	remaining: 840ms
+    284:	learn: 4225.4915320	total: 334ms	remaining: 839ms
+    285:	learn: 4223.2173332	total: 335ms	remaining: 837ms
+    286:	learn: 4221.6866568	total: 336ms	remaining: 836ms
+    287:	learn: 4219.3970988	total: 337ms	remaining: 834ms
+    288:	learn: 4217.2864235	total: 338ms	remaining: 833ms
+    289:	learn: 4215.6515571	total: 339ms	remaining: 831ms
+    290:	learn: 4213.4643770	total: 341ms	remaining: 830ms
+    291:	learn: 4211.5065962	total: 342ms	remaining: 829ms
+    292:	learn: 4210.4423211	total: 343ms	remaining: 827ms
+    293:	learn: 4206.0732703	total: 344ms	remaining: 826ms
+    294:	learn: 4205.4502478	total: 345ms	remaining: 824ms
+    295:	learn: 4204.8453870	total: 346ms	remaining: 823ms
+    296:	learn: 4203.4341847	total: 347ms	remaining: 821ms
+    297:	learn: 4201.4834600	total: 348ms	remaining: 820ms
+    298:	learn: 4200.7375060	total: 349ms	remaining: 818ms
+    299:	learn: 4199.9111249	total: 350ms	remaining: 817ms
+    300:	learn: 4198.2131004	total: 351ms	remaining: 815ms
+    301:	learn: 4196.1188855	total: 352ms	remaining: 813ms
+    302:	learn: 4194.9289332	total: 353ms	remaining: 812ms
+    303:	learn: 4193.9184871	total: 354ms	remaining: 810ms
+    304:	learn: 4191.9818046	total: 355ms	remaining: 809ms
+    305:	learn: 4191.4073657	total: 356ms	remaining: 808ms
+    306:	learn: 4190.6203675	total: 357ms	remaining: 806ms
+    307:	learn: 4189.9816720	total: 358ms	remaining: 805ms
+    308:	learn: 4189.3505396	total: 359ms	remaining: 803ms
+    309:	learn: 4187.3056078	total: 360ms	remaining: 802ms
+    310:	learn: 4185.1197944	total: 361ms	remaining: 800ms
+    311:	learn: 4184.5196301	total: 362ms	remaining: 799ms
+    312:	learn: 4183.9336630	total: 363ms	remaining: 797ms
+    313:	learn: 4183.1034071	total: 364ms	remaining: 796ms
+    314:	learn: 4181.5796643	total: 368ms	remaining: 799ms
+    315:	learn: 4180.7695198	total: 374ms	remaining: 809ms
+    316:	learn: 4179.3489636	total: 375ms	remaining: 808ms
+    317:	learn: 4176.9970565	total: 376ms	remaining: 807ms
+    318:	learn: 4175.1813635	total: 378ms	remaining: 807ms
+    319:	learn: 4171.9798637	total: 379ms	remaining: 806ms
+    320:	learn: 4171.4179246	total: 381ms	remaining: 805ms
+    321:	learn: 4169.9299465	total: 382ms	remaining: 805ms
+    322:	learn: 4167.9805186	total: 383ms	remaining: 804ms
+    323:	learn: 4166.7554870	total: 385ms	remaining: 803ms
+    324:	learn: 4164.8553902	total: 386ms	remaining: 801ms
+    325:	learn: 4164.0634841	total: 387ms	remaining: 800ms
+    326:	learn: 4162.2102206	total: 388ms	remaining: 799ms
+    327:	learn: 4161.4233330	total: 390ms	remaining: 799ms
+    328:	learn: 4160.7375528	total: 391ms	remaining: 798ms
+    329:	learn: 4158.9285980	total: 393ms	remaining: 798ms
+    330:	learn: 4157.1637200	total: 394ms	remaining: 796ms
+    331:	learn: 4156.1686598	total: 395ms	remaining: 796ms
+    332:	learn: 4154.4457676	total: 397ms	remaining: 795ms
+    333:	learn: 4153.7736988	total: 398ms	remaining: 794ms
+    334:	learn: 4152.9548150	total: 399ms	remaining: 792ms
+    335:	learn: 4152.3373406	total: 400ms	remaining: 791ms
+    336:	learn: 4150.7538436	total: 401ms	remaining: 790ms
+    337:	learn: 4149.0715313	total: 402ms	remaining: 788ms
+    338:	learn: 4148.4385808	total: 403ms	remaining: 787ms
+    339:	learn: 4145.7154112	total: 404ms	remaining: 785ms
+    340:	learn: 4143.5498764	total: 406ms	remaining: 784ms
+    341:	learn: 4143.0160416	total: 407ms	remaining: 782ms
+    342:	learn: 4141.2060081	total: 408ms	remaining: 781ms
+    343:	learn: 4139.5610445	total: 409ms	remaining: 779ms
+    344:	learn: 4139.1131944	total: 410ms	remaining: 778ms
+    345:	learn: 4136.9852094	total: 411ms	remaining: 776ms
+    346:	learn: 4136.1619820	total: 412ms	remaining: 774ms
+    347:	learn: 4134.5558263	total: 413ms	remaining: 773ms
+    348:	learn: 4133.6988918	total: 414ms	remaining: 771ms
+    349:	learn: 4133.2564099	total: 415ms	remaining: 770ms
+    350:	learn: 4131.1975512	total: 416ms	remaining: 769ms
+    351:	learn: 4129.2036185	total: 417ms	remaining: 767ms
+    352:	learn: 4127.8007816	total: 418ms	remaining: 766ms
+    353:	learn: 4126.2309251	total: 419ms	remaining: 764ms
+    354:	learn: 4123.5003243	total: 420ms	remaining: 763ms
+    355:	learn: 4121.6137302	total: 421ms	remaining: 762ms
+    356:	learn: 4119.9515837	total: 422ms	remaining: 760ms
+    357:	learn: 4118.4238906	total: 423ms	remaining: 759ms
+    358:	learn: 4116.8158122	total: 424ms	remaining: 757ms
+    359:	learn: 4116.2254797	total: 425ms	remaining: 756ms
+    360:	learn: 4114.7719939	total: 426ms	remaining: 754ms
+    361:	learn: 4114.0576319	total: 427ms	remaining: 753ms
+    362:	learn: 4113.6478308	total: 428ms	remaining: 751ms
+    363:	learn: 4112.0964483	total: 429ms	remaining: 750ms
+    364:	learn: 4109.0209836	total: 430ms	remaining: 749ms
+    365:	learn: 4107.5480882	total: 431ms	remaining: 747ms
+    366:	learn: 4105.5334102	total: 432ms	remaining: 746ms
+    367:	learn: 4103.7869959	total: 433ms	remaining: 744ms
+    368:	learn: 4102.0601476	total: 434ms	remaining: 743ms
+    369:	learn: 4101.2169952	total: 436ms	remaining: 742ms
+    370:	learn: 4100.5041454	total: 437ms	remaining: 740ms
+    371:	learn: 4099.1520180	total: 438ms	remaining: 739ms
+    372:	learn: 4097.2336987	total: 439ms	remaining: 738ms
+    373:	learn: 4095.8278931	total: 440ms	remaining: 736ms
+    374:	learn: 4095.4222063	total: 441ms	remaining: 735ms
+    375:	learn: 4093.6457324	total: 442ms	remaining: 733ms
+    376:	learn: 4092.2352877	total: 443ms	remaining: 732ms
+    377:	learn: 4091.3705083	total: 444ms	remaining: 731ms
+    378:	learn: 4088.3244903	total: 445ms	remaining: 729ms
+    379:	learn: 4085.3341647	total: 446ms	remaining: 728ms
+    380:	learn: 4085.0111429	total: 447ms	remaining: 726ms
+    381:	learn: 4083.6822897	total: 448ms	remaining: 725ms
+    382:	learn: 4081.9101288	total: 449ms	remaining: 723ms
+    383:	learn: 4080.5481256	total: 450ms	remaining: 722ms
+    384:	learn: 4079.2180111	total: 451ms	remaining: 721ms
+    385:	learn: 4077.4989100	total: 452ms	remaining: 719ms
+    386:	learn: 4074.7605890	total: 453ms	remaining: 718ms
+    387:	learn: 4073.7573958	total: 454ms	remaining: 717ms
+    388:	learn: 4070.8830950	total: 455ms	remaining: 715ms
+    389:	learn: 4069.8401067	total: 456ms	remaining: 714ms
+    390:	learn: 4067.2199572	total: 457ms	remaining: 712ms
+    391:	learn: 4066.4380585	total: 458ms	remaining: 711ms
+    392:	learn: 4064.9680011	total: 459ms	remaining: 709ms
+    393:	learn: 4063.6646070	total: 460ms	remaining: 708ms
+    394:	learn: 4061.9732982	total: 461ms	remaining: 707ms
+    395:	learn: 4061.4331004	total: 463ms	remaining: 706ms
+    396:	learn: 4059.7808114	total: 464ms	remaining: 704ms
+    397:	learn: 4058.5059719	total: 465ms	remaining: 703ms
+    398:	learn: 4057.2604814	total: 466ms	remaining: 701ms
+    399:	learn: 4056.2085089	total: 467ms	remaining: 700ms
+    400:	learn: 4055.7665071	total: 468ms	remaining: 699ms
+    401:	learn: 4055.2289566	total: 469ms	remaining: 697ms
+    402:	learn: 4052.9838627	total: 470ms	remaining: 696ms
+    403:	learn: 4050.3244827	total: 471ms	remaining: 694ms
+    404:	learn: 4049.8431680	total: 472ms	remaining: 693ms
+    405:	learn: 4048.1502538	total: 473ms	remaining: 692ms
+    406:	learn: 4046.9360731	total: 474ms	remaining: 690ms
+    407:	learn: 4045.9001823	total: 475ms	remaining: 689ms
+    408:	learn: 4043.4314560	total: 476ms	remaining: 688ms
+    409:	learn: 4042.7359148	total: 477ms	remaining: 686ms
+    410:	learn: 4041.5207747	total: 478ms	remaining: 685ms
+    411:	learn: 4041.0329863	total: 479ms	remaining: 684ms
+    412:	learn: 4040.3693406	total: 480ms	remaining: 682ms
+    413:	learn: 4039.6431490	total: 481ms	remaining: 681ms
+    414:	learn: 4038.2455107	total: 482ms	remaining: 679ms
+    415:	learn: 4035.5267573	total: 483ms	remaining: 678ms
+    416:	learn: 4035.0551065	total: 484ms	remaining: 677ms
+    417:	learn: 4033.9084910	total: 485ms	remaining: 675ms
+    418:	learn: 4032.5336138	total: 486ms	remaining: 674ms
+    419:	learn: 4031.5586603	total: 487ms	remaining: 673ms
+    420:	learn: 4030.2189408	total: 488ms	remaining: 671ms
+    421:	learn: 4026.7144036	total: 489ms	remaining: 670ms
+    422:	learn: 4025.9921364	total: 490ms	remaining: 669ms
+    423:	learn: 4023.6387182	total: 491ms	remaining: 667ms
+    424:	learn: 4021.0118227	total: 492ms	remaining: 666ms
+    425:	learn: 4019.6935173	total: 493ms	remaining: 665ms
+    426:	learn: 4019.3140646	total: 494ms	remaining: 663ms
+    427:	learn: 4017.2045827	total: 495ms	remaining: 662ms
+    428:	learn: 4015.8900130	total: 496ms	remaining: 661ms
+    429:	learn: 4014.6687951	total: 497ms	remaining: 659ms
+    430:	learn: 4013.2429713	total: 498ms	remaining: 658ms
+    431:	learn: 4011.8501681	total: 499ms	remaining: 657ms
+    432:	learn: 4010.7173013	total: 500ms	remaining: 655ms
+    433:	learn: 4008.5762615	total: 501ms	remaining: 654ms
+    434:	learn: 4007.4267178	total: 502ms	remaining: 653ms
+    435:	learn: 4006.2367891	total: 503ms	remaining: 651ms
+    436:	learn: 4005.2001065	total: 505ms	remaining: 650ms
+    437:	learn: 4001.3585655	total: 505ms	remaining: 649ms
+    438:	learn: 3999.2591573	total: 507ms	remaining: 647ms
+    439:	learn: 3997.7928336	total: 508ms	remaining: 646ms
+    440:	learn: 3996.3671049	total: 509ms	remaining: 645ms
+    441:	learn: 3995.2677065	total: 510ms	remaining: 643ms
+    442:	learn: 3994.1413812	total: 511ms	remaining: 642ms
+    443:	learn: 3993.8686410	total: 512ms	remaining: 641ms
+    444:	learn: 3992.7188644	total: 513ms	remaining: 639ms
+    445:	learn: 3991.5954799	total: 513ms	remaining: 638ms
+    446:	learn: 3990.4977439	total: 514ms	remaining: 636ms
+    447:	learn: 3987.7308801	total: 515ms	remaining: 635ms
+    448:	learn: 3987.3703753	total: 517ms	remaining: 634ms
+    449:	learn: 3986.5447797	total: 518ms	remaining: 633ms
+    450:	learn: 3985.1841214	total: 519ms	remaining: 631ms
+    451:	learn: 3984.1095806	total: 520ms	remaining: 630ms
+    452:	learn: 3983.3670878	total: 521ms	remaining: 629ms
+    453:	learn: 3983.1013112	total: 522ms	remaining: 627ms
+    454:	learn: 3981.3382266	total: 523ms	remaining: 626ms
+    455:	learn: 3978.8853265	total: 524ms	remaining: 625ms
+    456:	learn: 3978.5558357	total: 525ms	remaining: 624ms
+    457:	learn: 3977.8637621	total: 526ms	remaining: 622ms
+    458:	learn: 3977.1925469	total: 527ms	remaining: 621ms
+    459:	learn: 3976.1400760	total: 528ms	remaining: 620ms
+    460:	learn: 3975.8477394	total: 529ms	remaining: 618ms
+    461:	learn: 3974.3004935	total: 530ms	remaining: 617ms
+    462:	learn: 3973.3389783	total: 531ms	remaining: 616ms
+    463:	learn: 3972.9923782	total: 532ms	remaining: 615ms
+    464:	learn: 3972.0094286	total: 533ms	remaining: 613ms
+    465:	learn: 3971.8125240	total: 534ms	remaining: 612ms
+    466:	learn: 3968.3694803	total: 535ms	remaining: 611ms
+    467:	learn: 3967.0902924	total: 536ms	remaining: 609ms
+    468:	learn: 3965.1610453	total: 537ms	remaining: 608ms
+    469:	learn: 3964.0720624	total: 538ms	remaining: 607ms
+    470:	learn: 3962.6317094	total: 539ms	remaining: 606ms
+    471:	learn: 3962.1775240	total: 540ms	remaining: 604ms
+    472:	learn: 3958.5680767	total: 541ms	remaining: 603ms
+    473:	learn: 3957.5799384	total: 542ms	remaining: 602ms
+    474:	learn: 3955.6919891	total: 543ms	remaining: 600ms
+    475:	learn: 3955.1117415	total: 544ms	remaining: 599ms
+    476:	learn: 3953.9777596	total: 545ms	remaining: 598ms
+    477:	learn: 3951.9509165	total: 546ms	remaining: 596ms
+    478:	learn: 3950.9841706	total: 547ms	remaining: 595ms
+    479:	learn: 3950.2224890	total: 548ms	remaining: 594ms
+    480:	learn: 3948.1943980	total: 552ms	remaining: 595ms
+    481:	learn: 3947.2484969	total: 557ms	remaining: 599ms
+    482:	learn: 3946.9957119	total: 559ms	remaining: 598ms
+    483:	learn: 3945.5503205	total: 560ms	remaining: 597ms
+    484:	learn: 3943.6220121	total: 561ms	remaining: 596ms
+    485:	learn: 3942.6090130	total: 563ms	remaining: 595ms
+    486:	learn: 3941.4787762	total: 564ms	remaining: 595ms
+    487:	learn: 3940.5859034	total: 566ms	remaining: 594ms
+    488:	learn: 3939.1758173	total: 567ms	remaining: 593ms
+    489:	learn: 3938.4385329	total: 569ms	remaining: 592ms
+    490:	learn: 3937.7537361	total: 570ms	remaining: 591ms
+    491:	learn: 3936.3429485	total: 571ms	remaining: 590ms
+    492:	learn: 3935.0482891	total: 573ms	remaining: 589ms
+    493:	learn: 3933.7117712	total: 574ms	remaining: 588ms
+    494:	learn: 3932.2032107	total: 576ms	remaining: 587ms
+    495:	learn: 3931.6284000	total: 577ms	remaining: 586ms
+    496:	learn: 3930.0632000	total: 578ms	remaining: 585ms
+    497:	learn: 3927.1966339	total: 580ms	remaining: 585ms
+    498:	learn: 3925.1713307	total: 581ms	remaining: 584ms
+    499:	learn: 3923.6007024	total: 582ms	remaining: 582ms
+    500:	learn: 3922.0527790	total: 584ms	remaining: 582ms
+    501:	learn: 3920.5599172	total: 585ms	remaining: 581ms
+    502:	learn: 3918.0005806	total: 586ms	remaining: 579ms
+    503:	learn: 3913.9765705	total: 587ms	remaining: 578ms
+    504:	learn: 3910.6023113	total: 589ms	remaining: 577ms
+    505:	learn: 3910.1774181	total: 589ms	remaining: 575ms
+    506:	learn: 3907.4156601	total: 590ms	remaining: 574ms
+    507:	learn: 3906.7657949	total: 592ms	remaining: 573ms
+    508:	learn: 3905.4193872	total: 592ms	remaining: 571ms
+    509:	learn: 3904.0314572	total: 593ms	remaining: 570ms
+    510:	learn: 3902.9370671	total: 595ms	remaining: 569ms
+    511:	learn: 3901.3076185	total: 596ms	remaining: 568ms
+    512:	learn: 3898.0059731	total: 597ms	remaining: 567ms
+    513:	learn: 3897.4157429	total: 598ms	remaining: 565ms
+    514:	learn: 3896.3651985	total: 599ms	remaining: 564ms
+    515:	learn: 3893.2193909	total: 600ms	remaining: 563ms
+    516:	learn: 3892.0178076	total: 602ms	remaining: 562ms
+    517:	learn: 3891.3588921	total: 603ms	remaining: 561ms
+    518:	learn: 3890.1269445	total: 604ms	remaining: 560ms
+    519:	learn: 3889.6318262	total: 605ms	remaining: 558ms
+    520:	learn: 3888.7841994	total: 606ms	remaining: 557ms
+    521:	learn: 3887.5765995	total: 607ms	remaining: 556ms
+    522:	learn: 3884.8985954	total: 608ms	remaining: 555ms
+    523:	learn: 3884.0696518	total: 609ms	remaining: 553ms
+    524:	learn: 3883.7306548	total: 610ms	remaining: 552ms
+    525:	learn: 3883.4982286	total: 611ms	remaining: 551ms
+    526:	learn: 3882.3150123	total: 612ms	remaining: 549ms
+    527:	learn: 3880.6461706	total: 613ms	remaining: 548ms
+    528:	learn: 3877.4696850	total: 614ms	remaining: 547ms
+    529:	learn: 3875.7711223	total: 615ms	remaining: 546ms
+    530:	learn: 3875.2104362	total: 616ms	remaining: 544ms
+    531:	learn: 3874.6835364	total: 617ms	remaining: 543ms
+    532:	learn: 3871.7871667	total: 618ms	remaining: 542ms
+    533:	learn: 3870.2157891	total: 619ms	remaining: 541ms
+    534:	learn: 3869.8598510	total: 620ms	remaining: 539ms
+    535:	learn: 3869.7313878	total: 621ms	remaining: 538ms
+    536:	learn: 3868.3137813	total: 623ms	remaining: 537ms
+    537:	learn: 3867.0407354	total: 624ms	remaining: 535ms
+    538:	learn: 3865.5441555	total: 625ms	remaining: 534ms
+    539:	learn: 3864.7336783	total: 626ms	remaining: 533ms
+    540:	learn: 3863.7541375	total: 627ms	remaining: 532ms
+    541:	learn: 3862.9744089	total: 628ms	remaining: 531ms
+    542:	learn: 3861.0185758	total: 629ms	remaining: 529ms
+    543:	learn: 3859.0931937	total: 630ms	remaining: 528ms
+    544:	learn: 3858.4750441	total: 631ms	remaining: 527ms
+    545:	learn: 3856.9679322	total: 632ms	remaining: 526ms
+    546:	learn: 3855.4059636	total: 633ms	remaining: 524ms
+    547:	learn: 3853.9112607	total: 634ms	remaining: 523ms
+    548:	learn: 3852.1024701	total: 635ms	remaining: 522ms
+    549:	learn: 3851.0809317	total: 636ms	remaining: 521ms
+    550:	learn: 3850.1989053	total: 637ms	remaining: 519ms
+    551:	learn: 3848.4044197	total: 638ms	remaining: 518ms
+    552:	learn: 3847.3305087	total: 639ms	remaining: 517ms
+    553:	learn: 3846.5762677	total: 640ms	remaining: 516ms
+    554:	learn: 3846.2333784	total: 641ms	remaining: 514ms
+    555:	learn: 3845.7029229	total: 642ms	remaining: 513ms
+    556:	learn: 3844.7892462	total: 643ms	remaining: 512ms
+    557:	learn: 3841.7169921	total: 644ms	remaining: 510ms
+    558:	learn: 3839.1407691	total: 646ms	remaining: 509ms
+    559:	learn: 3838.0434454	total: 647ms	remaining: 508ms
+    560:	learn: 3836.7693405	total: 648ms	remaining: 507ms
+    561:	learn: 3835.6260066	total: 649ms	remaining: 506ms
+    562:	learn: 3834.7096771	total: 650ms	remaining: 504ms
+    563:	learn: 3832.5139303	total: 651ms	remaining: 503ms
+    564:	learn: 3831.8466834	total: 652ms	remaining: 502ms
+    565:	learn: 3828.8442871	total: 653ms	remaining: 501ms
+    566:	learn: 3828.0420737	total: 654ms	remaining: 499ms
+    567:	learn: 3826.5024604	total: 655ms	remaining: 498ms
+    568:	learn: 3825.4000558	total: 656ms	remaining: 497ms
+    569:	learn: 3824.5171867	total: 657ms	remaining: 496ms
+    570:	learn: 3823.8739520	total: 658ms	remaining: 494ms
+    571:	learn: 3821.6920177	total: 659ms	remaining: 493ms
+    572:	learn: 3821.3076207	total: 660ms	remaining: 492ms
+    573:	learn: 3819.5422421	total: 661ms	remaining: 491ms
+    574:	learn: 3818.6014680	total: 662ms	remaining: 489ms
+    575:	learn: 3818.2176818	total: 663ms	remaining: 488ms
+    576:	learn: 3818.0135633	total: 664ms	remaining: 487ms
+    577:	learn: 3817.3945804	total: 665ms	remaining: 485ms
+    578:	learn: 3814.7390926	total: 666ms	remaining: 484ms
+    579:	learn: 3811.9625156	total: 667ms	remaining: 483ms
+    580:	learn: 3809.5750885	total: 668ms	remaining: 482ms
+    581:	learn: 3808.1662564	total: 669ms	remaining: 481ms
+    582:	learn: 3806.9853480	total: 670ms	remaining: 479ms
+    583:	learn: 3805.8436401	total: 671ms	remaining: 478ms
+    584:	learn: 3803.6581665	total: 672ms	remaining: 477ms
+    585:	learn: 3801.5526965	total: 673ms	remaining: 476ms
+    586:	learn: 3801.3518831	total: 674ms	remaining: 475ms
+    587:	learn: 3801.0058652	total: 676ms	remaining: 473ms
+    588:	learn: 3798.3242001	total: 677ms	remaining: 472ms
+    589:	learn: 3796.8369811	total: 678ms	remaining: 471ms
+    590:	learn: 3794.1157778	total: 679ms	remaining: 470ms
+    591:	learn: 3793.6389882	total: 680ms	remaining: 468ms
+    592:	learn: 3792.5192232	total: 681ms	remaining: 467ms
+    593:	learn: 3791.4846919	total: 682ms	remaining: 466ms
+    594:	learn: 3790.2012909	total: 683ms	remaining: 465ms
+    595:	learn: 3788.7455426	total: 684ms	remaining: 464ms
+    596:	learn: 3787.5049827	total: 685ms	remaining: 462ms
+    597:	learn: 3786.2903865	total: 686ms	remaining: 461ms
+    598:	learn: 3785.5400154	total: 687ms	remaining: 460ms
+    599:	learn: 3784.6524147	total: 688ms	remaining: 459ms
+    600:	learn: 3781.6751708	total: 689ms	remaining: 458ms
+    601:	learn: 3780.5331960	total: 690ms	remaining: 456ms
+    602:	learn: 3779.2457866	total: 692ms	remaining: 455ms
+    603:	learn: 3777.6144801	total: 693ms	remaining: 454ms
+    604:	learn: 3777.2355625	total: 694ms	remaining: 453ms
+    605:	learn: 3776.6386215	total: 695ms	remaining: 452ms
+    606:	learn: 3775.9037037	total: 696ms	remaining: 451ms
+    607:	learn: 3774.8066401	total: 697ms	remaining: 450ms
+    608:	learn: 3771.9323939	total: 698ms	remaining: 448ms
+    609:	learn: 3770.6796117	total: 699ms	remaining: 447ms
+    610:	learn: 3768.7296256	total: 700ms	remaining: 446ms
+    611:	learn: 3767.6725094	total: 701ms	remaining: 445ms
+    612:	learn: 3766.5297077	total: 702ms	remaining: 443ms
+    613:	learn: 3765.6603403	total: 703ms	remaining: 442ms
+    614:	learn: 3765.0381486	total: 704ms	remaining: 441ms
+    615:	learn: 3764.8517231	total: 705ms	remaining: 440ms
+    616:	learn: 3763.9076477	total: 707ms	remaining: 439ms
+    617:	learn: 3762.4750748	total: 708ms	remaining: 438ms
+    618:	learn: 3761.6598594	total: 709ms	remaining: 437ms
+    619:	learn: 3760.2246964	total: 711ms	remaining: 436ms
+    620:	learn: 3759.4198777	total: 712ms	remaining: 435ms
+    621:	learn: 3758.1368766	total: 713ms	remaining: 433ms
+    622:	learn: 3756.3495400	total: 715ms	remaining: 432ms
+    623:	learn: 3755.3247197	total: 716ms	remaining: 431ms
+    624:	learn: 3754.9907936	total: 717ms	remaining: 430ms
+    625:	learn: 3754.6411676	total: 718ms	remaining: 429ms
+    626:	learn: 3753.6401681	total: 719ms	remaining: 428ms
+    627:	learn: 3751.6541062	total: 720ms	remaining: 427ms
+    628:	learn: 3750.6137726	total: 721ms	remaining: 425ms
+    629:	learn: 3749.7857261	total: 722ms	remaining: 424ms
+    630:	learn: 3749.3328507	total: 723ms	remaining: 423ms
+    631:	learn: 3748.1139044	total: 724ms	remaining: 422ms
+    632:	learn: 3747.4617478	total: 725ms	remaining: 421ms
+    633:	learn: 3746.4415626	total: 726ms	remaining: 419ms
+    634:	learn: 3745.6063396	total: 727ms	remaining: 418ms
+    635:	learn: 3744.3603584	total: 729ms	remaining: 417ms
+    636:	learn: 3743.3306541	total: 730ms	remaining: 416ms
+    637:	learn: 3742.7580822	total: 731ms	remaining: 415ms
+    638:	learn: 3741.4143944	total: 732ms	remaining: 413ms
+    639:	learn: 3740.4135470	total: 733ms	remaining: 412ms
+    640:	learn: 3740.2366833	total: 734ms	remaining: 411ms
+    641:	learn: 3739.0184840	total: 739ms	remaining: 412ms
+    642:	learn: 3738.3038480	total: 742ms	remaining: 412ms
+    643:	learn: 3736.8244760	total: 744ms	remaining: 411ms
+    644:	learn: 3735.1913095	total: 745ms	remaining: 410ms
+    645:	learn: 3734.3469583	total: 747ms	remaining: 409ms
+    646:	learn: 3731.7400176	total: 748ms	remaining: 408ms
+    647:	learn: 3729.9040558	total: 749ms	remaining: 407ms
+    648:	learn: 3728.5030226	total: 751ms	remaining: 406ms
+    649:	learn: 3726.1857003	total: 752ms	remaining: 405ms
+    650:	learn: 3725.0140623	total: 754ms	remaining: 404ms
+    651:	learn: 3724.3934852	total: 755ms	remaining: 403ms
+    652:	learn: 3722.6944711	total: 757ms	remaining: 402ms
+    653:	learn: 3722.0833512	total: 758ms	remaining: 401ms
+    654:	learn: 3721.2316274	total: 760ms	remaining: 400ms
+    655:	learn: 3720.3673444	total: 761ms	remaining: 399ms
+    656:	learn: 3719.7949063	total: 762ms	remaining: 398ms
+    657:	learn: 3719.2132848	total: 764ms	remaining: 397ms
+    658:	learn: 3718.6266292	total: 765ms	remaining: 396ms
+    659:	learn: 3717.5491590	total: 766ms	remaining: 395ms
+    660:	learn: 3716.7510069	total: 768ms	remaining: 394ms
+    661:	learn: 3715.3874562	total: 769ms	remaining: 393ms
+    662:	learn: 3714.0898687	total: 771ms	remaining: 392ms
+    663:	learn: 3712.0946334	total: 772ms	remaining: 391ms
+    664:	learn: 3711.9272330	total: 773ms	remaining: 390ms
+    665:	learn: 3710.9403023	total: 774ms	remaining: 388ms
+    666:	learn: 3709.5821108	total: 775ms	remaining: 387ms
+    667:	learn: 3708.8357220	total: 776ms	remaining: 386ms
+    668:	learn: 3707.3468022	total: 778ms	remaining: 385ms
+    669:	learn: 3706.3578521	total: 779ms	remaining: 384ms
+    670:	learn: 3706.1037629	total: 780ms	remaining: 382ms
+    671:	learn: 3704.8937618	total: 781ms	remaining: 381ms
+    672:	learn: 3703.9286467	total: 782ms	remaining: 380ms
+    673:	learn: 3703.1058139	total: 783ms	remaining: 379ms
+    674:	learn: 3701.5786512	total: 784ms	remaining: 377ms
+    675:	learn: 3699.6889642	total: 785ms	remaining: 376ms
+    676:	learn: 3698.6484654	total: 786ms	remaining: 375ms
+    677:	learn: 3697.5147990	total: 787ms	remaining: 374ms
+    678:	learn: 3696.9076310	total: 788ms	remaining: 373ms
+    679:	learn: 3696.1627281	total: 789ms	remaining: 371ms
+    680:	learn: 3695.1601292	total: 790ms	remaining: 370ms
+    681:	learn: 3694.0142826	total: 791ms	remaining: 369ms
+    682:	learn: 3693.7559618	total: 792ms	remaining: 368ms
+    683:	learn: 3692.7918257	total: 793ms	remaining: 367ms
+    684:	learn: 3691.7466016	total: 794ms	remaining: 365ms
+    685:	learn: 3690.7939466	total: 795ms	remaining: 364ms
+    686:	learn: 3689.1885806	total: 797ms	remaining: 363ms
+    687:	learn: 3688.7473556	total: 798ms	remaining: 362ms
+    688:	learn: 3688.4800643	total: 799ms	remaining: 361ms
+    689:	learn: 3687.3857899	total: 800ms	remaining: 359ms
+    690:	learn: 3686.6834433	total: 801ms	remaining: 358ms
+    691:	learn: 3685.7491053	total: 802ms	remaining: 357ms
+    692:	learn: 3683.9377755	total: 803ms	remaining: 356ms
+    693:	learn: 3683.6413228	total: 804ms	remaining: 354ms
+    694:	learn: 3680.3537157	total: 805ms	remaining: 353ms
+    695:	learn: 3679.2614461	total: 806ms	remaining: 352ms
+    696:	learn: 3677.7418001	total: 807ms	remaining: 351ms
+    697:	learn: 3676.8113400	total: 808ms	remaining: 350ms
+    698:	learn: 3674.2671508	total: 809ms	remaining: 348ms
+    699:	learn: 3673.5022044	total: 810ms	remaining: 347ms
+    700:	learn: 3672.5690057	total: 811ms	remaining: 346ms
+    701:	learn: 3672.4026059	total: 812ms	remaining: 345ms
+    702:	learn: 3669.6614129	total: 813ms	remaining: 344ms
+    703:	learn: 3667.8578115	total: 814ms	remaining: 342ms
+    704:	learn: 3666.6767722	total: 815ms	remaining: 341ms
+    705:	learn: 3665.5219432	total: 816ms	remaining: 340ms
+    706:	learn: 3664.3980841	total: 817ms	remaining: 339ms
+    707:	learn: 3663.4481130	total: 818ms	remaining: 338ms
+    708:	learn: 3662.3811259	total: 819ms	remaining: 336ms
+    709:	learn: 3661.2704010	total: 820ms	remaining: 335ms
+    710:	learn: 3660.4569222	total: 821ms	remaining: 334ms
+    711:	learn: 3659.4187546	total: 822ms	remaining: 333ms
+    712:	learn: 3657.9495579	total: 823ms	remaining: 331ms
+    713:	learn: 3656.7414238	total: 824ms	remaining: 330ms
+    714:	learn: 3654.7545351	total: 825ms	remaining: 329ms
+    715:	learn: 3653.9548031	total: 827ms	remaining: 328ms
+    716:	learn: 3652.8668831	total: 828ms	remaining: 327ms
+    717:	learn: 3651.8598069	total: 829ms	remaining: 326ms
+    718:	learn: 3651.0768141	total: 830ms	remaining: 324ms
+    719:	learn: 3650.0395855	total: 831ms	remaining: 323ms
+    720:	learn: 3649.4334355	total: 832ms	remaining: 322ms
+    721:	learn: 3648.5994141	total: 833ms	remaining: 321ms
+    722:	learn: 3647.6730594	total: 834ms	remaining: 319ms
+    723:	learn: 3646.8120418	total: 835ms	remaining: 318ms
+    724:	learn: 3646.0526680	total: 836ms	remaining: 317ms
+    725:	learn: 3644.5589526	total: 837ms	remaining: 316ms
+    726:	learn: 3643.6156614	total: 838ms	remaining: 315ms
+    727:	learn: 3642.7197594	total: 839ms	remaining: 313ms
+    728:	learn: 3640.9534045	total: 840ms	remaining: 312ms
+    729:	learn: 3639.5974464	total: 841ms	remaining: 311ms
+    730:	learn: 3638.8315560	total: 842ms	remaining: 310ms
+    731:	learn: 3637.7247518	total: 843ms	remaining: 309ms
+    732:	learn: 3637.3296542	total: 844ms	remaining: 308ms
+    733:	learn: 3635.9353994	total: 845ms	remaining: 306ms
+    734:	learn: 3635.6775868	total: 846ms	remaining: 305ms
+    735:	learn: 3634.7857038	total: 848ms	remaining: 304ms
+    736:	learn: 3633.8911148	total: 849ms	remaining: 303ms
+    737:	learn: 3632.8322383	total: 850ms	remaining: 302ms
+    738:	learn: 3631.6661171	total: 851ms	remaining: 300ms
+    739:	learn: 3629.9846316	total: 852ms	remaining: 299ms
+    740:	learn: 3627.1067847	total: 853ms	remaining: 298ms
+    741:	learn: 3625.7204517	total: 854ms	remaining: 297ms
+    742:	learn: 3624.8588543	total: 855ms	remaining: 296ms
+    743:	learn: 3623.6830056	total: 856ms	remaining: 294ms
+    744:	learn: 3622.9431175	total: 857ms	remaining: 293ms
+    745:	learn: 3621.5227714	total: 858ms	remaining: 292ms
+    746:	learn: 3620.6046271	total: 859ms	remaining: 291ms
+    747:	learn: 3619.8697332	total: 860ms	remaining: 290ms
+    748:	learn: 3617.0662453	total: 861ms	remaining: 289ms
+    749:	learn: 3616.6995120	total: 862ms	remaining: 287ms
+    750:	learn: 3615.1884266	total: 863ms	remaining: 286ms
+    751:	learn: 3614.6772263	total: 864ms	remaining: 285ms
+    752:	learn: 3613.6876170	total: 865ms	remaining: 284ms
+    753:	learn: 3612.7519622	total: 866ms	remaining: 283ms
+    754:	learn: 3611.9986511	total: 867ms	remaining: 281ms
+    755:	learn: 3611.0289045	total: 868ms	remaining: 280ms
+    756:	learn: 3609.5271766	total: 869ms	remaining: 279ms
+    757:	learn: 3608.5617217	total: 870ms	remaining: 278ms
+    758:	learn: 3605.6553230	total: 872ms	remaining: 277ms
+    759:	learn: 3604.3751374	total: 873ms	remaining: 276ms
+    760:	learn: 3603.8258094	total: 874ms	remaining: 274ms
+    761:	learn: 3602.7894029	total: 875ms	remaining: 273ms
+    762:	learn: 3601.9130213	total: 876ms	remaining: 272ms
+    763:	learn: 3600.1510405	total: 877ms	remaining: 271ms
+    764:	learn: 3599.0406705	total: 878ms	remaining: 270ms
+    765:	learn: 3598.0175524	total: 879ms	remaining: 268ms
+    766:	learn: 3596.6510714	total: 880ms	remaining: 267ms
+    767:	learn: 3596.1961064	total: 881ms	remaining: 266ms
+    768:	learn: 3595.6116414	total: 882ms	remaining: 265ms
+    769:	learn: 3594.7124880	total: 883ms	remaining: 264ms
+    770:	learn: 3593.7738598	total: 884ms	remaining: 263ms
+    771:	learn: 3592.0750730	total: 885ms	remaining: 261ms
+    772:	learn: 3591.2129167	total: 886ms	remaining: 260ms
+    773:	learn: 3590.8453154	total: 887ms	remaining: 259ms
+    774:	learn: 3590.6055060	total: 888ms	remaining: 258ms
+    775:	learn: 3589.5911726	total: 889ms	remaining: 257ms
+    776:	learn: 3588.5989905	total: 890ms	remaining: 255ms
+    777:	learn: 3587.4851367	total: 891ms	remaining: 254ms
+    778:	learn: 3587.1941130	total: 892ms	remaining: 253ms
+    779:	learn: 3586.4424577	total: 893ms	remaining: 252ms
+    780:	learn: 3585.3551691	total: 894ms	remaining: 251ms
+    781:	learn: 3583.3097394	total: 895ms	remaining: 250ms
+    782:	learn: 3580.9801484	total: 896ms	remaining: 248ms
+    783:	learn: 3579.6092852	total: 897ms	remaining: 247ms
+    784:	learn: 3579.0130089	total: 898ms	remaining: 246ms
+    785:	learn: 3578.0209738	total: 899ms	remaining: 245ms
+    786:	learn: 3577.2723568	total: 900ms	remaining: 244ms
+    787:	learn: 3576.5902185	total: 901ms	remaining: 242ms
+    788:	learn: 3575.8997924	total: 902ms	remaining: 241ms
+    789:	learn: 3575.0614428	total: 903ms	remaining: 240ms
+    790:	learn: 3572.2787324	total: 904ms	remaining: 239ms
+    791:	learn: 3571.3162890	total: 906ms	remaining: 238ms
+    792:	learn: 3570.7068964	total: 907ms	remaining: 237ms
+    793:	learn: 3570.2804522	total: 908ms	remaining: 235ms
+    794:	learn: 3569.0265545	total: 909ms	remaining: 234ms
+    795:	learn: 3568.3686240	total: 910ms	remaining: 233ms
+    796:	learn: 3567.7224193	total: 911ms	remaining: 232ms
+    797:	learn: 3567.1298900	total: 912ms	remaining: 231ms
+    798:	learn: 3566.1387841	total: 913ms	remaining: 230ms
+    799:	learn: 3565.0761122	total: 914ms	remaining: 228ms
+    800:	learn: 3564.9562158	total: 915ms	remaining: 227ms
+    801:	learn: 3564.2112765	total: 916ms	remaining: 226ms
+    802:	learn: 3563.1948927	total: 917ms	remaining: 225ms
+    803:	learn: 3562.5718277	total: 918ms	remaining: 224ms
+    804:	learn: 3562.0133974	total: 919ms	remaining: 223ms
+    805:	learn: 3560.7349979	total: 920ms	remaining: 221ms
+    806:	learn: 3558.5552008	total: 921ms	remaining: 220ms
+    807:	learn: 3556.0141650	total: 923ms	remaining: 219ms
+    808:	learn: 3554.7535480	total: 924ms	remaining: 218ms
+    809:	learn: 3553.7124920	total: 927ms	remaining: 217ms
+    810:	learn: 3552.7157588	total: 928ms	remaining: 216ms
+    811:	learn: 3551.9308797	total: 930ms	remaining: 215ms
+    812:	learn: 3550.9546739	total: 931ms	remaining: 214ms
+    813:	learn: 3549.1152857	total: 932ms	remaining: 213ms
+    814:	learn: 3548.4442638	total: 934ms	remaining: 212ms
+    815:	learn: 3545.8083542	total: 936ms	remaining: 211ms
+    816:	learn: 3543.4726487	total: 937ms	remaining: 210ms
+    817:	learn: 3542.6410212	total: 938ms	remaining: 209ms
+    818:	learn: 3541.9798015	total: 941ms	remaining: 208ms
+    819:	learn: 3541.3344971	total: 942ms	remaining: 207ms
+    820:	learn: 3540.4025941	total: 943ms	remaining: 206ms
+    821:	learn: 3538.4183494	total: 945ms	remaining: 205ms
+    822:	learn: 3537.6213041	total: 946ms	remaining: 204ms
+    823:	learn: 3536.7111340	total: 948ms	remaining: 202ms
+    824:	learn: 3535.6402018	total: 949ms	remaining: 201ms
+    825:	learn: 3534.4123281	total: 950ms	remaining: 200ms
+    826:	learn: 3531.8696325	total: 951ms	remaining: 199ms
+    827:	learn: 3531.1688713	total: 952ms	remaining: 198ms
+    828:	learn: 3528.8961843	total: 953ms	remaining: 197ms
+    829:	learn: 3528.1463522	total: 954ms	remaining: 195ms
+    830:	learn: 3527.1871574	total: 955ms	remaining: 194ms
+    831:	learn: 3526.6891218	total: 956ms	remaining: 193ms
+    832:	learn: 3525.9370035	total: 957ms	remaining: 192ms
+    833:	learn: 3524.7990156	total: 958ms	remaining: 191ms
+    834:	learn: 3523.9464407	total: 959ms	remaining: 190ms
+    835:	learn: 3522.8116346	total: 960ms	remaining: 188ms
+    836:	learn: 3521.9316841	total: 961ms	remaining: 187ms
+    837:	learn: 3520.3440578	total: 962ms	remaining: 186ms
+    838:	learn: 3519.4831163	total: 963ms	remaining: 185ms
+    839:	learn: 3518.6742006	total: 964ms	remaining: 184ms
+    840:	learn: 3517.8860815	total: 965ms	remaining: 182ms
+    841:	learn: 3517.1937807	total: 966ms	remaining: 181ms
+    842:	learn: 3516.3206300	total: 967ms	remaining: 180ms
+    843:	learn: 3515.1231223	total: 968ms	remaining: 179ms
+    844:	learn: 3513.7997419	total: 969ms	remaining: 178ms
+    845:	learn: 3513.1248828	total: 970ms	remaining: 177ms
+    846:	learn: 3512.5587245	total: 971ms	remaining: 175ms
+    847:	learn: 3511.3662928	total: 972ms	remaining: 174ms
+    848:	learn: 3510.1201788	total: 973ms	remaining: 173ms
+    849:	learn: 3508.7374323	total: 974ms	remaining: 172ms
+    850:	learn: 3507.4091497	total: 976ms	remaining: 171ms
+    851:	learn: 3507.2988906	total: 976ms	remaining: 170ms
+    852:	learn: 3507.0930092	total: 978ms	remaining: 168ms
+    853:	learn: 3505.3318537	total: 979ms	remaining: 167ms
+    854:	learn: 3504.1805259	total: 980ms	remaining: 166ms
+    855:	learn: 3503.4047812	total: 981ms	remaining: 165ms
+    856:	learn: 3503.0741440	total: 982ms	remaining: 164ms
+    857:	learn: 3502.4158463	total: 983ms	remaining: 163ms
+    858:	learn: 3501.4296718	total: 984ms	remaining: 161ms
+    859:	learn: 3500.6693324	total: 985ms	remaining: 160ms
+    860:	learn: 3500.0946047	total: 986ms	remaining: 159ms
+    861:	learn: 3499.3971518	total: 987ms	remaining: 158ms
+    862:	learn: 3496.9175219	total: 988ms	remaining: 157ms
+    863:	learn: 3496.2244103	total: 989ms	remaining: 156ms
+    864:	learn: 3495.1198203	total: 990ms	remaining: 154ms
+    865:	learn: 3493.1900997	total: 991ms	remaining: 153ms
+    866:	learn: 3491.9025014	total: 992ms	remaining: 152ms
+    867:	learn: 3490.9497519	total: 993ms	remaining: 151ms
+    868:	learn: 3489.0189063	total: 994ms	remaining: 150ms
+    869:	learn: 3488.2526890	total: 995ms	remaining: 149ms
+    870:	learn: 3486.6721692	total: 996ms	remaining: 148ms
+    871:	learn: 3485.9239364	total: 997ms	remaining: 146ms
+    872:	learn: 3485.4132374	total: 998ms	remaining: 145ms
+    873:	learn: 3483.8443164	total: 999ms	remaining: 144ms
+    874:	learn: 3483.0309123	total: 1s	remaining: 143ms
+    875:	learn: 3482.7847770	total: 1s	remaining: 142ms
+    876:	learn: 3482.0400623	total: 1s	remaining: 141ms
+    877:	learn: 3480.8097826	total: 1s	remaining: 139ms
+    878:	learn: 3480.0161780	total: 1s	remaining: 138ms
+    879:	learn: 3479.1604515	total: 1s	remaining: 137ms
+    880:	learn: 3477.9475414	total: 1.01s	remaining: 136ms
+    881:	learn: 3477.1294008	total: 1.01s	remaining: 135ms
+    882:	learn: 3476.3484816	total: 1.01s	remaining: 134ms
+    883:	learn: 3475.1686498	total: 1.01s	remaining: 132ms
+    884:	learn: 3474.4298766	total: 1.01s	remaining: 131ms
+    885:	learn: 3473.4902859	total: 1.01s	remaining: 130ms
+    886:	learn: 3472.3881572	total: 1.01s	remaining: 129ms
+    887:	learn: 3471.8210363	total: 1.01s	remaining: 128ms
+    888:	learn: 3470.7614047	total: 1.01s	remaining: 127ms
+    889:	learn: 3470.0465029	total: 1.01s	remaining: 126ms
+    890:	learn: 3469.2147128	total: 1.02s	remaining: 124ms
+    891:	learn: 3468.8237135	total: 1.02s	remaining: 123ms
+    892:	learn: 3468.0120427	total: 1.02s	remaining: 122ms
+    893:	learn: 3467.2681099	total: 1.02s	remaining: 121ms
+    894:	learn: 3466.1159130	total: 1.02s	remaining: 120ms
+    895:	learn: 3465.2584758	total: 1.02s	remaining: 119ms
+    896:	learn: 3464.0699492	total: 1.02s	remaining: 118ms
+    897:	learn: 3463.8344473	total: 1.02s	remaining: 116ms
+    898:	learn: 3462.3753107	total: 1.02s	remaining: 115ms
+    899:	learn: 3461.8904058	total: 1.03s	remaining: 114ms
+    900:	learn: 3460.2683671	total: 1.03s	remaining: 113ms
+    901:	learn: 3459.5148676	total: 1.03s	remaining: 112ms
+    902:	learn: 3458.3773435	total: 1.03s	remaining: 111ms
+    903:	learn: 3456.5582631	total: 1.03s	remaining: 109ms
+    904:	learn: 3455.9862689	total: 1.03s	remaining: 108ms
+    905:	learn: 3455.2632774	total: 1.03s	remaining: 107ms
+    906:	learn: 3455.0614754	total: 1.03s	remaining: 106ms
+    907:	learn: 3454.5243745	total: 1.03s	remaining: 105ms
+    908:	learn: 3453.6436649	total: 1.04s	remaining: 104ms
+    909:	learn: 3452.5066957	total: 1.04s	remaining: 103ms
+    910:	learn: 3451.8128536	total: 1.04s	remaining: 101ms
+    911:	learn: 3450.9363413	total: 1.04s	remaining: 100ms
+    912:	learn: 3449.9748624	total: 1.04s	remaining: 99.2ms
+    913:	learn: 3449.4115828	total: 1.04s	remaining: 98ms
+    914:	learn: 3448.9971180	total: 1.04s	remaining: 96.9ms
+    915:	learn: 3447.9798533	total: 1.04s	remaining: 95.7ms
+    916:	learn: 3447.2520315	total: 1.04s	remaining: 94.6ms
+    917:	learn: 3445.1902751	total: 1.04s	remaining: 93.4ms
+    918:	learn: 3444.4063662	total: 1.05s	remaining: 92.3ms
+    919:	learn: 3443.7985764	total: 1.05s	remaining: 91.1ms
+    920:	learn: 3442.9344614	total: 1.05s	remaining: 90ms
+    921:	learn: 3441.7852061	total: 1.05s	remaining: 88.8ms
+    922:	learn: 3440.4222213	total: 1.05s	remaining: 87.7ms
+    923:	learn: 3439.2964227	total: 1.05s	remaining: 86.5ms
+    924:	learn: 3438.4623741	total: 1.05s	remaining: 85.4ms
+    925:	learn: 3437.6290845	total: 1.05s	remaining: 84.2ms
+    926:	learn: 3436.1128106	total: 1.05s	remaining: 83.1ms
+    927:	learn: 3434.5195714	total: 1.06s	remaining: 81.9ms
+    928:	learn: 3432.1960603	total: 1.06s	remaining: 80.8ms
+    929:	learn: 3431.4747343	total: 1.06s	remaining: 79.6ms
+    930:	learn: 3430.3242792	total: 1.06s	remaining: 78.5ms
+    931:	learn: 3430.0983288	total: 1.06s	remaining: 77.4ms
+    932:	learn: 3429.3257897	total: 1.06s	remaining: 76.2ms
+    933:	learn: 3428.5070582	total: 1.06s	remaining: 75.1ms
+    934:	learn: 3427.3845893	total: 1.06s	remaining: 73.9ms
+    935:	learn: 3426.3205720	total: 1.06s	remaining: 72.8ms
+    936:	learn: 3425.4843792	total: 1.06s	remaining: 71.6ms
+    937:	learn: 3424.3688618	total: 1.07s	remaining: 70.5ms
+    938:	learn: 3423.4638399	total: 1.07s	remaining: 69.3ms
+    939:	learn: 3421.6660279	total: 1.07s	remaining: 68.2ms
+    940:	learn: 3420.5263115	total: 1.07s	remaining: 67.1ms
+    941:	learn: 3419.7225414	total: 1.07s	remaining: 65.9ms
+    942:	learn: 3419.5018399	total: 1.07s	remaining: 64.8ms
+    943:	learn: 3418.8634332	total: 1.07s	remaining: 63.6ms
+    944:	learn: 3418.1066909	total: 1.07s	remaining: 62.5ms
+    945:	learn: 3417.6938609	total: 1.07s	remaining: 61.3ms
+    946:	learn: 3417.4783833	total: 1.07s	remaining: 60.2ms
+    947:	learn: 3416.9767415	total: 1.08s	remaining: 59.1ms
+    948:	learn: 3415.9671938	total: 1.08s	remaining: 57.9ms
+    949:	learn: 3414.4819117	total: 1.08s	remaining: 56.8ms
+    950:	learn: 3412.1359309	total: 1.08s	remaining: 55.6ms
+    951:	learn: 3411.4199944	total: 1.08s	remaining: 54.5ms
+    952:	learn: 3410.2543581	total: 1.08s	remaining: 53.4ms
+    953:	learn: 3408.5810924	total: 1.08s	remaining: 52.2ms
+    954:	learn: 3408.0843608	total: 1.08s	remaining: 51.1ms
+    955:	learn: 3407.5836912	total: 1.08s	remaining: 49.9ms
+    956:	learn: 3406.7746445	total: 1.09s	remaining: 48.8ms
+    957:	learn: 3405.8499158	total: 1.09s	remaining: 47.7ms
+    958:	learn: 3405.0889250	total: 1.09s	remaining: 46.5ms
+    959:	learn: 3404.1922382	total: 1.09s	remaining: 45.4ms
+    960:	learn: 3403.9092853	total: 1.09s	remaining: 44.3ms
+    961:	learn: 3403.4137297	total: 1.09s	remaining: 43.1ms
+    962:	learn: 3402.4520234	total: 1.09s	remaining: 42ms
+    963:	learn: 3401.6964592	total: 1.09s	remaining: 40.8ms
+    964:	learn: 3400.7733876	total: 1.09s	remaining: 39.7ms
+    965:	learn: 3399.0982662	total: 1.09s	remaining: 38.6ms
+    966:	learn: 3397.9472072	total: 1.1s	remaining: 37.4ms
+    967:	learn: 3397.1569421	total: 1.1s	remaining: 36.3ms
+    968:	learn: 3394.9671656	total: 1.1s	remaining: 35.1ms
+    969:	learn: 3394.1970289	total: 1.1s	remaining: 34ms
+    970:	learn: 3393.3387380	total: 1.1s	remaining: 32.9ms
+    971:	learn: 3392.7111680	total: 1.1s	remaining: 31.7ms
+    972:	learn: 3392.0743866	total: 1.1s	remaining: 30.6ms
+    973:	learn: 3391.3697650	total: 1.1s	remaining: 29.5ms
+    974:	learn: 3390.6605086	total: 1.11s	remaining: 28.5ms
+    975:	learn: 3389.6205818	total: 1.11s	remaining: 27.3ms
+    976:	learn: 3388.0007911	total: 1.11s	remaining: 26.2ms
+    977:	learn: 3387.2378918	total: 1.11s	remaining: 25.1ms
+    978:	learn: 3386.4518835	total: 1.11s	remaining: 23.9ms
+    979:	learn: 3385.6385612	total: 1.12s	remaining: 22.8ms
+    980:	learn: 3384.7703019	total: 1.12s	remaining: 21.7ms
+    981:	learn: 3383.2755739	total: 1.12s	remaining: 20.5ms
+    982:	learn: 3382.5413690	total: 1.12s	remaining: 19.4ms
+    983:	learn: 3381.7038342	total: 1.12s	remaining: 18.3ms
+    984:	learn: 3380.9560405	total: 1.12s	remaining: 17.1ms
+    985:	learn: 3379.6430772	total: 1.13s	remaining: 16ms
+    986:	learn: 3379.6098979	total: 1.13s	remaining: 14.8ms
+    987:	learn: 3378.7548228	total: 1.13s	remaining: 13.7ms
+    988:	learn: 3377.9929185	total: 1.13s	remaining: 12.6ms
+    989:	learn: 3377.0125134	total: 1.13s	remaining: 11.4ms
+    990:	learn: 3374.8865635	total: 1.13s	remaining: 10.3ms
+    991:	learn: 3374.1532316	total: 1.14s	remaining: 9.15ms
+    992:	learn: 3373.4354920	total: 1.14s	remaining: 8.01ms
+    993:	learn: 3372.6094511	total: 1.14s	remaining: 6.87ms
+    994:	learn: 3371.2784291	total: 1.14s	remaining: 5.73ms
+    995:	learn: 3369.1996155	total: 1.14s	remaining: 4.58ms
+    996:	learn: 3367.5249091	total: 1.14s	remaining: 3.44ms
+    997:	learn: 3366.2217649	total: 1.14s	remaining: 2.29ms
+    998:	learn: 3365.7921406	total: 1.15s	remaining: 1.15ms
+    999:	learn: 3365.4363762	total: 1.15s	remaining: 0us
+    
+
+In [39]:
+
+    
+    
+    print(Fore.GREEN + "Accuracy of CatBoost Regression is : ",catb_reg.score(X_test,y_test))
+    
+    
+    
+    Accuracy of CatBoost Regression is :  0.8876292745135764
+    
+
+  * LGBM Regressor : 89.79%
+  * CatBoost Regressor : 88.76%
+  * XGB Regressor: 88.65%
+  * Random Forest Regressor: 86.06%
+  * Linear Regressor: 79.45%
+
+# If you found this kernel helpful, please upvote it¶
+

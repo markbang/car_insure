@@ -1,0 +1,1509 @@
+# Modelling on Unbalanced Data: Caravan Insurance¶
+
+Imports
+
+In [1]:
+
+    
+    
+    #%matplotlib inline
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from sklearn.ensemble import BaggingClassifier,RandomForestClassifier,AdaBoostClassifier
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import confusion_matrix,roc_auc_score,roc_curve,classification_report,f1_score
+    from lightgbm import LGBMClassifier
+    import itertools
+    import scipy.stats as ss
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    
+    
+    /kaggle/input/caravan-insurance-challenge/caravan-insurance-challenge.csv
+    
+
+In [2]:
+
+    
+    
+    RS=410 #Random State
+    
+
+In [3]:
+
+    
+    
+    data=pd.read_csv('/kaggle/input/caravan-insurance-challenge/caravan-insurance-challenge.csv')
+    data.head()
+    
+
+Out[3]:
+
+| ORIGIN | MOSTYPE | MAANTHUI | MGEMOMV | MGEMLEEF | MOSHOOFD | MGODRK | MGODPR | MGODOV | MGODGE | ... | APERSONG | AGEZONG | AWAOREG | ABRAND | AZEILPL | APLEZIER | AFIETS | AINBOED | ABYSTAND | CARAVAN  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | train | 33 | 1 | 3 | 2 | 8 | 0 | 5 | 1 | 3 | ... | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0  
+1 | train | 37 | 1 | 2 | 2 | 8 | 1 | 4 | 1 | 4 | ... | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0  
+2 | train | 37 | 1 | 2 | 2 | 8 | 0 | 4 | 2 | 4 | ... | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0  
+3 | train | 9 | 1 | 3 | 3 | 3 | 2 | 3 | 2 | 4 | ... | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0  
+4 | train | 40 | 1 | 4 | 2 | 10 | 1 | 4 | 1 | 4 | ... | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0  
+  
+5 rows Ã 87 columns
+
+In [4]:
+
+    
+    
+    data.shape
+    
+
+Out[4]:
+
+    
+    
+    (9822, 87)
+
+In [5]:
+
+    
+    
+    data.columns
+    
+
+Out[5]:
+
+    
+    
+    Index(['ORIGIN', 'MOSTYPE', 'MAANTHUI', 'MGEMOMV', 'MGEMLEEF', 'MOSHOOFD',
+           'MGODRK', 'MGODPR', 'MGODOV', 'MGODGE', 'MRELGE', 'MRELSA', 'MRELOV',
+           'MFALLEEN', 'MFGEKIND', 'MFWEKIND', 'MOPLHOOG', 'MOPLMIDD', 'MOPLLAAG',
+           'MBERHOOG', 'MBERZELF', 'MBERBOER', 'MBERMIDD', 'MBERARBG', 'MBERARBO',
+           'MSKA', 'MSKB1', 'MSKB2', 'MSKC', 'MSKD', 'MHHUUR', 'MHKOOP', 'MAUT1',
+           'MAUT2', 'MAUT0', 'MZFONDS', 'MZPART', 'MINKM30', 'MINK3045',
+           'MINK4575', 'MINK7512', 'MINK123M', 'MINKGEM', 'MKOOPKLA', 'PWAPART',
+           'PWABEDR', 'PWALAND', 'PPERSAUT', 'PBESAUT', 'PMOTSCO', 'PVRAAUT',
+           'PAANHANG', 'PTRACTOR', 'PWERKT', 'PBROM', 'PLEVEN', 'PPERSONG',
+           'PGEZONG', 'PWAOREG', 'PBRAND', 'PZEILPL', 'PPLEZIER', 'PFIETS',
+           'PINBOED', 'PBYSTAND', 'AWAPART', 'AWABEDR', 'AWALAND', 'APERSAUT',
+           'ABESAUT', 'AMOTSCO', 'AVRAAUT', 'AAANHANG', 'ATRACTOR', 'AWERKT',
+           'ABROM', 'ALEVEN', 'APERSONG', 'AGEZONG', 'AWAOREG', 'ABRAND',
+           'AZEILPL', 'APLEZIER', 'AFIETS', 'AINBOED', 'ABYSTAND', 'CARAVAN'],
+          dtype='object')
+
+In [6]:
+
+    
+    
+    data.ORIGIN.value_counts()
+    
+
+Out[6]:
+
+    
+    
+    train    5822
+    test     4000
+    Name: ORIGIN, dtype: int64
+
+Data Analysis
+
+No NA values,all variables are type of int64.The data is peculiar in that
+every numeric stands for an attribute of person.Even variables that could be
+continuous,such as income have been binned.
+
+In [7]:
+
+    
+    
+    data.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 9822 entries, 0 to 9821
+    Data columns (total 87 columns):
+    ORIGIN      9822 non-null object
+    MOSTYPE     9822 non-null int64
+    MAANTHUI    9822 non-null int64
+    MGEMOMV     9822 non-null int64
+    MGEMLEEF    9822 non-null int64
+    MOSHOOFD    9822 non-null int64
+    MGODRK      9822 non-null int64
+    MGODPR      9822 non-null int64
+    MGODOV      9822 non-null int64
+    MGODGE      9822 non-null int64
+    MRELGE      9822 non-null int64
+    MRELSA      9822 non-null int64
+    MRELOV      9822 non-null int64
+    MFALLEEN    9822 non-null int64
+    MFGEKIND    9822 non-null int64
+    MFWEKIND    9822 non-null int64
+    MOPLHOOG    9822 non-null int64
+    MOPLMIDD    9822 non-null int64
+    MOPLLAAG    9822 non-null int64
+    MBERHOOG    9822 non-null int64
+    MBERZELF    9822 non-null int64
+    MBERBOER    9822 non-null int64
+    MBERMIDD    9822 non-null int64
+    MBERARBG    9822 non-null int64
+    MBERARBO    9822 non-null int64
+    MSKA        9822 non-null int64
+    MSKB1       9822 non-null int64
+    MSKB2       9822 non-null int64
+    MSKC        9822 non-null int64
+    MSKD        9822 non-null int64
+    MHHUUR      9822 non-null int64
+    MHKOOP      9822 non-null int64
+    MAUT1       9822 non-null int64
+    MAUT2       9822 non-null int64
+    MAUT0       9822 non-null int64
+    MZFONDS     9822 non-null int64
+    MZPART      9822 non-null int64
+    MINKM30     9822 non-null int64
+    MINK3045    9822 non-null int64
+    MINK4575    9822 non-null int64
+    MINK7512    9822 non-null int64
+    MINK123M    9822 non-null int64
+    MINKGEM     9822 non-null int64
+    MKOOPKLA    9822 non-null int64
+    PWAPART     9822 non-null int64
+    PWABEDR     9822 non-null int64
+    PWALAND     9822 non-null int64
+    PPERSAUT    9822 non-null int64
+    PBESAUT     9822 non-null int64
+    PMOTSCO     9822 non-null int64
+    PVRAAUT     9822 non-null int64
+    PAANHANG    9822 non-null int64
+    PTRACTOR    9822 non-null int64
+    PWERKT      9822 non-null int64
+    PBROM       9822 non-null int64
+    PLEVEN      9822 non-null int64
+    PPERSONG    9822 non-null int64
+    PGEZONG     9822 non-null int64
+    PWAOREG     9822 non-null int64
+    PBRAND      9822 non-null int64
+    PZEILPL     9822 non-null int64
+    PPLEZIER    9822 non-null int64
+    PFIETS      9822 non-null int64
+    PINBOED     9822 non-null int64
+    PBYSTAND    9822 non-null int64
+    AWAPART     9822 non-null int64
+    AWABEDR     9822 non-null int64
+    AWALAND     9822 non-null int64
+    APERSAUT    9822 non-null int64
+    ABESAUT     9822 non-null int64
+    AMOTSCO     9822 non-null int64
+    AVRAAUT     9822 non-null int64
+    AAANHANG    9822 non-null int64
+    ATRACTOR    9822 non-null int64
+    AWERKT      9822 non-null int64
+    ABROM       9822 non-null int64
+    ALEVEN      9822 non-null int64
+    APERSONG    9822 non-null int64
+    AGEZONG     9822 non-null int64
+    AWAOREG     9822 non-null int64
+    ABRAND      9822 non-null int64
+    AZEILPL     9822 non-null int64
+    APLEZIER    9822 non-null int64
+    AFIETS      9822 non-null int64
+    AINBOED     9822 non-null int64
+    ABYSTAND    9822 non-null int64
+    CARAVAN     9822 non-null int64
+    dtypes: int64(86), object(1)
+    memory usage: 6.5+ MB
+    
+
+Every feature is already encoded as an integer representation,saving us the
+conversion work.
+
+In [8]:
+
+    
+    
+    data.CARAVAN.value_counts()
+    
+
+Out[8]:
+
+    
+    
+    0    9236
+    1     586
+    Name: CARAVAN, dtype: int64
+
+Now,we are dealing with a very imbalanced dataset.
+
+In [9]:
+
+    
+    
+    plt.subplots(figsize=(10,8))
+    sns.heatmap(data.drop(columns=['ORIGIN']).corr());
+    
+
+![](__results___files/__results___14_0.png)
+
+A correlation plot shows some interesting patterns in the data.There is a
+clear divide between the two groupings listed in the description file .
+
+In [10]:
+
+    
+    
+    fig,axes=plt.subplots(1,2,figsize=(12,8))
+    sns.heatmap(data.drop(columns=["ORIGIN"]).iloc[:,:43].corr(),vmin=-1,vmax=1,cmap='coolwarm',ax=axes[0])
+    sns.heatmap(data.drop(columns=['ORIGIN']).iloc[:,43:].corr(),vmin=-1,vmax=1,cmap='coolwarm',ax=axes[1])
+    axes[0].set_title("Upper-left Corrplot")
+    axes[1].set_title("Bottom-right Corrplot")
+    
+
+Out[10]:
+
+    
+    
+    Text(0.5, 1.0, 'Bottom-right Corrplot')
+
+![](__results___files/__results___16_1.png)
+
+after zooming in bit,Bottom-right corrplot shows how variables starting with P
+each have a corresponding variable starting with A this means that having both
+in our data will likely provide little value.
+
+In [11]:
+
+    
+    
+    #Drop percentage representations
+    data_np=data.drop(columns=data.loc[:,(data.columns.str.startswith('p'))]).copy()
+    data_np.to_feather('reduced_cmbd.df')
+    
+
+In [12]:
+
+    
+    
+    !pip install pyarrow
+    
+    
+    
+    Requirement already satisfied: pyarrow in /opt/conda/lib/python3.6/site-packages (0.16.0)
+    
+    Requirement already satisfied: numpy>=1.14 in /opt/conda/lib/python3.6/site-packages (from pyarrow) (1.18.2)
+    
+    Requirement already satisfied: six>=1.0.0 in /opt/conda/lib/python3.6/site-packages (from pyarrow) (1.14.0)
+    
+    
+
+**MODELS**
+
+4 Models will be used in
+total:BaggingClassifier,RandomForestClassifier,AdaBoostClassifier from sklearn
+and Microsoft's lightgbm
+
+In [13]:
+
+    
+    
+    def plot_confusion_matrix(y_true, y_pred, classes,
+                              normalize=False, cf_report=False,
+                              title='Confusion matrix', ax=None, cmap=plt.cm.Blues, cbar=False):
+        """
+        This function prints and plots the confusion matrix.
+        Normalization can be applied by setting `normalize=True`.
+        """
+        cm = confusion_matrix(y_true, y_pred)
+        if normalize:
+            cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+            
+        if cf_report:
+            print(classification_report(y_true,y_pred))
+        
+        fig, ax = (plt.gcf(), ax) if ax is not None else plt.subplots(1,1)
+        
+        im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
+        ax.set_title(title)
+        
+        if cbar:
+            fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04) # "Magic" numbers (https://stackoverflow.com/a/26720422/10939610)
+        
+        tick_marks = np.arange(len(classes))
+        ax.set_xticks(tick_marks)
+        ax.set_xticklabels(classes, rotation=45)
+        ax.set_yticks(tick_marks)
+        ax.set_yticklabels(classes)
+    
+        fmt = '.2f' if normalize else 'd'
+        thresh = cm.max() / 2.
+        for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+            ax.text(j, i, format(cm[i, j], fmt),
+                     horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
+    
+        fig.tight_layout()
+        ax.set_ylabel('True label')
+        ax.set_xlabel('Predicted label')
+    
+
+In [14]:
+
+    
+    
+    def plot_roc(y_true, y_pred, ax=None):
+        """Plot ROC curve""" 
+        false_positive_rate, true_positive_rate, threshold = roc_curve(y_true, y_pred)
+        roc_score = roc_auc_score(y_true,y_pred)
+        
+        fig, ax = (plt.gcf(), ax) if ax is not None else plt.subplots(1,1)
+    
+        ax.set_title("Receiver Operating Characteristic")
+        ax.plot(false_positive_rate, true_positive_rate)
+        ax.plot([0, 1], ls="--")
+        ax.plot([0, 0], [1, 0] , c=".7"), plt.plot([1, 1] , c=".7")
+        ax.annotate('ROC: {:.5f}'.format(roc_score), [0.75,0.05])
+        ax.set_ylabel("True Positive Rate")
+        ax.set_xlabel("False Positive Rate")
+        fig.tight_layout()
+        return roc_score
+    
+
+In [15]:
+
+    
+    
+    def feat_imps(model, X_train, plot=False, n=None):
+        """ Dataframe containing each feature with its corresponding importance in the given model
+        
+        Args
+        ----
+            model : model, classifier that supports .feature_importances_ (RandomForest, AdaBoost, ect..)
+            X_train : array like, training data object
+            plot : boolean, if True, plots the data in the form of a bargraph
+            n : int, only applicable if plot=True, number of features to plot, (default=15)
+            
+        Returns
+        -------
+            pandas DataFrame : columns = feature name, importance
+        """
+        
+        fi_df = pd.DataFrame({'feature':X_train.columns,
+                              'importance':model.feature_importances_}
+                            ).sort_values(by='importance', ascending=False)
+        if plot:
+            fi_df[:(n if n is not None else 15)].plot.bar(x='feature',y='importance')
+        else:
+            return fi_df
+    
+
+In [16]:
+
+    
+    
+    def plot_cmroc(y_true, y_pred, classes=[0,1], normalize=True, cf_report=False):
+        """Convenience function to plot confusion matrix and ROC curve """
+        fig,axes = plt.subplots(1,2, figsize=(9,4))
+        plot_confusion_matrix(y_true, y_pred, classes=classes, normalize=normalize, cf_report=cf_report, ax=axes[0])
+        roc_score = plot_roc(y_true, y_pred, ax=axes[1])
+        fig.tight_layout()
+        plt.show()
+        return roc_score
+    
+
+In [17]:
+
+    
+    
+    train_df=data.query("ORIGIN=='train'").iloc[:,1:].copy()
+    test_df=data.query("ORIGIN=='test'").iloc[:,1:].copy()
+    
+
+The test data will be treated as holdout test set,so we will split train_df
+into a training validation set.
+
+In [18]:
+
+    
+    
+    X,y=train_df.drop(columns='CARAVAN'),train_df.CARAVAN
+    X_train,X_val,y_train,y_val=train_test_split(X,y,test_size=0.20,random_state=RS)
+    
+
+To address the issue with imbalanced data,we will compare three approaches for
+each model used: 1.Random Over Sampling 2.Random Under Sampling
+3.SMOTE(Synthetic Minority Over-Sampling Technique)
+
+In [19]:
+
+    
+    
+    !pip install imblearn
+    
+    
+    
+    Collecting imblearn
+      Downloading imblearn-0.0-py2.py3-none-any.whl (1.9 kB)
+    Requirement already satisfied: imbalanced-learn in /opt/conda/lib/python3.6/site-packages (from imblearn) (0.6.2)
+    Requirement already satisfied: scipy>=0.17 in /opt/conda/lib/python3.6/site-packages (from imbalanced-learn->imblearn) (1.4.1)
+    Requirement already satisfied: numpy>=1.11 in /opt/conda/lib/python3.6/site-packages (from imbalanced-learn->imblearn) (1.18.2)
+    Requirement already satisfied: scikit-learn>=0.22 in /opt/conda/lib/python3.6/site-packages (from imbalanced-learn->imblearn) (0.22.2.post1)
+    Requirement already satisfied: joblib>=0.11 in /opt/conda/lib/python3.6/site-packages (from imbalanced-learn->imblearn) (0.14.1)
+    Installing collected packages: imblearn
+    Successfully installed imblearn-0.0
+    
+
+In [20]:
+
+    
+    
+    from imblearn.over_sampling import RandomOverSampler,SMOTE
+    from imblearn.under_sampling import RandomUnderSampler
+    from imblearn.metrics import classification_report_imbalanced
+    ros=RandomOverSampler(random_state=RS)
+    rus=RandomUnderSampler(random_state=RS)
+    smt=SMOTE(random_state=RS,n_jobs=-1)
+    X_under,y_under=rus.fit_sample(X_train,y_train)
+    X_over,y_over=ros.fit_sample(X_train,y_train)
+    X_smote,y_smote=smt.fit_sample(X_train,y_train)
+    pd.DataFrame([*map(lambda x:ss.describe(x)._asdict(),[y_train,y_under,y_over,y_smote])],index=['Unbalanced','Undersample','Oversample','SMOTE'])
+    
+    
+    
+    Using TensorFlow backend.
+    
+
+Out[20]:
+
+| nobs | minmax | mean | variance | skewness | kurtosis  
+---|---|---|---|---|---|---  
+Unbalanced | 4657 | (0, 1) | 0.060339 | 0.056711 | 3.692854 | 11.637168  
+Undersample | 562 | (0, 1) | 0.500000 | 0.250446 | 0.000000 | -2.000000  
+Oversample | 8752 | (0, 1) | 0.500000 | 0.250029 | 0.000000 | -2.000000  
+SMOTE | 8752 | (0, 1) | 0.500000 | 0.250029 | 0.000000 | -2.000000  
+  
+Without doing any sort of resampling,the mean was ~0.058 with heavy skew.Each
+method of resampling has shifted the mean to 0.5 and eliminated the
+skewness,each using a different method to achieve this.
+
+In [21]:
+
+    
+    
+    #Define baseline models
+    bc=BaggingClassifier(n_estimators=53,random_state=RS,n_jobs=-1)
+    ada=AdaBoostClassifier(n_estimators=53,random_state=RS)
+    rfc=RandomForestClassifier(n_estimators=53,random_state=RS,n_jobs=-1)
+    lgbm=LGBMClassifier(n_estimators=53,random_state=RS,n_jobs=-1)
+    
+
+Unbalanced Data
+
+Bagging
+
+In [22]:
+
+    
+    
+    bc_unbal=plot_cmroc(y_val,bc.fit(X_train,y_train).predict(X_val))
+    
+
+![](__results___files/__results___35_0.png)
+
+Boosting(AdaBoost)
+
+In [23]:
+
+    
+    
+    ada_unbal=plot_cmroc(y_val,ada.fit(X_train,y_train).predict(X_val))
+    
+
+![](__results___files/__results___37_0.png)
+
+Boosting(LGBM)
+
+In [24]:
+
+    
+    
+    lgbm_unbal=plot_cmroc(y_val,lgbm.fit(X_train,y_train).predict(X_val))
+    
+
+![](__results___files/__results___39_0.png)
+
+Random Forest
+
+In [25]:
+
+    
+    
+    rfc_unbal=plot_cmroc(y_val,rfc.fit(X_train,y_train).predict(X_val))
+    
+
+![](__results___files/__results___41_0.png)
+
+Unbalanced Evaluation
+
+In [26]:
+
+    
+    
+    models=[bc,ada,rfc,lgbm]
+    unbal_scores=[bc_unbal,ada_unbal,rfc_unbal,lgbm_unbal]
+    for model,score in zip(models,unbal_scores):
+        print('{:25s}:{:.5f}'.format(model.__class__.__name__,score))
+    
+    
+    
+    BaggingClassifier        :0.50172
+    AdaBoostClassifier       :0.51174
+    RandomForestClassifier   :0.49562
+    LGBMClassifier           :0.50063
+    
+
+Poor performance across all models when using the unbalanced dataset.AdaBoost
+was no better than random guessing and the best model,the BaggingClassifier.
+
+# Undersampling¶
+
+Bagging
+
+In [27]:
+
+    
+    
+    bc_under=plot_cmroc(y_val,bc.fit(X_under,y_under).predict(X_val))
+    
+
+![](__results___files/__results___47_0.png)
+
+Boosting(AdaBoost)
+
+In [28]:
+
+    
+    
+    ada_under=plot_cmroc(y_val,ada.fit(X_under,y_under).predict(X_val))
+    
+
+![](__results___files/__results___49_0.png)
+
+Boosting(LGBM)
+
+In [29]:
+
+    
+    
+    lgbm_under=plot_cmroc(y_val,lgbm.fit(X_under,y_under).predict(X_val))
+    
+
+![](__results___files/__results___51_0.png)
+
+Random Forest
+
+In [30]:
+
+    
+    
+    rfc_under=plot_cmroc(y_val,rfc.fit(X_under,y_under).predict(X_val))
+    
+
+![](__results___files/__results___53_0.png)
+
+Undersampling Evaluation
+
+In [31]:
+
+    
+    
+    models=[bc,ada,rfc,lgbm]
+    under_scores=[bc_under,ada_under,rfc_under,lgbm_under]
+    for model,score in zip(models,under_scores):
+        print('{:25s}:{:.5f}'.format(model.__class__.__name__,score))
+    
+    
+    
+    BaggingClassifier        :0.57158
+    AdaBoostClassifier       :0.63902
+    RandomForestClassifier   :0.61436
+    LGBMClassifier           :0.56994
+    
+
+Nearly a 18% increase in ROC score was seen across the board using the
+undersampling method.
+
+# Oversampling¶
+
+Bagging
+
+In [32]:
+
+    
+    
+    bc_over=plot_cmroc(y_val,bc.fit(X_over,y_over).predict(X_val))
+    
+
+![](__results___files/__results___59_0.png)
+
+Boosting(AdaBoost)
+
+In [33]:
+
+    
+    
+    ada_over=plot_cmroc(y_val,ada.fit(X_over,y_over).predict(X_val))
+    
+
+![](__results___files/__results___61_0.png)
+
+Boosting(LGBM)
+
+In [34]:
+
+    
+    
+    lgbm_over=plot_cmroc(y_val,lgbm.fit(X_over,y_over).predict(X_val))
+    
+
+![](__results___files/__results___63_0.png)
+
+Random Forest
+
+In [35]:
+
+    
+    
+    rfc_over=plot_cmroc(y_val,rfc.fit(X_over,y_over).predict(X_val))
+    
+
+![](__results___files/__results___65_0.png)
+
+# Oversampling Evaluation¶
+
+In [36]:
+
+    
+    
+    models=[bc,ada,rfc,lgbm]
+    over_scores=[bc_over,ada_over,rfc_over,lgbm_over]
+    for model,score in zip(models,over_scores):
+        print('{:25s}:{:.5f}'.format(model.__class__.__name__,score))
+    
+    
+    
+    BaggingClassifier        :0.55095
+    AdaBoostClassifier       :0.64753
+    RandomForestClassifier   :0.53175
+    LGBMClassifier           :0.61462
+    
+
+In contrast with the unbalanced dataset,with the over sampled data,AdaBoost
+greatly out performed the other models with this data augmentation method.
+
+# SMOTE¶
+
+Bagging
+
+In [37]:
+
+    
+    
+    bc_smote=plot_cmroc(y_val,bc.fit(X_smote,y_smote).predict(X_val
+                                                             ))
+    
+
+![](__results___files/__results___71_0.png)
+
+Boosting(AdaBoost)
+
+In [38]:
+
+    
+    
+    ada_smote=plot_cmroc(y_val,ada.fit(X_smote,y_smote).predict(X_val))
+    
+
+![](__results___files/__results___73_0.png)
+
+Boosting(LGBM)
+
+In [39]:
+
+    
+    
+    lgbm_smote=plot_cmroc(y_val,lgbm.fit(X_smote,y_smote).predict(X_val))
+    
+
+![](__results___files/__results___75_0.png)
+
+Random Forest
+
+In [40]:
+
+    
+    
+    rfc_smote=plot_cmroc(y_val,rfc.fit(X_smote,y_smote).predict(X_val))
+    
+
+![](__results___files/__results___77_0.png)
+
+# SMOTE Evaluation¶
+
+In [41]:
+
+    
+    
+    models=[bc,ada,rfc,lgbm]
+    smote_scores=[bc_smote,ada_smote,rfc_smote,lgbm_smote]
+    for model,score in zip(models,smote_scores):
+        print('{:25s}:{:.5f}'.format(model.__class__.__name__,score))
+    
+    
+    
+    BaggingClassifier        :0.52810
+    AdaBoostClassifier       :0.58841
+    RandomForestClassifier   :0.50936
+    LGBMClassifier           :0.53921
+    
+
+# Tweaking the best¶
+
+For all of the classifiers,Random under sampling was the most successful
+method of rebalancing the dataset.With the exception of AdaBoost,the other
+methods barely outperformed random guessing.
+
+Let's evaluate the best from each group against the holdout test data
+
+In [42]:
+
+    
+    
+    X_test,y_test=test_df.iloc[:,:-1],test_df.iloc[:,-1]
+    
+
+In [43]:
+
+    
+    
+    bc=BaggingClassifier(n_estimators=53,n_jobs=-1)
+    ada=AdaBoostClassifier(n_estimators=53,random_state=RS)
+    rfc=RandomForestClassifier(n_estimators=53,n_jobs=-1,random_state=RS)
+    lgbm=LGBMClassifier(n_estimators=53,random_state=RS)
+    
+
+In [44]:
+
+    
+    
+    models=[bc,ada,rfc,lgbm]
+    for model in models:
+        model.fit(X_under,y_under)
+        tpreds=model.predict(X_test)
+        print('{:25s}:{:.5f}'.format(model.__class__.__name__,roc_auc_score(y_test,tpreds)))
+    
+    
+    
+    BaggingClassifier        :0.64830
+    AdaBoostClassifier       :0.63926
+    RandomForestClassifier   :0.66351
+    LGBMClassifier           :0.65498
+    
+
+So,if this contest happened to evaluated on Area Under ROC,the best model we
+could have submitted would have been the Random Forest Classifier with a score
+of 0.66
+
+A bit better of a score likely be achieved through ensembling these models as
+well,but there are many other tweaks.
+
+# Grid Search¶
+
+In [45]:
+
+    
+    
+    from sklearn.model_selection import GridSearchCV
+    param_grid={
+        'learning_rate':[0.01,0.05,0.1,1],
+        'n_estimators':[20,40,60,80,100],
+        'num_values':[3,7,17,31],
+        'max_bin':[4,8,16,32,64],
+        'min_child_samples':[3,5,10,20,30],
+    }
+    
+
+In [46]:
+
+    
+    
+    lgbm_gs=GridSearchCV(LGBMClassifier(),param_grid,n_jobs=-1,scoring='roc_auc',verbose=2,iid=False,cv=5)
+    lgbm_gs.fit(X_under,y_under)
+    print('Best parameters:',lgbm_gs.best_params_)
+    
+    
+    
+    Fitting 5 folds for each of 2000 candidates, totalling 10000 fits
+    
+    
+    
+    [Parallel(n_jobs=-1)]: Using backend LokyBackend with 4 concurrent workers.
+    [Parallel(n_jobs=-1)]: Done  33 tasks      | elapsed:    1.7s
+    [Parallel(n_jobs=-1)]: Done 154 tasks      | elapsed:    7.1s
+    [Parallel(n_jobs=-1)]: Done 390 tasks      | elapsed:   16.7s
+    [Parallel(n_jobs=-1)]: Done 956 tasks      | elapsed:   38.4s
+    [Parallel(n_jobs=-1)]: Done 1686 tasks      | elapsed:  1.1min
+    [Parallel(n_jobs=-1)]: Done 2576 tasks      | elapsed:  1.7min
+    [Parallel(n_jobs=-1)]: Done 3630 tasks      | elapsed:  2.4min
+    [Parallel(n_jobs=-1)]: Done 4844 tasks      | elapsed:  3.3min
+    [Parallel(n_jobs=-1)]: Done 6222 tasks      | elapsed:  4.2min
+    [Parallel(n_jobs=-1)]: Done 7760 tasks      | elapsed:  5.2min
+    [Parallel(n_jobs=-1)]: Done 9462 tasks      | elapsed:  6.2min
+    
+    
+    
+    Best parameters: {'learning_rate': 0.1, 'max_bin': 32, 'min_child_samples': 5, 'n_estimators': 40, 'num_values': 3}
+    
+    
+    
+    [Parallel(n_jobs=-1)]: Done 10000 out of 10000 | elapsed:  6.5min finished
+    /opt/conda/lib/python3.6/site-packages/sklearn/model_selection/_search.py:823: FutureWarning: The parameter 'iid' is deprecated in 0.22 and will be removed in 0.24.
+      "removed in 0.24.", FutureWarning
+    
+
+In [47]:
+
+    
+    
+    plot_cmroc(y_val,lgbm_gs.predict(X_val))
+    
+
+![](__results___files/__results___90_0.png)
+
+Out[47]:
+
+    
+    
+    0.5878734741592584
+
+In [48]:
+
+    
+    
+    plot_cmroc(y_test,lgbm_gs.predict(X_test))
+    
+
+![](__results___files/__results___91_0.png)
+
+Out[48]:
+
+    
+    
+    0.669922354906875
+
+# Random Forest¶
+
+In [49]:
+
+    
+    
+    param_grid_rf={
+        'n_estimators':[40,60,100,128,256],
+        'min_samples_leaf':[3,7,17,31],
+        'max_leaf_nodes':[4,8,16,32,64],
+        'min_samples_split':[3,5,10,20,30],
+    }
+    
+
+In [50]:
+
+    
+    
+    rfc_gs=GridSearchCV(RandomForestClassifier(),param_grid_rf,n_jobs=-1,scoring='roc_auc',verbose=2,iid=False,cv=5)
+    rfc_gs.fit(X_under,y_under)
+    print('Best parameters:',rfc_gs.best_params_)
+    
+    
+    
+    Fitting 5 folds for each of 500 candidates, totalling 2500 fits
+    
+    
+    
+    [Parallel(n_jobs=-1)]: Using backend LokyBackend with 4 concurrent workers.
+    [Parallel(n_jobs=-1)]: Done  58 tasks      | elapsed:    4.7s
+    [Parallel(n_jobs=-1)]: Done 300 tasks      | elapsed:   25.1s
+    [Parallel(n_jobs=-1)]: Done 706 tasks      | elapsed:   58.7s
+    [Parallel(n_jobs=-1)]: Done 1272 tasks      | elapsed:  1.8min
+    [Parallel(n_jobs=-1)]: Done 1649 tasks      | elapsed:  2.4min
+    [Parallel(n_jobs=-1)]: Done 2094 tasks      | elapsed:  3.0min
+    
+    
+    
+    Best parameters: {'max_leaf_nodes': 8, 'min_samples_leaf': 7, 'min_samples_split': 3, 'n_estimators': 60}
+    
+    
+    
+    [Parallel(n_jobs=-1)]: Done 2500 out of 2500 | elapsed:  3.6min finished
+    /opt/conda/lib/python3.6/site-packages/sklearn/model_selection/_search.py:823: FutureWarning: The parameter 'iid' is deprecated in 0.22 and will be removed in 0.24.
+      "removed in 0.24.", FutureWarning
+    
+
+In [51]:
+
+    
+    
+    plot_cmroc(y_val,rfc_gs.predict(X_val))
+    
+
+![](__results___files/__results___95_0.png)
+
+Out[51]:
+
+    
+    
+    0.6758081178805427
+
+In [52]:
+
+    
+    
+    plot_cmroc(y_test,rfc_gs.predict(X_test))
+    
+
+![](__results___files/__results___96_0.png)
+
+Out[52]:
+
+    
+    
+    0.6560306738325314
+
+In [53]:
+
+    
+    
+    lgbm_gs_ub=GridSearchCV(LGBMClassifier(),param_grid,n_jobs=-1,scoring='roc_auc',verbose=1,iid=False,cv=5)
+    lgbm_gs_ub.fit(X_train,y_train)
+    print('Best parameters:',lgbm_gs_ub.best_params_)
+    
+    
+    
+    Fitting 5 folds for each of 2000 candidates, totalling 10000 fits
+    
+    
+    
+    [Parallel(n_jobs=-1)]: Using backend LokyBackend with 4 concurrent workers.
+    [Parallel(n_jobs=-1)]: Done  76 tasks      | elapsed:    6.0s
+    [Parallel(n_jobs=-1)]: Done 376 tasks      | elapsed:   31.6s
+    [Parallel(n_jobs=-1)]: Done 876 tasks      | elapsed:  1.3min
+    [Parallel(n_jobs=-1)]: Done 1296 tasks      | elapsed:  1.9min
+    [Parallel(n_jobs=-1)]: Done 1746 tasks      | elapsed:  2.5min
+    [Parallel(n_jobs=-1)]: Done 2296 tasks      | elapsed:  3.4min
+    [Parallel(n_jobs=-1)]: Done 2946 tasks      | elapsed:  4.3min
+    [Parallel(n_jobs=-1)]: Done 3696 tasks      | elapsed:  5.5min
+    [Parallel(n_jobs=-1)]: Done 4546 tasks      | elapsed:  6.8min
+    [Parallel(n_jobs=-1)]: Done 5496 tasks      | elapsed:  8.2min
+    [Parallel(n_jobs=-1)]: Done 6546 tasks      | elapsed:  9.8min
+    [Parallel(n_jobs=-1)]: Done 7696 tasks      | elapsed: 11.5min
+    [Parallel(n_jobs=-1)]: Done 8946 tasks      | elapsed: 13.0min
+    [Parallel(n_jobs=-1)]: Done 10000 out of 10000 | elapsed: 14.3min finished
+    /opt/conda/lib/python3.6/site-packages/sklearn/model_selection/_search.py:823: FutureWarning: The parameter 'iid' is deprecated in 0.22 and will be removed in 0.24.
+      "removed in 0.24.", FutureWarning
+    
+    
+    
+    Best parameters: {'learning_rate': 0.05, 'max_bin': 16, 'min_child_samples': 3, 'n_estimators': 80, 'num_values': 3}
+    
+
+In [54]:
+
+    
+    
+    plot_cmroc(y_val,lgbm_gs_ub.predict(X_val))
+    
+
+![](__results___files/__results___98_0.png)
+
+Out[54]:
+
+    
+    
+    0.4936247723132969
+
+In [55]:
+
+    
+    
+    plot_cmroc(y_test,lgbm_gs_ub.predict(X_test))
+    
+
+![](__results___files/__results___99_0.png)
+
+Out[55]:
+
+    
+    
+    0.5120477218000438
+
+# Dimensionality Reduction and Features Analysis¶
+
+Dimensionality reduction with:
+
+    
+    
+    1.Principal Component Analysis(PCA)
+    2.t-SNE
+    3.UMAP
+    
+
+As well as a few methods to feature selection:
+
+    
+    
+    1.Stepwise Feature selection
+    2.Recursive Feature elimination
+    3.Feature Importance Analysis
+    
+
+Performed on a Logistic Regressor and Random Forest Classifier
+
+In [56]:
+
+    
+    
+    import warnings
+    from sklearn.feature_selection import RFE,SelectKBest,chi2
+    from sklearn.decomposition import PCA
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.ensemble import RandomForestClassifier
+    import statsmodels.api as sm
+    import scipy.stats as ss
+    import joblib
+    from mlxtend.feature_selection import SequentialFeatureSelector
+    
+
+In [57]:
+
+    
+    
+    fi_data=data.drop(columns=['ORIGIN']).copy()
+    X,y=fi_data.drop(columns='CARAVAN'),fi_data.CARAVAN
+    
+
+# Exploratory Data Analysis¶
+
+# Dimensionality Reduction¶
+
+In [58]:
+
+    
+    
+    #plotting function
+    def scatter_density(data,labels,sca_title='',den_title="",**kwargs):
+        """plot a scatter plot and a density plot Args:
+                 data:2-d array ,shape (n_samples,2)
+                 labels:array-like,class labels to be used for coloring scatterplot
+                  sca_title:str,scatter plot title
+                  den_title:str,density plot title
+                  **kwargs:keyword arguments passed to seaborn.
+                  Kdeplot
+                  Returns:
+                         ax,matplotlib axis object"""
+        fig,ax=plt.subplots(1,2,figsize=(10,4),sharey=True,sharex=True)
+        #,gridspec_kw={'width_ratios':[50,50,4]}
+        dataneg=data[labels==0]
+        datapos=data[labels==1]
+        sns.scatterplot(data[:,0],data[:,1],hue=labels,ax=ax[0])
+        #sns.scatterplot(dataneg[:,0],dataneg[:,1],palette='Blues',ax=ax[0],alpha=0.06)
+        #sns.scatterplot(datapos[:,0],datapos[:,1],palette='Oranges',ax=ax[0],alpha=1)
+        sns.kdeplot(datapos[:,0],datapos[:,1],ax=ax[1],cmap='Oranges',**kwargs)
+        sns.kdeplot(dataneg[:,0],dataneg[:,1],ax=ax[1],map='Blues',nlevels=30,**kwargs,shade=True,shade_lowest=False)#,cbar=True,cbar_ax=ax[2])
+        ax[0].set_title(sca_title)
+        ax[1].set_title(den_title)
+        fig.tight_layout()
+        plt.show()
+        return ax
+    
+
+# PCA(principal Component analysis)¶
+
+PCA is effected by differences in magnitude well begin by scaling the data.
+
+In [59]:
+
+    
+    
+    from sklearn.decomposition import PCA
+    Xs=pd.DataFrame(StandardScaler().fit_transform(X),columns=X.columns)
+    pca=PCA(random_state=RS)
+    Xpca=pca.fit_transform(Xs)
+    
+
+implement PCA without proper Scaling
+
+In [60]:
+
+    
+    
+    pca=PCA(random_state=RS)
+    _Xpca_raw=PCA(n_components=2,random_state=RS).fit_transform(X)
+    scatter_density(_Xpca_raw,y,'PCA Scatter Unscaled','PCA Density UnScaled');
+    
+    
+    
+    /opt/conda/lib/python3.6/site-packages/seaborn/distributions.py:437: UserWarning: The following kwargs were not used by contour: 'map', 'nlevels'
+      cset = contour_func(xx, yy, z, n_levels, **kwargs)
+    
+
+![](__results___files/__results___111_1.png)
+
+The density plot shows a clear separation between two groups and even the
+scatter plot shows some degree of misleading grouping.Properly scaled ,things
+will look quite a bit different.
+
+In [61]:
+
+    
+    
+    from sklearn.decomposition import PCA
+    Xs=pd.DataFrame(StandardScaler().fit_transform(X),columns=X.columns)
+    pca=PCA(random_state=RS)
+    Xpca=pca.fit_transform(Xs)
+    
+    Xpca=pca.fit_transform(Xs)
+    scatter_density(Xpca,y,'PCA Scaled:Scatter','PCA Scaled:Density');
+    
+    
+    
+    /opt/conda/lib/python3.6/site-packages/seaborn/distributions.py:437: UserWarning: The following kwargs were not used by contour: 'map', 'nlevels'
+      cset = contour_func(xx, yy, z, n_levels, **kwargs)
+    
+
+![](__results___files/__results___113_1.png)
+
+Now we are dealing with the accurate representation of the data,an amorphous
+point mass.That is why it is so important to check that the assumptions are
+model are met,otherwise it is all too easy to head down a path leading to dead
+ends or inavalid conclusions.
+
+In [62]:
+
+    
+    
+    pca.explained_variance_ratio_[:3]
+    
+
+Out[62]:
+
+    
+    
+    array([0.11035515, 0.05773411, 0.04685836])
+
+About 16% of variance can be explained by these first two abstract components.
+
+In [63]:
+
+    
+    
+    plt.plot(np.cumsum(pca.explained_variance_ratio_))
+    plt.annotate('(64,0.993)',xy=(64,0.993),xytext=(64,0.8),fontsize='medium',arrowprops={'arrowstyle':'->','mutation_scale':15})
+    plt.xlabel('number of components')
+    plt.ylabel('cumulative explained variance')
+    plt.title('Explained variance')
+    plt.show()
+    
+
+![](__results___files/__results___117_0.png)
+
+# t-SNE(T-distributed Stochastic Neighbor Embedding)¶
+
+In [64]:
+
+    
+    
+    !pip install openTSNE
+    
+    
+    
+    Collecting openTSNE
+      Downloading openTSNE-0.4.4-cp36-cp36m-manylinux1_x86_64.whl (1.8 MB)
+         |ââââââââââââââââââââââââââââââââ| 1.8 MB 192 kB/s eta 0:00:01
+    Requirement already satisfied: numpy>=1.14.6 in /opt/conda/lib/python3.6/site-packages (from openTSNE) (1.18.2)
+    Requirement already satisfied: scipy in /opt/conda/lib/python3.6/site-packages (from openTSNE) (1.4.1)
+    Requirement already satisfied: scikit-learn>=0.20 in /opt/conda/lib/python3.6/site-packages (from openTSNE) (0.22.2.post1)
+    Requirement already satisfied: joblib>=0.11 in /opt/conda/lib/python3.6/site-packages (from scikit-learn>=0.20->openTSNE) (0.14.1)
+    Installing collected packages: openTSNE
+    Successfully installed openTSNE-0.4.4
+    
+
+In [65]:
+
+    
+    
+    from openTSNE import TSNE
+    from openTSNE.callbacks import ErrorLogger
+    tsne=TSNE(perplexity=75,learning_rate=500,n_iter=1000,metric='euclidean',negative_gradient_method='bh',n_jobs=4,callbacks=ErrorLogger(),random_state=RS)
+    Xembd=tsne.fit(Xs)
+    
+    
+    
+    /opt/conda/lib/python3.6/site-packages/openTSNE/callbacks.py:55: FutureWarning: `ErrorLogger` will be removed in upcoming version. Please use the `verbose` flag instead.
+      category=FutureWarning,
+    
+    
+    
+    ---------------------------------------------------------------------------
+    KeyError                                  Traceback (most recent call last)
+    /opt/conda/lib/python3.6/site-packages/pandas/core/indexes/base.py in get_loc(self, key, method, tolerance)
+       2896             try:
+    -> 2897                 return self._engine.get_loc(key)
+       2898             except KeyError:
+    
+    pandas/_libs/index.pyx in pandas._libs.index.IndexEngine.get_loc()
+    
+    pandas/_libs/index.pyx in pandas._libs.index.IndexEngine.get_loc()
+    
+    pandas/_libs/hashtable_class_helper.pxi in pandas._libs.hashtable.PyObjectHashTable.get_item()
+    
+    pandas/_libs/hashtable_class_helper.pxi in pandas._libs.hashtable.PyObjectHashTable.get_item()
+    
+    KeyError: 0
+    
+    During handling of the above exception, another exception occurred:
+    
+    KeyError                                  Traceback (most recent call last)
+    <ipython-input-65-80fa7f82e63b> in <module>
+          2 from openTSNE.callbacks import ErrorLogger
+          3 tsne=TSNE(perplexity=75,learning_rate=500,n_iter=1000,metric='euclidean',negative_gradient_method='bh',n_jobs=4,callbacks=ErrorLogger(),random_state=RS)
+    ----> 4 Xembd=tsne.fit(Xs)
+    
+    /opt/conda/lib/python3.6/site-packages/openTSNE/tsne.py in fit(self, X)
+       1187             print("-" * 80, repr(self), "-" * 80, sep="\n")
+       1188 
+    -> 1189         embedding = self.prepare_initial(X)
+       1190 
+       1191         try:
+    
+    /opt/conda/lib/python3.6/site-packages/openTSNE/tsne.py in prepare_initial(self, X)
+       1241                 n_jobs=self.n_jobs,
+       1242                 random_state=self.random_state,
+    -> 1243                 verbose=self.verbose,
+       1244             )
+       1245         else:
+    
+    /opt/conda/lib/python3.6/site-packages/openTSNE/affinity.py in __init__(self, data, perplexity, method, metric, metric_params, symmetrize, n_jobs, random_state, verbose)
+        136         k_neighbors = min(self.n_samples - 1, int(3 * self.perplexity))
+        137         self.knn_index, self.__neighbors, self.__distances = build_knn_index(
+    --> 138             data, method, k_neighbors, metric, metric_params, n_jobs, random_state, verbose
+        139         )
+        140 
+    
+    /opt/conda/lib/python3.6/site-packages/openTSNE/affinity.py in build_knn_index(data, method, k, metric, metric_params, n_jobs, random_state, verbose)
+        317         )
+        318 
+    --> 319     neighbors, distances = knn_index.build(data, k=k)
+        320 
+        321     return knn_index, neighbors, distances
+    
+    /opt/conda/lib/python3.6/site-packages/openTSNE/nearest_neighbors.py in build(self, data, k)
+        210 
+        211         for i in range(N):
+    --> 212             self.index.add_item(i, data[i])
+        213 
+        214         # Number of trees. FIt-SNE uses 50 by default.
+    
+    /opt/conda/lib/python3.6/site-packages/pandas/core/frame.py in __getitem__(self, key)
+       2993             if self.columns.nlevels > 1:
+       2994                 return self._getitem_multilevel(key)
+    -> 2995             indexer = self.columns.get_loc(key)
+       2996             if is_integer(indexer):
+       2997                 indexer = [indexer]
+    
+    /opt/conda/lib/python3.6/site-packages/pandas/core/indexes/base.py in get_loc(self, key, method, tolerance)
+       2897                 return self._engine.get_loc(key)
+       2898             except KeyError:
+    -> 2899                 return self._engine.get_loc(self._maybe_cast_indexer(key))
+       2900         indexer = self.get_indexer([key], method=method, tolerance=tolerance)
+       2901         if indexer.ndim > 1 or indexer.size > 1:
+    
+    pandas/_libs/index.pyx in pandas._libs.index.IndexEngine.get_loc()
+    
+    pandas/_libs/index.pyx in pandas._libs.index.IndexEngine.get_loc()
+    
+    pandas/_libs/hashtable_class_helper.pxi in pandas._libs.hashtable.PyObjectHashTable.get_item()
+    
+    pandas/_libs/hashtable_class_helper.pxi in pandas._libs.hashtable.PyObjectHashTable.get_item()
+    
+    KeyError: 0
+
+In [66]:
+
+    
+    
+    scatter_density(Xembd,y,'t-SNE scatter','t-SNE density');
+    
+    
+    
+    ---------------------------------------------------------------------------
+    NameError                                 Traceback (most recent call last)
+    <ipython-input-66-29e09de9ef68> in <module>
+    ----> 1 scatter_density(Xembd,y,'t-SNE scatter','t-SNE density');
+    
+    NameError: name 'Xembd' is not defined
+
+Although we do begin to see some small clusters taking shape.Depending on
+parameter choice,t-SNE has been shown to spuriously cluster.Highest density
+areas overlap between positive and negative saples and there are only a few
+small pockets where they have successfully separated.
+
+In [67]:
+
+    
+    
+    !pip install 'umap-learn==0.3.10'
+    
+    
+    
+    Requirement already satisfied: umap-learn==0.3.10 in /opt/conda/lib/python3.6/site-packages (0.3.10)
+    
+    Requirement already satisfied: numpy>=1.13 in /opt/conda/lib/python3.6/site-packages (from umap-learn==0.3.10) (1.18.2)
+    
+    Requirement already satisfied: numba>=0.37 in /opt/conda/lib/python3.6/site-packages (from umap-learn==0.3.10) (0.48.0)
+    
+    Requirement already satisfied: scikit-learn>=0.16 in /opt/conda/lib/python3.6/site-packages (from umap-learn==0.3.10) (0.22.2.post1)
+    
+    Requirement already satisfied: scipy>=0.19 in /opt/conda/lib/python3.6/site-packages (from umap-learn==0.3.10) (1.4.1)
+    
+    Requirement already satisfied: llvmlite<0.32.0,>=0.31.0dev0 in /opt/conda/lib/python3.6/site-packages (from numba>=0.37->umap-learn==0.3.10) (0.31.0)
+    
+    Requirement already satisfied: setuptools in /opt/conda/lib/python3.6/site-packages (from numba>=0.37->umap-learn==0.3.10) (46.1.3.post20200330)
+    
+    Requirement already satisfied: joblib>=0.11 in /opt/conda/lib/python3.6/site-packages (from scikit-learn>=0.16->umap-learn==0.3.10) (0.14.1)
+    
+    
+
+**UMAP(Uniform manifold Approximation and Projection)**
+
+UMAP is relatively recent development in non-linear dimensionality reduction.
+
+In [68]:
+
+    
+    
+    import umap.umap_ as umap
+    
+    ump=umap.UMAP(n_neighbors=30,min_dist=0.2,random_state=RS,verbose=True)
+    Xumap=ump.fit_transform(Xs,y)
+    
+    
+    
+    UMAP(a=None, angular_rp_forest=False, b=None, init='spectral',
+         learning_rate=1.0, local_connectivity=1.0, metric='euclidean',
+         metric_kwds=None, min_dist=0.2, n_components=2, n_epochs=None,
+         n_neighbors=30, negative_sample_rate=5, random_state=410,
+         repulsion_strength=1.0, set_op_mix_ratio=1.0, spread=1.0,
+         target_metric='categorical', target_metric_kwds=None,
+         target_n_neighbors=-1, target_weight=0.5, transform_queue_size=4.0,
+         transform_seed=42, verbose=True)
+    Construct fuzzy simplicial set
+    Fri Aug 14 06:13:36 2020 Finding Nearest Neighbors
+    Fri Aug 14 06:13:36 2020 Building RP forest with 10 trees
+    Fri Aug 14 06:13:37 2020 NN descent for 13 iterations
+    
+    
+    
+    /opt/conda/lib/python3.6/site-packages/umap/nndescent.py:92: NumbaPerformanceWarning: 
+    The keyword argument 'parallel=True' was specified but no transformation for parallel execution was possible.
+    
+    To find out why, try turning on parallel diagnostics, see http://numba.pydata.org/numba-doc/latest/user/parallel.html#diagnostics for help.
+    
+    File "../../opt/conda/lib/python3.6/site-packages/umap/utils.py", line 451:
+    @numba.njit(parallel=True)
+    def build_candidates(
+    ^
+    
+      current_graph, n_vertices, n_neighbors, max_candidates, rng_state
+    
+    
+    
+    	 0  /  13
+    	 1  /  13
+    	 2  /  13
+    	 3  /  13
+    Fri Aug 14 06:13:45 2020 Finished Nearest Neighbor Search
+    Fri Aug 14 06:13:49 2020 Construct embedding
+    	completed  0  /  500 epochs
+    	completed  50  /  500 epochs
+    	completed  100  /  500 epochs
+    	completed  150  /  500 epochs
+    	completed  200  /  500 epochs
+    	completed  250  /  500 epochs
+    	completed  300  /  500 epochs
+    	completed  350  /  500 epochs
+    	completed  400  /  500 epochs
+    	completed  450  /  500 epochs
+    Fri Aug 14 06:14:38 2020 Finished embedding
+    
+
+In [69]:
+
+    
+    
+    scatter_density(Xumap,y,'UMAP:Scatter','UMAP:Density')
+    
+    
+    
+    /opt/conda/lib/python3.6/site-packages/seaborn/distributions.py:437: UserWarning: The following kwargs were not used by contour: 'map', 'nlevels'
+      cset = contour_func(xx, yy, z, n_levels, **kwargs)
+    
+
+![](__results___files/__results___126_1.png)
+
+Out[69]:
+
+    
+    
+    array([<matplotlib.axes._subplots.AxesSubplot object at 0x7f5144641128>,
+           <matplotlib.axes._subplots.AxesSubplot object at 0x7f5111671f28>],
+          dtype=object)
+
+In [70]:
+
+    
+    
+    ump=umap.UMAP(n_neighbors=30,min_dist=0.2,random_state=RS,verbose=False)
+    Xumap=ump.fit_transform(Xs)
+    
+
+In [71]:
+
+    
+    
+    ump=umap.UMAP(n_neighbors=30,min_dist=0.2,random_state=RS,verbose=False)
+    Xumap=ump.fit_transform(Xs)
+    scatter_density(Xumap,y,'UMAP:Scatter','UMAP:Density');
+    
+    
+    
+    /opt/conda/lib/python3.6/site-packages/seaborn/distributions.py:437: UserWarning: The following kwargs were not used by contour: 'map', 'nlevels'
+      cset = contour_func(xx, yy, z, n_levels, **kwargs)
+    
+
+![](__results___files/__results___128_1.png)
+
+In [ ]:
+
+    
+    
+     
+    
+
+In [ ]:
+
+    
+    
+     
+    
+

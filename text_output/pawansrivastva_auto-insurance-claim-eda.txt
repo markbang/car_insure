@@ -1,0 +1,1733 @@
+In [1]:
+
+    
+    
+    import numpy as np
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    %matplotlib inline
+    import warnings
+    warnings.filterwarnings("ignore")
+    
+    
+    import plotly.express as px
+    from plotly.subplots import make_subplots
+    import plotly.figure_factory as ff
+    
+
+# GENERAL INSPECTION¶
+
+In [2]:
+
+    
+    
+    insurance_claim=pd.read_csv("/kaggle/input/auto-insurance-claims-data/insurance_claims.csv")
+    insurance_claim.head()
+    
+
+Out[2]:
+
+| months_as_customer | age | policy_number | policy_bind_date | policy_state | policy_csl | policy_deductable | policy_annual_premium | umbrella_limit | insured_zip | ... | police_report_available | total_claim_amount | injury_claim | property_claim | vehicle_claim | auto_make | auto_model | auto_year | fraud_reported | _c39  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 328 | 48 | 521585 | 2014-10-17 | OH | 250/500 | 1000 | 1406.91 | 0 | 466132 | ... | YES | 71610 | 6510 | 13020 | 52080 | Saab | 92x | 2004 | Y | NaN  
+1 | 228 | 42 | 342868 | 2006-06-27 | IN | 250/500 | 2000 | 1197.22 | 5000000 | 468176 | ... | ? | 5070 | 780 | 780 | 3510 | Mercedes | E400 | 2007 | Y | NaN  
+2 | 134 | 29 | 687698 | 2000-09-06 | OH | 100/300 | 2000 | 1413.14 | 5000000 | 430632 | ... | NO | 34650 | 7700 | 3850 | 23100 | Dodge | RAM | 2007 | N | NaN  
+3 | 256 | 41 | 227811 | 1990-05-25 | IL | 250/500 | 2000 | 1415.74 | 6000000 | 608117 | ... | NO | 63400 | 6340 | 6340 | 50720 | Chevrolet | Tahoe | 2014 | Y | NaN  
+4 | 228 | 44 | 367455 | 2014-06-06 | IL | 500/1000 | 1000 | 1583.91 | 6000000 | 610706 | ... | NO | 6500 | 1300 | 650 | 4550 | Accura | RSX | 2009 | N | NaN  
+  
+5 rows Ã 40 columns
+
+In [3]:
+
+    
+    
+    ### Descriptive analysis
+    
+    insurance_claim.describe()
+    
+
+Out[3]:
+
+| months_as_customer | age | policy_number | policy_deductable | policy_annual_premium | umbrella_limit | insured_zip | capital-gains | capital-loss | incident_hour_of_the_day | number_of_vehicles_involved | bodily_injuries | witnesses | total_claim_amount | injury_claim | property_claim | vehicle_claim | auto_year | _c39  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+count | 1000.000000 | 1000.000000 | 1000.000000 | 1000.000000 | 1000.000000 | 1.000000e+03 | 1000.000000 | 1000.000000 | 1000.000000 | 1000.000000 | 1000.00000 | 1000.000000 | 1000.000000 | 1000.00000 | 1000.000000 | 1000.000000 | 1000.000000 | 1000.000000 | 0.0  
+mean | 203.954000 | 38.948000 | 546238.648000 | 1136.000000 | 1256.406150 | 1.101000e+06 | 501214.488000 | 25126.100000 | -26793.700000 | 11.644000 | 1.83900 | 0.992000 | 1.487000 | 52761.94000 | 7433.420000 | 7399.570000 | 37928.950000 | 2005.103000 | NaN  
+std | 115.113174 | 9.140287 | 257063.005276 | 611.864673 | 244.167395 | 2.297407e+06 | 71701.610941 | 27872.187708 | 28104.096686 | 6.951373 | 1.01888 | 0.820127 | 1.111335 | 26401.53319 | 4880.951853 | 4824.726179 | 18886.252893 | 6.015861 | NaN  
+min | 0.000000 | 19.000000 | 100804.000000 | 500.000000 | 433.330000 | -1.000000e+06 | 430104.000000 | 0.000000 | -111100.000000 | 0.000000 | 1.00000 | 0.000000 | 0.000000 | 100.00000 | 0.000000 | 0.000000 | 70.000000 | 1995.000000 | NaN  
+25% | 115.750000 | 32.000000 | 335980.250000 | 500.000000 | 1089.607500 | 0.000000e+00 | 448404.500000 | 0.000000 | -51500.000000 | 6.000000 | 1.00000 | 0.000000 | 1.000000 | 41812.50000 | 4295.000000 | 4445.000000 | 30292.500000 | 2000.000000 | NaN  
+50% | 199.500000 | 38.000000 | 533135.000000 | 1000.000000 | 1257.200000 | 0.000000e+00 | 466445.500000 | 0.000000 | -23250.000000 | 12.000000 | 1.00000 | 1.000000 | 1.000000 | 58055.00000 | 6775.000000 | 6750.000000 | 42100.000000 | 2005.000000 | NaN  
+75% | 276.250000 | 44.000000 | 759099.750000 | 2000.000000 | 1415.695000 | 0.000000e+00 | 603251.000000 | 51025.000000 | 0.000000 | 17.000000 | 3.00000 | 2.000000 | 2.000000 | 70592.50000 | 11305.000000 | 10885.000000 | 50822.500000 | 2010.000000 | NaN  
+max | 479.000000 | 64.000000 | 999435.000000 | 2000.000000 | 2047.590000 | 1.000000e+07 | 620962.000000 | 100500.000000 | 0.000000 | 23.000000 | 4.00000 | 2.000000 | 3.000000 | 114920.00000 | 21450.000000 | 23670.000000 | 79560.000000 | 2015.000000 | NaN  
+  
+In [4]:
+
+    
+    
+    ### Shape of dataframe
+    
+    insurance_claim.shape
+    
+
+Out[4]:
+
+    
+    
+    (1000, 40)
+
+In [5]:
+
+    
+    
+    ### Datatypes of dataframe
+    
+    insurance_claim.dtypes
+    
+
+Out[5]:
+
+    
+    
+    months_as_customer               int64
+    age                              int64
+    policy_number                    int64
+    policy_bind_date                object
+    policy_state                    object
+    policy_csl                      object
+    policy_deductable                int64
+    policy_annual_premium          float64
+    umbrella_limit                   int64
+    insured_zip                      int64
+    insured_sex                     object
+    insured_education_level         object
+    insured_occupation              object
+    insured_hobbies                 object
+    insured_relationship            object
+    capital-gains                    int64
+    capital-loss                     int64
+    incident_date                   object
+    incident_type                   object
+    collision_type                  object
+    incident_severity               object
+    authorities_contacted           object
+    incident_state                  object
+    incident_city                   object
+    incident_location               object
+    incident_hour_of_the_day         int64
+    number_of_vehicles_involved      int64
+    property_damage                 object
+    bodily_injuries                  int64
+    witnesses                        int64
+    police_report_available         object
+    total_claim_amount               int64
+    injury_claim                     int64
+    property_claim                   int64
+    vehicle_claim                    int64
+    auto_make                       object
+    auto_model                      object
+    auto_year                        int64
+    fraud_reported                  object
+    _c39                           float64
+    dtype: object
+
+In [6]:
+
+    
+    
+    insurance_claim.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 1000 entries, 0 to 999
+    Data columns (total 40 columns):
+     #   Column                       Non-Null Count  Dtype  
+    ---  ------                       --------------  -----  
+     0   months_as_customer           1000 non-null   int64  
+     1   age                          1000 non-null   int64  
+     2   policy_number                1000 non-null   int64  
+     3   policy_bind_date             1000 non-null   object 
+     4   policy_state                 1000 non-null   object 
+     5   policy_csl                   1000 non-null   object 
+     6   policy_deductable            1000 non-null   int64  
+     7   policy_annual_premium        1000 non-null   float64
+     8   umbrella_limit               1000 non-null   int64  
+     9   insured_zip                  1000 non-null   int64  
+     10  insured_sex                  1000 non-null   object 
+     11  insured_education_level      1000 non-null   object 
+     12  insured_occupation           1000 non-null   object 
+     13  insured_hobbies              1000 non-null   object 
+     14  insured_relationship         1000 non-null   object 
+     15  capital-gains                1000 non-null   int64  
+     16  capital-loss                 1000 non-null   int64  
+     17  incident_date                1000 non-null   object 
+     18  incident_type                1000 non-null   object 
+     19  collision_type               1000 non-null   object 
+     20  incident_severity            1000 non-null   object 
+     21  authorities_contacted        1000 non-null   object 
+     22  incident_state               1000 non-null   object 
+     23  incident_city                1000 non-null   object 
+     24  incident_location            1000 non-null   object 
+     25  incident_hour_of_the_day     1000 non-null   int64  
+     26  number_of_vehicles_involved  1000 non-null   int64  
+     27  property_damage              1000 non-null   object 
+     28  bodily_injuries              1000 non-null   int64  
+     29  witnesses                    1000 non-null   int64  
+     30  police_report_available      1000 non-null   object 
+     31  total_claim_amount           1000 non-null   int64  
+     32  injury_claim                 1000 non-null   int64  
+     33  property_claim               1000 non-null   int64  
+     34  vehicle_claim                1000 non-null   int64  
+     35  auto_make                    1000 non-null   object 
+     36  auto_model                   1000 non-null   object 
+     37  auto_year                    1000 non-null   int64  
+     38  fraud_reported               1000 non-null   object 
+     39  _c39                         0 non-null      float64
+    dtypes: float64(2), int64(17), object(21)
+    memory usage: 312.6+ KB
+    
+
+# DATA CLEANING¶
+
+#### _MISSING VALUE TREATMENT_¶
+
+In [7]:
+
+    
+    
+    ### First of all we fill "?" with np.Nan
+    
+    insurance_claim=insurance_claim.replace("?",np.NaN)
+    
+
+In [8]:
+
+    
+    
+    round(100*(insurance_claim.isnull().sum()/len(insurance_claim.index)),2)
+    
+
+Out[8]:
+
+    
+    
+    months_as_customer               0.0
+    age                              0.0
+    policy_number                    0.0
+    policy_bind_date                 0.0
+    policy_state                     0.0
+    policy_csl                       0.0
+    policy_deductable                0.0
+    policy_annual_premium            0.0
+    umbrella_limit                   0.0
+    insured_zip                      0.0
+    insured_sex                      0.0
+    insured_education_level          0.0
+    insured_occupation               0.0
+    insured_hobbies                  0.0
+    insured_relationship             0.0
+    capital-gains                    0.0
+    capital-loss                     0.0
+    incident_date                    0.0
+    incident_type                    0.0
+    collision_type                  17.8
+    incident_severity                0.0
+    authorities_contacted            0.0
+    incident_state                   0.0
+    incident_city                    0.0
+    incident_location                0.0
+    incident_hour_of_the_day         0.0
+    number_of_vehicles_involved      0.0
+    property_damage                 36.0
+    bodily_injuries                  0.0
+    witnesses                        0.0
+    police_report_available         34.3
+    total_claim_amount               0.0
+    injury_claim                     0.0
+    property_claim                   0.0
+    vehicle_claim                    0.0
+    auto_make                        0.0
+    auto_model                       0.0
+    auto_year                        0.0
+    fraud_reported                   0.0
+    _c39                           100.0
+    dtype: float64
+
+In [9]:
+
+    
+    
+    ### Dropping column "_c39"
+    
+    insurance_claim.drop(["_c39"],axis=1,inplace=True)
+    
+
+In [10]:
+
+    
+    
+    ### Checking unique values for collosion type
+    
+    round(100*(insurance_claim['collision_type'].value_counts(normalize=True,dropna=False)),2)
+    
+
+Out[10]:
+
+    
+    
+    Rear Collision     29.2
+    Side Collision     27.6
+    Front Collision    25.4
+    NaN                17.8
+    Name: collision_type, dtype: float64
+
+In [11]:
+
+    
+    
+    ### We can impute collosion type with mode i.e most occuring collosion type
+    ### imputing
+    
+    insurance_claim['collision_type']=insurance_claim['collision_type'].fillna(insurance_claim['collision_type'].mode()[0])
+    
+
+In [12]:
+
+    
+    
+    ### Checking unique values for collosion type
+    
+    round(100*(insurance_claim['property_damage'].value_counts(normalize=True,dropna=False)),2)
+    
+
+Out[12]:
+
+    
+    
+    NaN    36.0
+    NO     33.8
+    YES    30.2
+    Name: property_damage, dtype: float64
+
+In [13]:
+
+    
+    
+    ### If there was property loss,then the report would have been filed.So,we can consider missing value as "NO"
+    ###Imputing with "NO"
+    
+    insurance_claim['property_damage']=insurance_claim['property_damage'].fillna("NO")
+    
+
+In [14]:
+
+    
+    
+    ### Checking unique values for collosion type
+    
+    round(100*(insurance_claim['police_report_available'].value_counts(normalize=True,dropna=False)),2)
+    
+
+Out[14]:
+
+    
+    
+    NaN    34.3
+    NO     34.3
+    YES    31.4
+    Name: police_report_available, dtype: float64
+
+In [15]:
+
+    
+    
+    ### If there was police reported,then the report would have been filed.So,we can consider missing value as "NO"
+    ###Imputing with "NO"
+    
+    insurance_claim['police_report_available']=insurance_claim['property_damage'].fillna("NO")
+    
+
+In [16]:
+
+    
+    
+    ### Checking missing value again
+    
+    round(100*(insurance_claim.isnull().sum()/len(insurance_claim.index)),2)
+    
+
+Out[16]:
+
+    
+    
+    months_as_customer             0.0
+    age                            0.0
+    policy_number                  0.0
+    policy_bind_date               0.0
+    policy_state                   0.0
+    policy_csl                     0.0
+    policy_deductable              0.0
+    policy_annual_premium          0.0
+    umbrella_limit                 0.0
+    insured_zip                    0.0
+    insured_sex                    0.0
+    insured_education_level        0.0
+    insured_occupation             0.0
+    insured_hobbies                0.0
+    insured_relationship           0.0
+    capital-gains                  0.0
+    capital-loss                   0.0
+    incident_date                  0.0
+    incident_type                  0.0
+    collision_type                 0.0
+    incident_severity              0.0
+    authorities_contacted          0.0
+    incident_state                 0.0
+    incident_city                  0.0
+    incident_location              0.0
+    incident_hour_of_the_day       0.0
+    number_of_vehicles_involved    0.0
+    property_damage                0.0
+    bodily_injuries                0.0
+    witnesses                      0.0
+    police_report_available        0.0
+    total_claim_amount             0.0
+    injury_claim                   0.0
+    property_claim                 0.0
+    vehicle_claim                  0.0
+    auto_make                      0.0
+    auto_model                     0.0
+    auto_year                      0.0
+    fraud_reported                 0.0
+    dtype: float64
+
+  * _There is no missing values now_
+
+In [17]:
+
+    
+    
+    ### Dropping those column which are not much sighnificance in oir analysis
+    
+    insurance_claim.drop(["incident_hour_of_the_day",'insured_zip','policy_bind_date','incident_location'],axis=1,inplace=True)
+    
+
+In [18]:
+
+    
+    
+    ### Checking shape of dataset again
+    
+    insurance_claim.shape
+    
+
+Out[18]:
+
+    
+    
+    (1000, 35)
+
+In [19]:
+
+    
+    
+    ### Checking values for each column
+    
+    insurance_claim.nunique()
+    
+
+Out[19]:
+
+    
+    
+    months_as_customer              391
+    age                              46
+    policy_number                  1000
+    policy_state                      3
+    policy_csl                        3
+    policy_deductable                 3
+    policy_annual_premium           991
+    umbrella_limit                   11
+    insured_sex                       2
+    insured_education_level           7
+    insured_occupation               14
+    insured_hobbies                  20
+    insured_relationship              6
+    capital-gains                   338
+    capital-loss                    354
+    incident_date                    60
+    incident_type                     4
+    collision_type                    3
+    incident_severity                 4
+    authorities_contacted             5
+    incident_state                    7
+    incident_city                     7
+    number_of_vehicles_involved       4
+    property_damage                   2
+    bodily_injuries                   3
+    witnesses                         4
+    police_report_available           2
+    total_claim_amount              763
+    injury_claim                    638
+    property_claim                  626
+    vehicle_claim                   726
+    auto_make                        14
+    auto_model                       39
+    auto_year                        21
+    fraud_reported                    2
+    dtype: int64
+
+#### _SANITY CHECK_¶
+
+In [20]:
+
+    
+    
+    ### Total claim must be equal to sum of "injury_claim","property_claim","vehicle_claim"
+    
+    insurance_claim[insurance_claim['total_claim_amount'] != insurance_claim['injury_claim']+insurance_claim['property_claim']+insurance_claim['vehicle_claim']].shape[0]
+    
+
+Out[20]:
+
+    
+    
+    0
+
+In [21]:
+
+    
+    
+    ### Others sanity check
+    
+    print(insurance_claim[insurance_claim['months_as_customer']<0].shape[0])
+    print(insurance_claim[insurance_claim['age']<0].shape[0])
+    print(insurance_claim[insurance_claim['policy_annual_premium']<0].shape[0])
+    print(insurance_claim[insurance_claim['total_claim_amount']<0].shape[0])
+    print(insurance_claim[insurance_claim['umbrella_limit']<0].shape[0])
+    print(insurance_claim[insurance_claim['capital-gains']<0].shape[0])
+    print(insurance_claim[insurance_claim['number_of_vehicles_involved']<0].shape[0])
+    print(insurance_claim[insurance_claim['injury_claim']<0].shape[0])
+    print(insurance_claim[insurance_claim['property_claim']<0].shape[0])
+    print(insurance_claim[insurance_claim['vehicle_claim']<0].shape[0])
+    
+    
+    
+    0
+    0
+    0
+    0
+    1
+    0
+    0
+    0
+    0
+    0
+    
+
+_There is 1 row which has negative umbrella limit_
+
+In [22]:
+
+    
+    
+    ### Fetching that row
+    
+    insurance_claim[insurance_claim['umbrella_limit']<0]
+    
+
+Out[22]:
+
+| months_as_customer | age | policy_number | policy_state | policy_csl | policy_deductable | policy_annual_premium | umbrella_limit | insured_sex | insured_education_level | ... | witnesses | police_report_available | total_claim_amount | injury_claim | property_claim | vehicle_claim | auto_make | auto_model | auto_year | fraud_reported  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+290 | 284 | 42 | 526039 | OH | 100/300 | 500 | 1338.54 | -1000000 | MALE | Associate | ... | 1 | YES | 94160 | 8560 | 17120 | 68480 | Chevrolet | Malibu | 1996 | N  
+  
+1 rows Ã 35 columns
+
+In [23]:
+
+    
+    
+    ### dropping above row
+    
+    insurance_claim.drop(insurance_claim.index[290],inplace=True)
+    
+
+In [24]:
+
+    
+    
+    ### Checking whether it has dropped or not
+    
+    print(insurance_claim[insurance_claim['umbrella_limit']<0].shape[0])
+    
+    
+    
+    0
+    
+
+#### _DATA TYPES_¶
+
+In [25]:
+
+    
+    
+    ### Checking datatypes
+    insurance_claim.dtypes
+    
+
+Out[25]:
+
+    
+    
+    months_as_customer               int64
+    age                              int64
+    policy_number                    int64
+    policy_state                    object
+    policy_csl                      object
+    policy_deductable                int64
+    policy_annual_premium          float64
+    umbrella_limit                   int64
+    insured_sex                     object
+    insured_education_level         object
+    insured_occupation              object
+    insured_hobbies                 object
+    insured_relationship            object
+    capital-gains                    int64
+    capital-loss                     int64
+    incident_date                   object
+    incident_type                   object
+    collision_type                  object
+    incident_severity               object
+    authorities_contacted           object
+    incident_state                  object
+    incident_city                   object
+    number_of_vehicles_involved      int64
+    property_damage                 object
+    bodily_injuries                  int64
+    witnesses                        int64
+    police_report_available         object
+    total_claim_amount               int64
+    injury_claim                     int64
+    property_claim                   int64
+    vehicle_claim                    int64
+    auto_make                       object
+    auto_model                      object
+    auto_year                        int64
+    fraud_reported                  object
+    dtype: object
+
+In [26]:
+
+    
+    
+    ### changing Incident date into datetime format
+    insurance_claim['incident_date']=pd.to_datetime(insurance_claim['incident_date'],format='%Y-%m-%d')
+    
+    ### changing auto_year date into datetime format
+    insurance_claim['auto_year']=pd.to_datetime(insurance_claim['auto_year'],format='%Y')
+    
+
+In [27]:
+
+    
+    
+    ### Checking datatypes again
+    insurance_claim.dtypes
+    
+
+Out[27]:
+
+    
+    
+    months_as_customer                      int64
+    age                                     int64
+    policy_number                           int64
+    policy_state                           object
+    policy_csl                             object
+    policy_deductable                       int64
+    policy_annual_premium                 float64
+    umbrella_limit                          int64
+    insured_sex                            object
+    insured_education_level                object
+    insured_occupation                     object
+    insured_hobbies                        object
+    insured_relationship                   object
+    capital-gains                           int64
+    capital-loss                            int64
+    incident_date                  datetime64[ns]
+    incident_type                          object
+    collision_type                         object
+    incident_severity                      object
+    authorities_contacted                  object
+    incident_state                         object
+    incident_city                          object
+    number_of_vehicles_involved             int64
+    property_damage                        object
+    bodily_injuries                         int64
+    witnesses                               int64
+    police_report_available                object
+    total_claim_amount                      int64
+    injury_claim                            int64
+    property_claim                          int64
+    vehicle_claim                           int64
+    auto_make                              object
+    auto_model                             object
+    auto_year                      datetime64[ns]
+    fraud_reported                         object
+    dtype: object
+
+#### _OUTLIER DETECTION_¶
+
+In [28]:
+
+    
+    
+    insurance_claim.describe().columns.to_list()
+    
+
+Out[28]:
+
+    
+    
+    ['months_as_customer',
+     'age',
+     'policy_number',
+     'policy_deductable',
+     'policy_annual_premium',
+     'umbrella_limit',
+     'capital-gains',
+     'capital-loss',
+     'number_of_vehicles_involved',
+     'bodily_injuries',
+     'witnesses',
+     'total_claim_amount',
+     'injury_claim',
+     'property_claim',
+     'vehicle_claim']
+
+In [29]:
+
+    
+    
+    plt.figure(figsize=[20,20])
+    
+    
+    num_col= ['months_as_customer','age','policy_deductable','policy_annual_premium','umbrella_limit','capital-gains','capital-loss','number_of_vehicles_involved','bodily_injuries','witnesses','total_claim_amount','injury_claim','property_claim','vehicle_claim']
+    
+    c=1
+    
+    for i in num_col:
+        plt.subplot(4, 4, c)
+        plt.xlabel(i)
+        sns.boxplot(insurance_claim[i] , palette="Set2")
+        c = c + 1
+        
+    plt.show()
+    
+
+![](__results___files/__results___36_0.png)
+
+_There is no outlier_
+
+In [30]:
+
+    
+    
+    insurance_claim['police_report_available'].value_counts(normalize=True,dropna=False)
+    
+
+Out[30]:
+
+    
+    
+    NO     0.698699
+    YES    0.301301
+    Name: police_report_available, dtype: float64
+
+In [31]:
+
+    
+    
+    ### Intialize "count" column
+    
+    insurance_claim['count']=1
+    
+
+# EDA¶
+
+In [32]:
+
+    
+    
+    #plt.figure(figsize=[5,4])
+    fig = px.pie(insurance_claim,names='fraud_reported')
+    fig.show()
+    
+
+_25% data is reported as fraud_
+
+In [33]:
+
+    
+    
+    ### Datasplitting into fraud and not fraud category
+    
+    insurance_claim_f=insurance_claim[insurance_claim['fraud_reported']=='Y']
+    insurance_claim_nf=insurance_claim[insurance_claim['fraud_reported']=='N']
+    
+
+In [34]:
+
+    
+    
+    plt.figure(figsize=[15,20])
+    num_col=insurance_claim.describe().columns.to_list()
+    
+    c=1
+    
+    for i in num_col:
+        plt.subplot(4, 4, c)
+        sns.distplot(insurance_claim_f[i],hist=False,label='Fraud')
+        sns.distplot(insurance_claim_nf[i],hist=False,label='Not-Fraud')
+        c = c + 1
+        plt.legend()    
+    plt.show()
+    
+
+![](__results___files/__results___44_0.png)
+
+In [35]:
+
+    
+    
+    fig = px.box(insurance_claim, x="policy_state", y="total_claim_amount", color="fraud_reported")
+    fig.show()
+    
+
+In [36]:
+
+    
+    
+    fig=px.scatter(insurance_claim,x='policy_annual_premium',y='total_claim_amount',color='fraud_reported',marginal_x='histogram',marginal_y='histogram',trendline='ols')
+    fig.show()
+    
+
+In [37]:
+
+    
+    
+    fig=px.scatter(insurance_claim,x='policy_annual_premium',y='property_claim',color='fraud_reported')
+    fig.show()
+    
+
+In [38]:
+
+    
+    
+    fig=px.scatter(insurance_claim,x='policy_annual_premium',y='vehicle_claim',color='fraud_reported')
+    fig.show()
+    
+
+In [39]:
+
+    
+    
+    fig=px.scatter(insurance_claim,x='policy_annual_premium',y='injury_claim',color='fraud_reported')
+    fig.show()
+    
+
+In [40]:
+
+    
+    
+    fig=px.scatter(insurance_claim,x='age',y='total_claim_amount',color='fraud_reported',marginal_x='box',marginal_y='violin',trendline='ols')
+    fig.show()
+    
+
+In [41]:
+
+    
+    
+    groupdf_is=insurance_claim.groupby(by=['insured_sex','fraud_reported']).count()
+    groupdf_is.reset_index(inplace=True)
+    groupdf_is=groupdf_is[['insured_sex','fraud_reported','count']]
+    groupdf_is.head()
+    
+
+Out[41]:
+
+| insured_sex | fraud_reported | count  
+---|---|---|---  
+0 | FEMALE | N | 411  
+1 | FEMALE | Y | 126  
+2 | MALE | N | 341  
+3 | MALE | Y | 121  
+  
+In [42]:
+
+    
+    
+    fig=px.bar(groupdf_is,x='insured_sex',y='count',color='fraud_reported',text='count',pattern_shape_sequence=['|','/'],pattern_shape='fraud_reported')
+    fig.show()
+    
+
+In [43]:
+
+    
+    
+    groupdf_uu=insurance_claim.groupby(by=['umbrella_limit','fraud_reported']).count()
+    groupdf_uu.reset_index(inplace=True)
+    groupdf_uu=groupdf_uu[['umbrella_limit','fraud_reported','count']]
+    groupdf_uu.head(3)
+    
+
+Out[43]:
+
+| umbrella_limit | fraud_reported | count  
+---|---|---|---  
+0 | 0 | N | 611  
+1 | 0 | Y | 187  
+2 | 2000000 | N | 1  
+  
+In [44]:
+
+    
+    
+    fig=px.bar(groupdf_uu,x='umbrella_limit',y='count',color='fraud_reported',text='count')
+    fig.show()
+    
+
+In [45]:
+
+    
+    
+    groupdf_el=insurance_claim.groupby(by=['insured_education_level','fraud_reported']).count()
+    groupdf_el.reset_index(inplace=True)
+    groupdf_el=groupdf_el[['insured_education_level','fraud_reported','count']]
+    groupdf_el.head()
+    
+
+Out[45]:
+
+| insured_education_level | fraud_reported | count  
+---|---|---|---  
+0 | Associate | N | 110  
+1 | Associate | Y | 34  
+2 | College | N | 90  
+3 | College | Y | 32  
+4 | High School | N | 124  
+  
+In [46]:
+
+    
+    
+    fig=px.bar(groupdf_el,x='insured_education_level',y='count',color='fraud_reported',text='count',title="Insurance Claim for different education Level")
+    fig.show()
+    
+
+In [47]:
+
+    
+    
+    groupdf_ic=insurance_claim.groupby(by=['insured_occupation','fraud_reported']).count()
+    groupdf_ic.reset_index(inplace=True)
+    groupdf_ic=groupdf_ic[['insured_occupation','fraud_reported','count']]
+    groupdf_ic.head()
+    
+
+Out[47]:
+
+| insured_occupation | fraud_reported | count  
+---|---|---|---  
+0 | adm-clerical | N | 54  
+1 | adm-clerical | Y | 11  
+2 | armed-forces | N | 52  
+3 | armed-forces | Y | 17  
+4 | craft-repair | N | 52  
+  
+In [48]:
+
+    
+    
+    fig=px.bar(groupdf_ic,x='insured_occupation',y='count',color='fraud_reported',text='count',title='Number of Claims diffrent Occupation')
+    fig.show()
+    
+
+In [49]:
+
+    
+    
+    groupdf_h=insurance_claim.groupby(by=['insured_hobbies','fraud_reported']).count()
+    groupdf_h.reset_index(inplace=True)
+    groupdf_h=groupdf_h[['insured_hobbies','fraud_reported','count']]
+    groupdf_h.head()
+    
+
+Out[49]:
+
+| insured_hobbies | fraud_reported | count  
+---|---|---|---  
+0 | base-jumping | N | 36  
+1 | base-jumping | Y | 13  
+2 | basketball | N | 28  
+3 | basketball | Y | 6  
+4 | board-games | N | 34  
+  
+In [50]:
+
+    
+    
+    fig=px.bar(groupdf_h,x='insured_hobbies',y='count',color='fraud_reported',text='count',title="Hobby Wise claim")
+    fig.show()
+    
+
+In [51]:
+
+    
+    
+    groupdf_rl=insurance_claim.groupby(by=['insured_relationship','fraud_reported']).count()
+    groupdf_rl.reset_index(inplace=True)
+    groupdf_rl=groupdf_rl[['insured_relationship','fraud_reported','count']]
+    groupdf_rl.head()
+    
+
+Out[51]:
+
+| insured_relationship | fraud_reported | count  
+---|---|---|---  
+0 | husband | N | 135  
+1 | husband | Y | 35  
+2 | not-in-family | N | 129  
+3 | not-in-family | Y | 45  
+4 | other-relative | N | 125  
+  
+In [52]:
+
+    
+    
+    fig=px.bar(groupdf_rl,x='insured_relationship',y='count',color='fraud_reported',text='count')
+    fig.show()
+    
+
+In [53]:
+
+    
+    
+    groupdf_it=insurance_claim.groupby(by=['incident_type','fraud_reported']).count()
+    groupdf_it.reset_index(inplace=True)
+    groupdf_it=groupdf_it[['incident_type','fraud_reported','count']]
+    groupdf_it.head()
+    
+
+Out[53]:
+
+| incident_type | fraud_reported | count  
+---|---|---|---  
+0 | Multi-vehicle Collision | N | 305  
+1 | Multi-vehicle Collision | Y | 114  
+2 | Parked Car | N | 76  
+3 | Parked Car | Y | 8  
+4 | Single Vehicle Collision | N | 285  
+  
+In [54]:
+
+    
+    
+    fig=px.bar(groupdf_it,x='incident_type',y='count',color='fraud_reported',text='count',title="Number of claims Vs. Incident type")
+    fig.show()
+    
+
+In [55]:
+
+    
+    
+    groupdf_ct=insurance_claim.groupby(by=['collision_type','fraud_reported']).count()
+    groupdf_ct.reset_index(inplace=True)
+    groupdf_ct=groupdf_ct[['collision_type','fraud_reported','count']]
+    groupdf_ct.head()
+    
+
+Out[55]:
+
+| collision_type | fraud_reported | count  
+---|---|---|---  
+0 | Front Collision | N | 184  
+1 | Front Collision | Y | 70  
+2 | Rear Collision | N | 363  
+3 | Rear Collision | Y | 107  
+4 | Side Collision | N | 205  
+  
+In [56]:
+
+    
+    
+    fig=px.bar(groupdf_ct,x='collision_type',y='count',color='fraud_reported',text='count',title="Nos. of Claim for different type of collision")
+    fig.show()
+    
+
+In [57]:
+
+    
+    
+    groupdf_ins=insurance_claim.groupby(by=['incident_severity','fraud_reported']).count()
+    groupdf_ins.reset_index(inplace=True)
+    groupdf_ins=groupdf_ins[['incident_severity','fraud_reported','count']]
+    groupdf_ins.head()
+    
+
+Out[57]:
+
+| incident_severity | fraud_reported | count  
+---|---|---|---  
+0 | Major Damage | N | 108  
+1 | Major Damage | Y | 167  
+2 | Minor Damage | N | 316  
+3 | Minor Damage | Y | 38  
+4 | Total Loss | N | 244  
+  
+In [58]:
+
+    
+    
+    fig=px.bar(groupdf_ins,x='incident_severity',y='count',color='fraud_reported',text='count',title="Number of claim Vs. Incident severity")
+    fig.show()
+    
+
+In [59]:
+
+    
+    
+    groupdf_ac=insurance_claim.groupby(by=['authorities_contacted','fraud_reported']).count()
+    groupdf_ac.reset_index(inplace=True)
+    groupdf_ac=groupdf_ac[['authorities_contacted','fraud_reported','count']]
+    groupdf_ac.head()
+    
+
+Out[59]:
+
+| authorities_contacted | fraud_reported | count  
+---|---|---|---  
+0 | Ambulance | N | 138  
+1 | Ambulance | Y | 57  
+2 | Fire | N | 163  
+3 | Fire | Y | 60  
+4 | None | N | 85  
+  
+In [60]:
+
+    
+    
+    fig=px.bar(groupdf_ac,x='authorities_contacted',y='count',color='fraud_reported',text='count')
+    fig.show()
+    
+
+In [61]:
+
+    
+    
+    groupdf_st=insurance_claim.groupby(by=['incident_state','fraud_reported']).count()
+    groupdf_st.reset_index(inplace=True)
+    groupdf_st=groupdf_st[['incident_state','fraud_reported','count']]
+    groupdf_st.head()
+    
+
+Out[61]:
+
+| incident_state | fraud_reported | count  
+---|---|---|---  
+0 | NC | N | 75  
+1 | NC | Y | 34  
+2 | NY | N | 204  
+3 | NY | Y | 58  
+4 | OH | N | 13  
+  
+In [62]:
+
+    
+    
+    fig=px.bar(groupdf_st,x='incident_state',y='count',color='fraud_reported',text='count',title="Claims for different state")
+    fig.show()
+    
+
+In [63]:
+
+    
+    
+    groupdf_pd=insurance_claim.groupby(by=['property_damage','fraud_reported']).count()
+    groupdf_pd.reset_index(inplace=True)
+    groupdf_pd=groupdf_pd[['property_damage','fraud_reported','count']]
+    groupdf_pd.head()
+    
+
+Out[63]:
+
+| property_damage | fraud_reported | count  
+---|---|---|---  
+0 | NO | N | 529  
+1 | NO | Y | 169  
+2 | YES | N | 223  
+3 | YES | Y | 78  
+  
+In [64]:
+
+    
+    
+    fig=px.bar(groupdf_pd,x='property_damage',y='count',color='fraud_reported',text='count')
+    fig.show()
+    
+
+In [65]:
+
+    
+    
+    groupdf_w=insurance_claim.groupby(by=['witnesses','fraud_reported']).count()
+    groupdf_w.reset_index(inplace=True)
+    groupdf_w=groupdf_w[['witnesses','fraud_reported','count']]
+    groupdf_w.head()
+    
+
+Out[65]:
+
+| witnesses | fraud_reported | count  
+---|---|---|---  
+0 | 0 | N | 199  
+1 | 0 | Y | 50  
+2 | 1 | N | 194  
+3 | 1 | Y | 63  
+4 | 2 | N | 176  
+  
+In [66]:
+
+    
+    
+    fig=px.bar(groupdf_w,x='witnesses',y='count',color='fraud_reported',text='count',title="Nos. of claims vs No. of witnesses")
+    fig.show()
+    
+
+In [67]:
+
+    
+    
+    groupdf_am=insurance_claim.groupby(by=['auto_make','fraud_reported']).count()
+    groupdf_am.reset_index(inplace=True)
+    groupdf_am=groupdf_am[['auto_make','fraud_reported','count']]
+    groupdf_am.head()
+    
+
+Out[67]:
+
+| auto_make | fraud_reported | count  
+---|---|---|---  
+0 | Accura | N | 55  
+1 | Accura | Y | 13  
+2 | Audi | N | 48  
+3 | Audi | Y | 21  
+4 | BMW | N | 52  
+  
+In [68]:
+
+    
+    
+    fig=px.bar(groupdf_am,x='auto_make',y='count',color='fraud_reported',text='count',title="Claims for different auto make")
+    fig.show()
+    
+
+In [69]:
+
+    
+    
+    groupdf_atm=insurance_claim.groupby(by=['auto_model','fraud_reported']).count()
+    groupdf_atm.reset_index(inplace=True)
+    groupdf_atm=groupdf_atm[['auto_model','fraud_reported','count']]
+    groupdf_atm.head()
+    
+
+Out[69]:
+
+| auto_model | fraud_reported | count  
+---|---|---|---  
+0 | 3 Series | N | 17  
+1 | 3 Series | Y | 1  
+2 | 92x | N | 20  
+3 | 92x | Y | 8  
+4 | 93 | N | 20  
+  
+In [70]:
+
+    
+    
+    fig=px.bar(groupdf_atm,x='auto_model',y='count',color='fraud_reported',text='count',title="Claims for diiferent auto model")
+    fig.show()
+    
+
+In [71]:
+
+    
+    
+    groupdf_atmm=insurance_claim.groupby(by=['auto_make','auto_model','fraud_reported']).count()
+    groupdf_atmm.reset_index(inplace=True)
+    groupdf_atmm=groupdf_atmm[['auto_make','auto_model','fraud_reported','count']]
+    groupdf_atmm['fraud_reported']=groupdf_atmm['fraud_reported'].apply(lambda x: 'Fraud Reported :YES' if x == 'Y' else 'Fraud Reported :NO')
+    groupdf_atmm.head()
+    
+
+Out[71]:
+
+| auto_make | auto_model | fraud_reported | count  
+---|---|---|---|---  
+0 | Accura | MDX | Fraud Reported :NO | 28  
+1 | Accura | MDX | Fraud Reported :YES | 8  
+2 | Accura | RSX | Fraud Reported :NO | 11  
+3 | Accura | RSX | Fraud Reported :YES | 1  
+4 | Accura | TL | Fraud Reported :NO | 16  
+  
+In [72]:
+
+    
+    
+    fig=px.bar(groupdf_atmm,x='auto_make',y='count',color='auto_model',text='count',hover_name='fraud_reported',title="Claims by Auto make amd Auto model")
+    fig.show()
+    
+
+In [73]:
+
+    
+    
+    plt.figure(figsize=[20,12])
+    sns.heatmap(insurance_claim.corr(),annot=True,cmap="PiYG")
+    plt.show()
+    
+
+![](__results___files/__results___83_0.png)
+
+In [74]:
+
+    
+    
+    ### Some feature showing strong correltion.
+    ### Plotting scatter plot for those
+    
+    plt.figure(figsize=[20,15])
+    
+    corr_df=insurance_claim[['months_as_customer', 'age','total_claim_amount', 'injury_claim','property_claim', 'vehicle_claim','fraud_reported']]
+    sns.pairplot(corr_df,hue='fraud_reported',corner=True)
+    plt.show()
+    
+    
+    
+    <Figure size 1440x1080 with 0 Axes>
+
+![](__results___files/__results___84_1.png)
+
+In [75]:
+
+    
+    
+    fig=px.box(insurance_claim,x='insured_sex',y='total_claim_amount',color='fraud_reported',notched=True,template='plotly_dark')
+    fig.show()
+    
+
+In [76]:
+
+    
+    
+    fig=px.box(insurance_claim,x='insured_education_level',y='total_claim_amount',color='fraud_reported',notched=True,template='plotly_dark')
+    fig.show()
+    
+
+In [77]:
+
+    
+    
+    fig=px.box(insurance_claim,x='insured_occupation',y='total_claim_amount',color='fraud_reported',notched=True,template='plotly_dark')
+    fig.show()
+    
+
+In [78]:
+
+    
+    
+    fig=px.box(insurance_claim,x='insured_hobbies',y='total_claim_amount',color='fraud_reported',notched=True,template='plotly_dark')
+    fig.show()
+    
+
+In [79]:
+
+    
+    
+    fig=px.box(insurance_claim,x='incident_type',y='total_claim_amount',color='fraud_reported',notched=True,template='plotly_dark')
+    fig.show()
+    
+
+In [80]:
+
+    
+    
+    fig=px.box(insurance_claim,x='incident_severity',y='total_claim_amount',color='fraud_reported',notched=True,template='plotly_dark')
+    fig.show()
+    
+
+In [81]:
+
+    
+    
+    fig=px.box(insurance_claim,x='number_of_vehicles_involved',y='total_claim_amount',color='fraud_reported',notched=True,template='plotly_dark')
+    fig.show()
+    
+
+In [82]:
+
+    
+    
+    fig=px.box(insurance_claim,x='bodily_injuries',y='total_claim_amount',color='fraud_reported',notched=True,template='plotly_dark')
+    fig.show()
+    
+
+In [83]:
+
+    
+    
+    fig=px.box(insurance_claim,x='auto_make',y='total_claim_amount',color='fraud_reported',notched=True,template='plotly_dark')
+    fig.show()
+    
+
+In [84]:
+
+    
+    
+    fig=px.box(insurance_claim,x='auto_model',y='total_claim_amount',color='fraud_reported',notched=False,template='plotly_dark')
+    fig.show()
+    
+
+In [85]:
+
+    
+    
+    fig=px.box(insurance_claim,x='auto_year',y='total_claim_amount',color='fraud_reported',notched=False,template='plotly_dark')
+    fig.show()
+    
+
+In [86]:
+
+    
+    
+    fig=px.box(insurance_claim,x='fraud_reported',y='total_claim_amount',notched=True,template='plotly_dark',points='all')
+    fig.show()
+    
+
+In [87]:
+
+    
+    
+    fig=px.box(insurance_claim,x='fraud_reported',y='vehicle_claim',notched=True,template='plotly_dark',points='all')
+    fig.show()
+    
+
+In [88]:
+
+    
+    
+    fig=px.box(insurance_claim,x='fraud_reported',y='total_claim_amount',color='insured_education_level',notched=True,template='plotly_dark')
+    fig.show()
+    
+
+In [89]:
+
+    
+    
+    fig=px.box(insurance_claim,x='fraud_reported',y='total_claim_amount',color='insured_occupation',notched=True,template='plotly_dark')
+    fig.show()
+    
+
+In [90]:
+
+    
+    
+    ### Make column "fraud flag" i.e 1 for yes and 0 for no
+    
+    insurance_claim['fraud_flag']=insurance_claim['fraud_reported'].apply(lambda x: 1 if x=='Y' else 0)
+    
+
+In [91]:
+
+    
+    
+    grp1=insurance_claim.groupby(['insured_occupation'])['fraud_flag'].mean()
+    grp1=pd.DataFrame(grp1)
+    grp1.reset_index(inplace=True)
+    grp1['fraud_flag']=grp1['fraud_flag'].apply(lambda x: 100*x)
+    grp1['fraud_flag']=grp1['fraud_flag'].apply(lambda x: round(x,2))
+    grp1['fraud_flag'] = grp1['fraud_flag'].apply(lambda x: "{}{}".format(x,'%'))
+    grp1.rename(columns={'fraud_flag':'Fraud percentage'},inplace=True)
+    grp1.head(10)
+    
+
+Out[91]:
+
+| insured_occupation | Fraud percentage  
+---|---|---  
+0 | adm-clerical | 16.92%  
+1 | armed-forces | 24.64%  
+2 | craft-repair | 29.73%  
+3 | exec-managerial | 36.84%  
+4 | farming-fishing | 30.19%  
+5 | handlers-cleaners | 20.37%  
+6 | machine-op-inspct | 23.91%  
+7 | other-service | 16.9%  
+8 | priv-house-serv | 16.9%  
+9 | prof-specialty | 21.18%  
+  
+In [92]:
+
+    
+    
+    fig=px.bar(grp1,x='insured_occupation',y='Fraud percentage',color='insured_occupation',log_y=True,title='Fraud percentage:Occupation wise',text='Fraud percentage')
+    fig.update_traces(textposition='outside')
+    fig.show()
+    
+
+In [93]:
+
+    
+    
+    grp2=insurance_claim.groupby(['insured_education_level'])['fraud_flag'].mean()
+    grp2=pd.DataFrame(grp2)
+    grp2.reset_index(inplace=True)
+    grp2['fraud_flag']=grp2['fraud_flag'].apply(lambda x: 100*x)
+    grp2['fraud_flag']=grp2['fraud_flag'].apply(lambda x: round(x,2))
+    grp2['fraud_flag'] = grp2['fraud_flag'].apply(lambda x: "{}{}".format(x,'%'))
+    grp2.rename(columns={'fraud_flag':'Fraud percentage'},inplace=True)
+    grp2.head()
+    
+
+Out[93]:
+
+| insured_education_level | Fraud percentage  
+---|---|---  
+0 | Associate | 23.61%  
+1 | College | 26.23%  
+2 | High School | 22.5%  
+3 | JD | 26.09%  
+4 | MD | 26.39%  
+  
+In [94]:
+
+    
+    
+    fig=px.bar(grp2,x='insured_education_level',y='Fraud percentage',color='insured_education_level',log_y=True,title='Fraud percentage:Education-Level wise',text='Fraud percentage')
+    fig.update_traces(textposition='outside')
+    fig.show()
+    
+
+In [95]:
+
+    
+    
+    grp3=insurance_claim.groupby(['insured_sex'])['fraud_flag'].mean()
+    grp3=pd.DataFrame(grp3)
+    grp3.reset_index(inplace=True)
+    grp3['fraud_flag']=grp3['fraud_flag'].apply(lambda x: 100*x)
+    grp3['fraud_flag']=grp3['fraud_flag'].apply(lambda x: round(x,2))
+    grp3['fraud_flag'] = grp3['fraud_flag'].apply(lambda x: "{}{}".format(x,'%'))
+    grp3.rename(columns={'fraud_flag':'Fraud percentage'},inplace=True)
+    grp3.head()
+    
+
+Out[95]:
+
+| insured_sex | Fraud percentage  
+---|---|---  
+0 | FEMALE | 23.46%  
+1 | MALE | 26.19%  
+  
+In [96]:
+
+    
+    
+    fig=px.bar(grp3,x='insured_sex',y='Fraud percentage',color='insured_sex',log_y=True,title='Fraud percentage:State wise',text='Fraud percentage')
+    fig.update_traces(textposition='outside')
+    fig.show()
+    
+
+In [97]:
+
+    
+    
+    grp4=insurance_claim.groupby(['auto_make'])['fraud_flag'].mean()
+    grp4=pd.DataFrame(grp4)
+    grp4.reset_index(inplace=True)
+    grp4['fraud_flag']=grp4['fraud_flag'].apply(lambda x: 100*x)
+    grp4['fraud_flag']=grp4['fraud_flag'].apply(lambda x: round(x,2))
+    grp4['fraud_flag'] = grp4['fraud_flag'].apply(lambda x: "{}{}".format(x,'%'))
+    grp4.rename(columns={'fraud_flag':'Fraud percentage'},inplace=True)
+    grp4.head()
+    
+
+Out[97]:
+
+| auto_make | Fraud percentage  
+---|---|---  
+0 | Accura | 19.12%  
+1 | Audi | 30.43%  
+2 | BMW | 27.78%  
+3 | Chevrolet | 28.0%  
+4 | Dodge | 25.0%  
+  
+In [98]:
+
+    
+    
+    fig=px.bar(grp4,x='auto_make',y='Fraud percentage',color='auto_make',log_y=True,title='Fraud percentage:Auto_Make wise',text='Fraud percentage')
+    fig.update_traces(textposition='outside')
+    fig.show()
+    
+
+In [99]:
+
+    
+    
+    grp5=insurance_claim.groupby(['auto_model'])['fraud_flag'].mean()
+    grp5=pd.DataFrame(grp5)
+    grp5.reset_index(inplace=True)
+    grp5['fraud_flag']=grp5['fraud_flag'].apply(lambda x: 100*x)
+    grp5['fraud_flag']=grp5['fraud_flag'].apply(lambda x: round(x,2))
+    grp5['fraud_flag'] = grp5['fraud_flag'].apply(lambda x: "{}{}".format(x,'%'))
+    grp5.rename(columns={'fraud_flag':'Fraud percentage'},inplace=True)
+    grp5.head()
+    
+
+Out[99]:
+
+| auto_model | Fraud percentage  
+---|---|---  
+0 | 3 Series | 5.56%  
+1 | 92x | 28.57%  
+2 | 93 | 20.0%  
+3 | 95 | 18.52%  
+4 | A3 | 27.03%  
+  
+In [100]:
+
+    
+    
+    fig=px.bar(grp5,x='auto_model',y='Fraud percentage',color='auto_model',log_y=True,title='Fraud percentage:Auto_Model wise',text='Fraud percentage')
+    fig.update_traces(textposition='outside',textfont_size=20)
+    fig.show()
+    
+
+In [101]:
+
+    
+    
+    fig=px.sunburst(insurance_claim,path=['auto_make','auto_model'])
+    fig.show()
+    
+
+In [102]:
+
+    
+    
+    fig=px.treemap(insurance_claim,path=[px.Constant("All Car Brand"),'auto_make','auto_model'],values='count')
+    fig.show()
+    
+
+In [103]:
+
+    
+    
+    claim_sex_edu=pd.pivot_table(data=insurance_claim,index='insured_sex',columns='insured_education_level',values='fraud_flag')
+    claim_sex_edu
+    
+
+Out[103]:
+
+insured_education_level | Associate | College | High School | JD | MD | Masters | PhD  
+---|---|---|---|---|---|---|---  
+insured_sex |  |  |  |  |  |  |   
+FEMALE | 0.282353 | 0.265625 | 0.170732 | 0.267442 | 0.194444 | 0.217949 | 0.242857  
+MALE | 0.169492 | 0.258621 | 0.282051 | 0.253333 | 0.333333 | 0.230769 | 0.290909  
+  
+In [104]:
+
+    
+    
+    plt.figure(figsize=[11,7])
+    sns.heatmap(claim_sex_edu,annot=True,cmap='RdYlGn_r')
+    plt.title("Fraud correlaton between betwwen insured_sex and insured_education_level")
+    plt.show()
+    
+
+![](__results___files/__results___114_0.png)
+
+In [105]:
+
+    
+    
+    claim_sex_ocu=pd.pivot_table(data=insurance_claim,index='insured_sex',columns='insured_occupation',values='fraud_flag')
+    claim_sex_ocu
+    
+
+Out[105]:
+
+insured_occupation | adm-clerical | armed-forces | craft-repair | exec-managerial | farming-fishing | handlers-cleaners | machine-op-inspct | other-service | priv-house-serv | prof-specialty | protective-serv | sales | tech-support | transport-moving  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+insured_sex |  |  |  |  |  |  |  |  |  |  |  |  |  |   
+FEMALE | 0.131579 | 0.257143 | 0.285714 | 0.324324 | 0.16129 | 0.206897 | 0.204545 | 0.162162 | 0.236842 | 0.212766 | 0.205882 | 0.261905 | 0.288889 | 0.315789  
+MALE | 0.222222 | 0.235294 | 0.312500 | 0.410256 | 0.50000 | 0.200000 | 0.270833 | 0.176471 | 0.090909 | 0.210526 | 0.241379 | 0.294118 | 0.272727 | 0.264706  
+  
+In [106]:
+
+    
+    
+    plt.figure(figsize=[15,9])
+    sns.heatmap(claim_sex_ocu,annot=True,cmap='RdYlGn_r')
+    plt.title("Fraud correlaton between betwwen insured_sex and insured_occupation_level")
+    plt.show()
+    
+
+![](__results___files/__results___116_0.png)
+
+In [107]:
+
+    
+    
+    claim_edu_ocu=pd.pivot_table(data=insurance_claim,index='insured_education_level',columns='insured_occupation',values='fraud_flag')
+    claim_edu_ocu
+    
+
+Out[107]:
+
+insured_occupation | adm-clerical | armed-forces | craft-repair | exec-managerial | farming-fishing | handlers-cleaners | machine-op-inspct | other-service | priv-house-serv | prof-specialty | protective-serv | sales | tech-support | transport-moving  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+insured_education_level |  |  |  |  |  |  |  |  |  |  |  |  |  |   
+Associate | 0.142857 | 0.181818 | 0.200000 | 0.600000 | 0.000000 | 0.125000 | 0.250000 | 0.285714 | 0.133333 | 0.307692 | 0.500000 | 0.133333 | 0.187500 | 0.600000  
+College | 0.300000 | 0.285714 | 0.250000 | 0.625000 | 0.375000 | 0.250000 | 0.250000 | 0.250000 | 0.333333 | 0.166667 | 0.285714 | 0.222222 | 0.142857 | 0.100000  
+High School | 0.272727 | 0.181818 | 0.454545 | 0.333333 | 0.333333 | 0.181818 | 0.117647 | 0.000000 | 0.000000 | 0.100000 | 0.100000 | 0.230769 | 0.333333 | 0.333333  
+JD | 0.125000 | 0.300000 | 0.400000 | 0.384615 | 0.416667 | 0.375000 | 0.142857 | 0.166667 | 0.181818 | 0.000000 | 0.090909 | 0.250000 | 0.428571 | 0.250000  
+MD | 0.000000 | 0.444444 | 0.333333 | 0.250000 | 0.428571 | 0.000000 | 0.363636 | 0.166667 | 0.230769 | 0.230769 | 0.181818 | 0.500000 | 0.214286 | 0.200000  
+Masters | 0.111111 | 0.222222 | 0.000000 | 0.272727 | 0.111111 | 0.125000 | 0.235294 | 0.200000 | 0.100000 | 0.444444 | 0.250000 | 0.333333 | 0.142857 | 0.357143  
+PhD | 0.333333 | 0.166667 | 0.230769 | 0.333333 | 0.142857 | 0.222222 | 0.312500 | 0.083333 | 0.285714 | 0.300000 | 0.250000 | 0.400000 | 0.500000 | 0.300000  
+  
+In [108]:
+
+    
+    
+    plt.figure(figsize=[15,9])
+    sns.heatmap(claim_edu_ocu,annot=True,cmap='RdYlGn_r')
+    plt.title("Fraud correlaton between betwwen insured_occupation and insured_education_level")
+    plt.show()
+    
+
+![](__results___files/__results___118_0.png)
+
+\-------------------------------------------------------------------------------------------The
+End------------------------------------------------------------------------------------------------------------
+
+In [ ]:
+
+    
+    
+     
+    
+

@@ -1,0 +1,470 @@
+In [1]:
+
+    
+    
+    %matplotlib inline
+    
+
+In [2]:
+
+    
+    
+    # Imports
+    
+    # pandas
+    import pandas as pd
+    from pandas import Series,DataFrame
+    
+    # numpy, matplotlib, seaborn
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    sns.set_style('whitegrid')
+    %matplotlib inline
+    
+    # machine learning
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.svm import SVC, LinearSVC
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.neighbors import KNeighborsClassifier
+    from sklearn.naive_bayes import GaussianNB
+    from sklearn import cross_validation
+    import xgboost as xgb
+    
+    
+    
+    /opt/conda/lib/python3.5/site-packages/matplotlib/__init__.py:872: UserWarning: axes.color_cycle is deprecated and replaced with axes.prop_cycle; please use the latter.
+      warnings.warn(self.msg_depr % (key, alt_key))
+    /opt/conda/lib/python3.5/site-packages/sklearn/cross_validation.py:42: DeprecationWarning: This module has been deprecated in favor of the model_selection module into which all the refactored classes and functions are moved. Also note that the interface of the new CV iterators are different from that of this module. This module will be removed in 0.20.
+      "This module will be removed in 0.20.", DeprecationWarning)
+    
+
+In [3]:
+
+    
+    
+    # get prudential & test csv files as a DataFrame
+    prudential_df  = pd.read_csv('../input/train.csv')
+    test_df        = pd.read_csv('../input/test.csv')
+    
+    # preview the data
+    prudential_df.head()
+    
+
+Out[3]:
+
+| Id | Product_Info_1 | Product_Info_2 | Product_Info_3 | Product_Info_4 | Product_Info_5 | Product_Info_6 | Product_Info_7 | Ins_Age | Ht | ... | Medical_Keyword_40 | Medical_Keyword_41 | Medical_Keyword_42 | Medical_Keyword_43 | Medical_Keyword_44 | Medical_Keyword_45 | Medical_Keyword_46 | Medical_Keyword_47 | Medical_Keyword_48 | Response  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 2 | 1 | D3 | 10 | 0.076923 | 2 | 1 | 1 | 0.641791 | 0.581818 | ... | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8  
+1 | 5 | 1 | A1 | 26 | 0.076923 | 2 | 3 | 1 | 0.059701 | 0.600000 | ... | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4  
+2 | 6 | 1 | E1 | 26 | 0.076923 | 2 | 3 | 1 | 0.029851 | 0.745455 | ... | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8  
+3 | 7 | 1 | D4 | 10 | 0.487179 | 2 | 3 | 1 | 0.164179 | 0.672727 | ... | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8  
+4 | 8 | 1 | D2 | 26 | 0.230769 | 2 | 3 | 1 | 0.417910 | 0.654545 | ... | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8  
+  
+5 rows Ã 128 columns
+
+In [4]:
+
+    
+    
+    prudential_df.info()
+    print("----------------------------")
+    test_df.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    Int64Index: 59381 entries, 0 to 59380
+    Columns: 128 entries, Id to Response
+    dtypes: float64(18), int64(109), object(1)
+    memory usage: 58.4+ MB
+    ----------------------------
+    <class 'pandas.core.frame.DataFrame'>
+    Int64Index: 19765 entries, 0 to 19764
+    Columns: 127 entries, Id to Medical_Keyword_48
+    dtypes: float64(18), int64(108), object(1)
+    memory usage: 19.3+ MB
+    
+
+In [5]:
+
+    
+    
+    # response
+    
+    fig, (axis1) = plt.subplots(1,1,figsize=(15,5))
+    
+    sns.countplot(x=prudential_df["Response"], order=[1,2,3,4,5,6,7,8], ax=axis1)
+    
+    
+    
+    /opt/conda/lib/python3.5/site-packages/matplotlib/__init__.py:892: UserWarning: axes.color_cycle is deprecated and replaced with axes.prop_cycle; please use the latter.
+      warnings.warn(self.msg_depr % (key, alt_key))
+    
+
+Out[5]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7fa29a319588>
+
+![](data:image/png;base64,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
+
+)
+
+In [6]:
+
+    
+    
+    # There are some columns with non-numerical values(i.e. dtype='object'),
+    # So, We will create a corresponding unique numerical value for each non-numerical value in a column of training and testing set.
+    
+    from sklearn import preprocessing
+    
+    for f in prudential_df.columns:
+        if prudential_df[f].dtype == 'object':
+            lbl = preprocessing.LabelEncoder()
+            lbl.fit(np.unique(list(prudential_df[f].values) + list(test_df[f].values)))
+            prudential_df[f] = lbl.transform(list(prudential_df[f].values))
+            test_df[f]       = lbl.transform(list(test_df[f].values))
+    
+
+In [7]:
+
+    
+    
+    # fill NaN values
+    
+    for f in prudential_df.columns:
+        if f == "Response": continue
+        if prudential_df[f].dtype == 'float64':
+            prudential_df[f].fillna(prudential_df[f].mean(), inplace=True)
+            test_df[f].fillna(test_df[f].mean(), inplace=True)
+        else:
+            prudential_df[f].fillna(prudential_df[f].median(), inplace=True)
+            test_df[f].fillna(test_df[f].median(), inplace=True)
+    
+    # prudential_df.fillna(0, inplace=True)
+    # test_df.fillna(0, inplace=True)
+    
+
+In [8]:
+
+    
+    
+    # define training and testing sets
+    
+    X_train = prudential_df.drop(["Response", "Id"],axis=1)
+    Y_train = prudential_df["Response"]
+    X_test  = test_df.drop("Id",axis=1).copy()
+    
+
+In [9]:
+
+    
+    
+    # modify response values so that range of values is from 0-7 instead of 1-8
+    Y_train = Y_train - 1
+    
+
+In [10]:
+
+    
+    
+    # Random Forests
+    
+    # random_forest = RandomForestClassifier(n_estimators=100)
+    
+    # random_forest.fit(X_train, Y_train)
+    
+    # Y_pred2 = random_forest.predict(X_test)
+    
+    # random_forest.score(X_train, Y_train)
+    
+
+In [11]:
+
+    
+    
+    # Xgboost 
+    
+    params = {"objective": "multi:softmax", "num_class": 8}
+    
+    T_train_xgb = xgb.DMatrix(X_train, Y_train)
+    X_test_xgb  = xgb.DMatrix(X_test)
+    
+    gbm = xgb.train(params, T_train_xgb, 20)
+    Y_pred = gbm.predict(X_test_xgb)
+    
+
+In [12]:
+
+    
+    
+    # change values back to range of values is from 1-8 instead of 0-7
+    
+    Y_pred = Y_pred + 1
+    Y_pred = Y_pred.astype(int)
+    
+
+In [13]:
+
+    
+    
+    # Create submission
+    
+    submission = pd.DataFrame({
+            "Id": test_df["Id"],
+            "Response": Y_pred
+        })
+    submission.to_csv('prudential.csv', index=False)
+    
+

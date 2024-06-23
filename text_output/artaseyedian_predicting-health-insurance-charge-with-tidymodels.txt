@@ -1,0 +1,948 @@
+# Medical Cost Personal Datasets¶
+
+## Insurance Forecast by using Linear Regression¶
+
+[Link to Kaggle Page](https://www.kaggle.com/mirichoi0218/insurance)
+
+[Link to GitHub Source](https://github.com/stedy/Machine-Learning-with-R-
+datasets/blob/master/insurance.csv)
+
+A little over a month ago, around the end of October, I attended the Open Data
+Science Conference primarily for the workshops and training sessions that were
+offered. The first workshop I attended was a demonstration by [Jared
+Lander](https://www.jaredlander.com/) on how to implement machine learning
+methods in R using a new package named _tidymodels_. I went into that training
+knowing almost nothing about machine learning, and have since then drawn
+exclusively from free online materials to understand how to analyze data using
+this "meta-package."
+
+As a brief introduction, tidymodels is, like tidyverse, not a single package
+but rather a collection of data science packages designed according to
+[tidyverse
+principles](https://cran.r-project.org/web/packages/tidyr/vignettes/tidy-
+data.html). Many of the packages present in tidymodels are also present in
+tidyverse. What makes tidymodels different from tidyverse, however, is that
+many of these packages are meant for predictive modeling and provide a
+universal standard interface for all of the different machine learning methods
+available in R.
+
+Today, we are using a data set of health insurance information from ~1300
+customers of a health insurance company. This data set is sourced from a book
+titled _Machine Learning with R_ by Brett Lantz.
+
+In [1]:
+
+    
+    
+    library(tidyverse)
+    library(parsnip)
+    library(recipes)
+    library(rsample)
+    library(workflows)
+    library(yardstick)
+    library(tune)
+    library(data.table)
+    
+    insur_dt <- fread("../input/insurance/insurance.csv")
+    
+    
+    
+    ââ Attaching packages âââââââââââââââââââââââââââââââââââââââ tidyverse 1.3.0 ââ
+    
+    â ggplot2 3.3.2     â purrr   0.3.4
+    â tibble  3.0.4     â dplyr   1.0.2
+    â tidyr   1.1.2     â stringr 1.4.0
+    â readr   1.4.0     â forcats 0.5.0
+    
+    ââ Conflicts ââââââââââââââââââââââââââââââââââââââââââ tidyverse_conflicts() ââ
+    â dplyr::filter() masks stats::filter()
+    â dplyr::lag()    masks stats::lag()
+    
+    
+    Attaching package: ârecipesâ
+    
+    
+    The following object is masked from âpackage:stringrâ:
+    
+        fixed
+    
+    
+    The following object is masked from âpackage:statsâ:
+    
+        step
+    
+    
+    For binary classification, the first factor level is assumed to be the event.
+    Use the argument `event_level = "second"` to alter this as needed.
+    
+    
+    Attaching package: âyardstickâ
+    
+    
+    The following object is masked from âpackage:readrâ:
+    
+        spec
+    
+    
+    
+    Attaching package: âtuneâ
+    
+    
+    The following object is masked from âpackage:recipesâ:
+    
+        tunable
+    
+    
+    
+    Attaching package: âdata.tableâ
+    
+    
+    The following objects are masked from âpackage:dplyrâ:
+    
+        between, first, last
+    
+    
+    The following object is masked from âpackage:purrrâ:
+    
+        transpose
+    
+    
+    
+
+In [2]:
+
+    
+    
+    insur_dt %>% colnames()
+    
+    insur_dt$age %>% summary()
+    
+    insur_dt$sex %>% table()
+    
+    insur_dt$bmi %>% summary()
+    
+    insur_dt$smoker %>% table()
+    
+    insur_dt$charges %>% summary()
+    
+
+  1. 'age'
+  2. 'sex'
+  3. 'bmi'
+  4. 'children'
+  5. 'smoker'
+  6. 'region'
+  7. 'charges'
+
+    
+    
+       Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+      18.00   27.00   39.00   39.21   51.00   64.00 
+    
+    
+    .
+    female   male 
+       662    676 
+    
+    
+       Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+      15.96   26.30   30.40   30.66   34.69   53.13 
+    
+    
+    .
+      no  yes 
+    1064  274 
+    
+    
+       Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+       1122    4740    9382   13270   16640   63770 
+
+Above, you'll noticed I loaded packages such as `parsnip` and `recipes`. These
+packages, together with others, form the meta-package `tidymodels` used for
+modeling and statistical analysis. You can learn more about it
+[here](https://www.tidymodels.org/). Usually, you can simply call
+`library(tidymodels)`, but Kaggle R notebooks seem unable to install and/or
+load it for the time being, which is fine.
+
+As you can see, there are 7 different relatively self-explanatory variables in
+this data set, some of which are presumably used by the benevolent and ever-
+loving private health insurance company in question to determine how much a
+given individual is ultimately charged. `age`, `sex` and `region` appear to be
+demographics; with age going no lower than 18 and no greater than 64 with a
+mean of about 40. The two factor levels in `sex` seem to be about the same in
+quantity.
+
+Assuming that the variable `bmi` corresponds to Body Mass Index, according to
+the
+[CDC](https://www.cdc.gov/healthyweight/assessing/bmi/adult_bmi/index.html), a
+BMI of 30 or above is considered clinically obese. In our present data set,
+the average is just over the cusp of obese.
+
+Next we have the number of smokers vs non-smokers. As someone who has filled
+out even one form before in my life, I can definitely tell you that `smoker`
+is going to be important going forward in determining the `charge` of each
+given heath insurance customer.
+
+Lastly, we have `charge`. The average annual charge for health insurance is a
+modest $13,000.
+
+In [3]:
+
+    
+    
+    # 1, 2, 3, 4 etc. children as factor
+    insur_dt$children <- insur_dt$children %>% as.factor()
+    
+    insur_dt
+    
+
+A data.table: 1338 Ã 7 age| sex| bmi| children| smoker| region| charges  
+---|---|---|---|---|---|---  
+<int>| <chr>| <dbl>| <fct>| <chr>| <chr>| <dbl>  
+19| female| 27.900| 0| yes| southwest| 16884.924  
+18| male | 33.770| 1| no | southeast|  1725.552  
+28| male | 33.000| 3| no | southeast|  4449.462  
+33| male | 22.705| 0| no | northwest| 21984.471  
+32| male | 28.880| 0| no | northwest|  3866.855  
+31| female| 25.740| 0| no | southeast|  3756.622  
+46| female| 33.440| 1| no | southeast|  8240.590  
+37| female| 27.740| 3| no | northwest|  7281.506  
+37| male | 29.830| 2| no | northeast|  6406.411  
+60| female| 25.840| 0| no | northwest| 28923.137  
+25| male | 26.220| 0| no | northeast|  2721.321  
+62| female| 26.290| 0| yes| southeast| 27808.725  
+23| male | 34.400| 0| no | southwest|  1826.843  
+56| female| 39.820| 0| no | southeast| 11090.718  
+27| male | 42.130| 0| yes| southeast| 39611.758  
+19| male | 24.600| 1| no | southwest|  1837.237  
+52| female| 30.780| 1| no | northeast| 10797.336  
+23| male | 23.845| 0| no | northeast|  2395.172  
+56| male | 40.300| 0| no | southwest| 10602.385  
+30| male | 35.300| 0| yes| southwest| 36837.467  
+60| female| 36.005| 0| no | northeast| 13228.847  
+30| female| 32.400| 1| no | southwest|  4149.736  
+18| male | 34.100| 0| no | southeast|  1137.011  
+34| female| 31.920| 1| yes| northeast| 37701.877  
+37| male | 28.025| 2| no | northwest|  6203.902  
+59| female| 27.720| 3| no | southeast| 14001.134  
+63| female| 23.085| 0| no | northeast| 14451.835  
+55| female| 32.775| 2| no | northwest| 12268.632  
+23| male | 17.385| 1| no | northwest|  2775.192  
+31| male | 36.300| 2| yes| southwest| 38711.000  
+â®| â®| â®| â®| â®| â®| â®  
+25| female| 30.200| 0| yes| southwest| 33900.653  
+41| male | 32.200| 2| no | southwest|  6875.961  
+42| male | 26.315| 1| no | northwest|  6940.910  
+33| female| 26.695| 0| no | northwest|  4571.413  
+34| male | 42.900| 1| no | southwest|  4536.259  
+19| female| 34.700| 2| yes| southwest| 36397.576  
+30| female| 23.655| 3| yes| northwest| 18765.875  
+18| male | 28.310| 1| no | northeast| 11272.331  
+19| female| 20.600| 0| no | southwest|  1731.677  
+18| male | 53.130| 0| no | southeast|  1163.463  
+35| male | 39.710| 4| no | northeast| 19496.719  
+39| female| 26.315| 2| no | northwest|  7201.701  
+31| male | 31.065| 3| no | northwest|  5425.023  
+62| male | 26.695| 0| yes| northeast| 28101.333  
+62| male | 38.830| 0| no | southeast| 12981.346  
+42| female| 40.370| 2| yes| southeast| 43896.376  
+31| male | 25.935| 1| no | northwest|  4239.893  
+61| male | 33.535| 0| no | northeast| 13143.337  
+42| female| 32.870| 0| no | northeast|  7050.021  
+51| male | 30.030| 1| no | southeast|  9377.905  
+23| female| 24.225| 2| no | northeast| 22395.744  
+52| male | 38.600| 2| no | southwest| 10325.206  
+57| female| 25.740| 2| no | southeast| 12629.166  
+23| female| 33.400| 0| no | southwest| 10795.937  
+52| female| 44.700| 3| no | southwest| 11411.685  
+50| male | 30.970| 3| no | northwest| 10600.548  
+18| female| 31.920| 0| no | northeast|  2205.981  
+18| female| 36.850| 0| no | southeast|  1629.833  
+21| female| 25.800| 0| no | southwest|  2007.945  
+61| female| 29.070| 0| yes| northwest| 29141.360  
+  
+I want to first start off by saving the number of `children` as factor levels.
+This will help me with my analysis later on, since the number of children, in
+real life, are really a continuous variable (usually pretty limited, most
+people do not have more than a few at most).
+
+## Exploratory Data Analysis¶
+
+In [4]:
+
+    
+    
+    skimr::skim(insur_dt)
+    
+    table(insur_dt$sex)
+    
+    
+    
+    ââ Data Summary ââââââââââââââââââââââââ
+                               Values  
+    Name                       insur_dt
+    Number of rows             1338    
+    Number of columns          7       
+    _______________________            
+    Column type frequency:             
+      character                3       
+      factor                   1       
+      numeric                  3       
+    ________________________           
+    Group variables            None    
+    
+    ââ Variable type: character ââââââââââââââââââââââââââââââââââââââââââââââââââââ
+      skim_variable n_missing complete_rate   min   max empty n_unique whitespace
+    1 sex                   0             1     4     6     0        2          0
+    2 smoker                0             1     2     3     0        2          0
+    3 region                0             1     9     9     0        4          0
+    
+    ââ Variable type: factor âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+      skim_variable n_missing complete_rate ordered n_unique
+    1 children              0             1 FALSE          6
+      top_counts                    
+    1 0: 574, 1: 324, 2: 240, 3: 157
+    
+    ââ Variable type: numeric ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+      skim_variable n_missing complete_rate    mean       sd     p0    p25    p50
+    1 age                   0             1    39.2    14.0    18     27     39  
+    2 bmi                   0             1    30.7     6.10   16.0   26.3   30.4
+    3 charges               0             1 13270.  12110.   1122.  4740.  9382. 
+          p75    p100 hist 
+    1    51      64   âââââ
+    2    34.7    53.1 âââââ
+    3 16640.  63770.  âââââ
+    
+    
+    
+    female   male 
+       662    676 
+
+I want to note that this data set is pretty clean; you will probably never
+encounter a data set like this in the wild. There are no `NA`s and, as I
+mentioned before, no class imbalance along `sex`. Let's look at the
+distribution of children:
+
+In [5]:
+
+    
+    
+    table(insur_dt$children)
+    
+    
+    
+      0   1   2   3   4   5 
+    574 324 240 157  25  18 
+
+Pretty standard; the plurality of people in this set do not have children. The
+next highest amount is 1, the second highest 2, etc.
+
+In [6]:
+
+    
+    
+    options(repr.plot.width=15, repr.plot.height = 10)
+    
+    insur_dt %>% 
+        select(age, bmi, children, smoker, region, charges) %>%
+        GGally::ggpairs(mapping = aes(color = region))
+    
+    
+    
+    Registered S3 method overwritten by 'GGally':
+      method from   
+      +.gg   ggplot2
+    
+    `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+    
+    `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+    
+    `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+    
+    `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+    
+    `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+    
+    `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+    
+    `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+    
+    `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+    
+    `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+    
+    
+
+![](__results___files/__results___11_1.png)
+
+`GGally` is a package that I don't know too much about, but I do know that it
+contains a function called `ggpairs`, which sort of just generates a bunch of
+different plots with the variables you feed it and helps you get an overview
+of the relationships that exist betweeen them. Most of these plots are just
+noise, but there are a few interesting ones, such as the two on the bottom
+left assessing `charge` vs `age` and `charge` vs `bmi`. Further to the right,
+there is also `charge` vs `smoker`. Let's take a closer look at some of these
+relationships:
+
+In [7]:
+
+    
+    
+    insur_dt %>% ggplot(aes(color = region)) + facet_wrap(~ region)+
+      geom_point(mapping = aes(x = bmi, y = charges))
+    
+
+![](__results___files/__results___13_0.png)
+
+I wanted to see if there are regions that are somehow charged at a different
+rate than the others, but these plots all look basically the same. If you'll
+notice, there are about two different blobs projecting from 0,0 to the center
+of the plot. We'll get back to that later.
+
+In [8]:
+
+    
+    
+    insur_dt %>% ggplot(aes(color = region)) + facet_wrap(~ region)+
+      geom_point(mapping = aes(x = age, y = charges))
+    
+
+![](__results___files/__results___15_0.png)
+
+Here, I wanted to see if there was any sort of noticeable relationship between
+`age` and `charges`. Across the four `region`s, most tend to lie on a slope
+near the X-axis increasing modestly with `age`. There are, however, a pattern
+that appears to be two levels coming off of that baseline. Since we don't have
+a variable for the type of health insurance plan these people are using, we
+should probably hold off on any judgements on what this could be for now.
+
+Let's move onto what is undoubtedly the piÃ¨ce de rÃ©sistance of health
+insurance coverage: smokers.
+
+In [9]:
+
+    
+    
+    insur_dt %>%
+        select(smoker, bmi, charges) %>%
+        ggplot(aes(color = smoker)) +
+        geom_point(mapping = aes(x = bmi, y = charges))
+    
+
+![](__results___files/__results___17_0.png)
+
+Wow. What a stark difference. Here, you can see that `smoker` almost creates a
+whole new blob of points separate from non-smokers... and that blob sharply
+rises after `bmi = 30`. Say, what was the CDC official cutoff for obesity
+again?
+
+In [10]:
+
+    
+    
+    insur_dt$age_bins <- cut(insur_dt$age,
+                    breaks = c(18,20,30,40,50,60,70,80,90),
+                    include.lowest = TRUE,
+                    right = TRUE)
+    
+    insur_dt %>%
+        select(bmi, charges, sex, age_bins) %>%
+        ggplot(aes(color = age_bins)) +
+        geom_point(mapping = aes(x = bmi, y = charges))
+    
+
+![](__results___files/__results___19_0.png)
+
+You can see that `age` does play a role in `charge`, but it's still stratified
+within the 3-ish clusters of points, so even among the high-`bmi` smokers,
+younger people still pay less money than older people in a consistent way, so
+it makes sense. However, it does not appear that age interacts with `bmi` or
+`smoker`, meaning that it independently effects the `charge`.
+
+In [11]:
+
+    
+    
+    insur_dt %>%
+        select(children, charges, sex) %>%
+        ggplot(aes(x = children, y = charges, group = children)) +
+        geom_boxplot(outlier.alpha = 0.5, aes(fill = children)) + 
+        theme(legend.position = "none")
+    
+
+![](__results___files/__results___21_0.png)
+
+Finally, `children` does not affect `charge` significantly.
+
+I think we've done enough exploratory analysis to establish that `bmi` and
+`smoker` together form a synergistic effect on `charge`, and that `age` also
+influences `charge` as well.
+
+## Build Model¶
+
+In [12]:
+
+    
+    
+    set.seed(123)
+    
+    insur_split <- initial_split(insur_dt, strata = smoker)
+    
+    insur_train <- training(insur_split)
+    insur_test <- testing(insur_split)
+    
+    # we are going to do data processing and feature engineering with recipes
+    
+    # below, we are going to predict charges using everything else(".")
+    insur_rec <- recipe(charges ~ bmi + age + smoker, data = insur_train) %>%
+        step_dummy(all_nominal()) %>%
+        step_normalize(all_numeric(), -all_outcomes()) %>%
+        step_interact(terms = ~ bmi:smoker_yes)
+    
+    test_proc <- insur_rec %>% prep() %>% bake(new_data = insur_test)
+    
+
+We first split our data into training and testing sets. We stratify sampling
+by `smoker` status because there is an imbalance there and we want them to be
+equally represented in both the training and testing data sets. This is
+accomplished by first conducting random sampling within these classes.
+
+An explanation of the `recipe`:
+
+  1. We are going to model the effect of `bmi`, `age` and `smoker` on `charges`. We do not specify interactions in this step because `recipe` handles interactions as a step.
+  2. We create dummy variables (`step_dummy`) for all nominal predictors, so `smoker` becomes `smoker_yes` and `smoker_no` is "implied" through omission (so if a row has `smoker_yes == 0`) because some models cannot have all dummy variables present as columns. To include all dummy variables, you can use `one_hot = TRUE`.
+  3. We then normalize all numeric predictors **except** our outcome variable(`step_normalize(all_numeric(), -all_outcomes())`), because you generally want to avoid transformations on outcomes when training and developing a model lest another data set inconsistent with the one you're using comes along and breaks your model. It's best do do transformations on outcomes before creating a `recipe`.
+  4. We are setting an interaction term; `bmi` and `smoker_yes` (the dummy variable for `smoker`), all interact with each other when effecting the outcome. Earlier, we noticed that older patients are charged more, and that older patients with higher `bmi` are charged even more than that. Well, older patients with a higher `bmi` who smoke are charged the most out of anyone in our data set. We observed this visually when looking at the plot, so we are going to also test this in the model we will develop.
+
+Let's actually specify the model. We are going to be working with a k-Nearest
+Neighbors model, just for fun. The KNN model is simply defined as follows
+(according to some R markdown book I found online after [Googling `knn
+simplified`](https://bookdown.org/tpinto_home/Regression-and-
+Classification/k-nearest-neighbours-regression.html)):
+
+> KNN regression is a non-parametric method that, in an intuitive manner,
+> approximates the association between independent variables and the
+> continuous outcome by averaging the observations in the same neighbourhood.
+> The size of the neighbourhood needs to be set by the analyst or can be
+> chosen using cross-validation (we will see this later) to select the size
+> that minimises the mean-squared error.
+
+To keep things simple, we are not going to use cross-validation to find the
+optimal `k`. Instead, we are just going to say `k = 10`. Another website I
+found said it's a good rule-of-thumb to keep `k = sqrt(n)`. I'm not going to
+do that because `nrow(insur_dt) â 37`, although I suppose Kaggle's compute
+server's could handle it, so I don't see why not.
+
+In [13]:
+
+    
+    
+    knn_spec <- nearest_neighbor(neighbors = 10) %>%
+        set_engine("kknn") %>%
+        set_mode("regression")
+    
+    knn_fit <- knn_spec %>%
+        fit(charges ~ age + bmi + smoker_yes + bmi_x_smoker_yes,
+            data = juice(insur_rec %>% prep()))
+    
+    insur_wf <- workflow() %>% 
+        add_recipe(insur_rec) %>% 
+        add_model(knn_spec)
+    
+
+We specified the model `knn_spec` by calling the model itself from `parsnip`,
+then we `set_engine` and set the mode to regression. Note the `neighbors`
+parameter in `nearest_neighbor`. That corresponds to the `k` in `knn`.
+
+We then fit the model using the model specification to our data. Because we
+already computed columns for the `bmi` and `smoker_yes` interaction, we do not
+need to represent the interaction formulaically again.
+
+Let's evaluate this model to see if it does good or does bad.
+
+In [14]:
+
+    
+    
+    insur_cv <- vfold_cv(insur_train, prop = 0.9)
+    
+    insur_rsmpl <- fit_resamples(insur_wf,
+                               insur_cv,
+                               control = control_resamples(save_pred = TRUE))
+    
+    insur_rsmpl %>% collect_metrics()
+    
+    summary(insur_dt$charges)
+    
+
+A tibble: 2 Ã 5 .metric| .estimator| mean| n| std_err  
+---|---|---|---|---  
+<chr>| <chr>| <dbl>| <int>| <dbl>  
+rmse| standard| 4915.6510690| 10| 273.81343938  
+rsq | standard|  0.8270987| 10|  0.01938272  
+      
+    
+       Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+       1122    4740    9382   13270   16640   63770 
+
+We set `vfold_cv` (which is the cross validation that most people are familiar
+with, wherein the training data is split into V folds and then is trained on
+V-1 folds in order to make a prediction on the last fold, and is repeated so
+that all folds are trained and used as a prediction fold) to a `prop` of
+`0.9`, which is the same as specifying 9 training folds and 1 testing fold
+(within our training data).
+
+We then finally run the cross validation by using `fit_resamples`. As you can
+see, we used our workflow object as our input.
+
+Finally, we call `collect_metrics` to examine the model effectiveness. We end
+up with an `rmse` of 4,915 and an `rsq` of `0.82`. The RMSE would suggest
+that, on average, our predictions varied from observed values by an absolute
+measure of 4,915, in this case, dollars in `charges`. The R^2 would suggest
+that our regression has a fit of ~82%, although a high R^2 doesn't always mean
+the model has a good fit and a low R^2 doesn't always mean that a model has a
+poor fit, for reasons that are beyond me.
+
+In [15]:
+
+    
+    
+    insur_rsmpl %>% 
+        unnest(.predictions) %>% 
+        ggplot(aes(charges, .pred, color = id)) + geom_abline(lty = 2, color = "gray80", size = 1.5) + geom_point(alpha = 0.5) + theme(legend.position = "none")
+    
+
+![](__results___files/__results___30_0.png)
+
+Above is a demonstration of our regression fit to a line. There is a large
+cluster of values that are model simply does not capture, and we could learn
+more about these points, but instead we are going to move on to applying our
+model to our test data, which we defined much earlier in this project.
+
+In [16]:
+
+    
+    
+    insur_test_res <- predict(knn_fit, new_data = test_proc %>% select(-charges))
+    
+    insur_test_res <- bind_cols(insur_test_res, insur_test %>% select(charges))
+    
+    insur_test_res
+    
+
+A tibble: 334 Ã 2 .pred| charges  
+---|---  
+<dbl>| <dbl>  
+4338.525|  3756.622  
+27037.674| 27808.725  
+2230.857|  1837.237  
+6500.010|  6203.902  
+2793.777|  4687.797  
+6057.326|  6313.759  
+14335.070| 12629.897  
+1663.168|  2211.131  
+5654.522|  3579.829  
+39401.337| 37742.576  
+6741.644|  6389.378  
+7694.382|  5920.104  
+11165.434| 11741.726  
+13082.557| 11356.661  
+9258.776| 11033.662  
+24208.089| 21098.554  
+42268.841| 43578.939  
+16868.173| 11082.577  
+16801.325| 10942.132  
+37803.476| 30184.937  
+42663.292| 47291.055  
+11319.155| 12105.320  
+6945.206|  6186.127  
+6057.326|  4646.759  
+1952.889|  2404.734  
+14738.325| 11488.317  
+20652.722| 19107.780  
+7170.958|  6686.431  
+8546.878|  7740.337  
+18765.553| 18972.495  
+â®| â®  
+4937.724| 18838.704  
+5963.655|  2055.325  
+3538.448| 12890.058  
+44858.212| 41661.602  
+15723.443|  8442.667  
+13021.607| 10594.226  
+15207.182| 12479.709  
+10059.839|  8515.759  
+5615.111|  3238.436  
+47823.897| 49577.662  
+9409.871|  9101.798  
+5803.031|  4415.159  
+4352.116|  3277.161  
+11378.411|  7337.748  
+25357.082| 26926.514  
+33986.118| 34254.053  
+10386.962|  8615.300  
+3027.748|  3021.809  
+23997.223| 24535.699  
+3564.919|  1708.926  
+2070.639|  2710.829  
+35853.024| 62592.873  
+24829.847| 37829.724  
+8002.203| 19496.719  
+6455.303|  7201.701  
+14008.436| 12981.346  
+4212.999| 10795.937  
+9685.979| 11411.685  
+2568.737|  1629.833  
+33587.734| 29141.360  
+  
+We've now applied our model to `test_proc`, which is the test set after we've
+used the `recipes` preprocessing steps on them to transform them in the same
+way we transformed our training data. We bind the resulting predictions with
+the actual `charges` found in the training data to create a two-column table
+with our predictions and the corresponding real values we attempted to
+predict.
+
+In [17]:
+
+    
+    
+    ggplot(insur_test_res, aes(x = charges, y = .pred)) + 
+      # Create a diagonal line:
+      geom_abline(lty = 2) + 
+      geom_point(alpha = 0.5) + 
+      labs(y = "Predicted Charges", x = "Charges") +
+      # Scale and size the x- and y-axis uniformly:
+      coord_obs_pred()
+    
+
+![](__results___files/__results___34_0.png)
+
+In [18]:
+
+    
+    
+    rmse(insur_test_res, truth = charges, estimate = .pred)
+    
+    insur_rsmpl %>% collect_metrics()
+    
+
+A tibble: 1 Ã 3 .metric| .estimator| .estimate  
+---|---|---  
+<chr>| <chr>| <dbl>  
+rmse| standard| 4985.013  
+  
+A tibble: 2 Ã 5 .metric| .estimator| mean| n| std_err  
+---|---|---|---|---  
+<chr>| <chr>| <dbl>| <int>| <dbl>  
+rmse| standard| 4915.6510690| 10| 273.81343938  
+rsq | standard|  0.8270987| 10|  0.01938272  
+  
+Nice! The RMSE generated by our test data is insignificantly different from
+the one generated by our cross-validation! That means our model can reliably
+reproduce predictions with approximately the same level of error.
+
+To be quite honest, now I want to configure a linear regression model the same
+way just to compare the results between the two. Fortunately, `tidymodels`
+makes this easy.
+
+## Linear Regression¶
+
+We already have the recipe. All we need now is to specify a linear model and
+cross-validate the fit to test it on the testing data.
+
+In [19]:
+
+    
+    
+    lm_spec <- linear_reg() %>% set_engine("lm")
+    
+    lm_fit <- lm_spec %>%
+        fit(charges ~ age + bmi + smoker_yes + bmi_x_smoker_yes,
+            data = juice(insur_rec %>% prep()))
+    
+    insur_lm_wf <- workflow() %>% 
+        add_recipe(insur_rec) %>% 
+        add_model(lm_spec)
+    
+
+We just repeat _some_ of the same steps that we did for KNN but for the linear
+model. We can even cross-validate by using (almost) the same command:
+
+In [20]:
+
+    
+    
+    insur_lm_rsmpl <- fit_resamples(insur_lm_wf,
+                               insur_cv,
+                               control = control_resamples(save_pred = TRUE))
+    
+    insur_lm_rsmpl %>% collect_metrics()
+    
+    insur_rsmpl %>% collect_metrics()
+    
+
+A tibble: 2 Ã 5 .metric| .estimator| mean| n| std_err  
+---|---|---|---|---  
+<chr>| <chr>| <dbl>| <int>| <dbl>  
+rmse| standard| 4866.2198826| 10| 251.33407535  
+rsq | standard|  0.8321469| 10|  0.01622478  
+  
+A tibble: 2 Ã 5 .metric| .estimator| mean| n| std_err  
+---|---|---|---|---  
+<chr>| <chr>| <dbl>| <int>| <dbl>  
+rmse| standard| 4915.6510690| 10| 273.81343938  
+rsq | standard|  0.8270987| 10|  0.01938272  
+  
+Fascinating! It appears that the good, ol' fashioned linear model beat
+k-Nearest Neighbors both in terms of RMSE but also R^2 across 10 cross-
+validation folds.
+
+In [21]:
+
+    
+    
+    insur_test_lm_res <- predict(lm_fit, new_data = test_proc %>% select(-charges))
+    
+    insur_test_lm_res <- bind_cols(insur_test_lm_res, insur_test %>% select(charges))
+    
+    insur_test_lm_res
+    
+
+A tibble: 334 Ã 2 .pred| charges  
+---|---  
+<dbl>| <dbl>  
+6334.798|  3756.622  
+31937.879| 27808.725  
+3171.162|  1837.237  
+7877.760|  6203.902  
+3080.535|  4687.797  
+7814.887|  6313.759  
+14070.085| 12629.897  
+2655.583|  2211.131  
+3498.149|  3579.829  
+36293.062| 37742.576  
+8713.869|  6389.378  
+8490.134|  5920.104  
+12128.680| 11741.726  
+13057.934| 11356.661  
+10502.254| 11033.662  
+22720.821| 21098.554  
+37348.973| 43578.939  
+12685.633| 11082.577  
+12203.560| 10942.132  
+36039.842| 30184.937  
+39403.253| 47291.055  
+12333.295| 12105.320  
+8859.917|  6186.127  
+7814.887|  4646.759  
+3450.797|  2404.734  
+11769.885| 11488.317  
+25450.437| 19107.780  
+7983.227|  6686.431  
+9532.671|  7740.337  
+23125.644| 18972.495  
+â®| â®  
+3095.715| 18838.704  
+3798.376|  2055.325  
+2575.945| 12890.058  
+39186.227| 41661.602  
+11394.752|  8442.667  
+12782.629| 10594.226  
+12473.654| 12479.709  
+10008.487|  8515.759  
+4368.722|  3238.436  
+47236.644| 49577.662  
+10056.746|  9101.798  
+7087.304|  4415.159  
+5280.052|  3277.161  
+9430.011|  7337.748  
+28967.959| 26926.514  
+28446.466| 34254.053  
+10015.964|  8615.300  
+4541.933|  3021.809  
+29826.357| 24535.699  
+2870.822|  1708.926  
+3145.220|  2710.829  
+33052.316| 62592.873  
+28977.721| 37829.724  
+7081.439| 19496.719  
+8448.080|  7201.701  
+14277.672| 12981.346  
+4034.938| 10795.937  
+11486.790| 11411.685  
+2627.829|  1629.833  
+35519.586| 29141.360  
+  
+Now that we have our predictions, let's look at how well the linear model
+fared:
+
+In [22]:
+
+    
+    
+    ggplot(insur_test_lm_res, aes(x = charges, y = .pred)) + 
+      # Create a diagonal line:
+      geom_abline(lty = 2) + 
+      geom_point(alpha = 0.5) + 
+      labs(y = "Predicted Charges", x = "Charges") +
+      # Scale and size the x- and y-axis uniformly:
+      coord_obs_pred()
+    
+
+![](__results___files/__results___44_0.png)
+
+It seems as though the area on the bottom left corner had the greatest
+concentration of charges, and explains most of the `lm` fit. Look at both of
+these plots makes me wonder if there was a better model we could have used,
+but our model was sufficient given our purposes and level of accuracy.
+
+In [23]:
+
+    
+    
+    combind_dt <- mutate(insur_test_lm_res,
+          lm_pred = .pred,  
+          charges = charges
+          ) %>% select(-.pred) %>% 
+        add_column(knn_pred = insur_test_res$.pred) 
+    
+    ggplot(combind_dt, aes(x = charges)) + 
+        geom_line(aes(y = knn_pred, color = "kNN Fit"), size = 1) +
+        geom_line(aes(y = lm_pred, color = "lm Fit"), size = 1) +
+        geom_point(aes(y = knn_pred, alpha = 0.5), color = "#F99E9E") +
+        geom_point(aes(y = lm_pred, alpha = 0.5), color = "#809BF4") +
+        geom_abline(size = 0.5, linetype = "dashed") + 
+        xlab('Charges') +
+        ylab('Predicted Charges') +
+        guides(alpha = FALSE)
+    
+
+![](__results___files/__results___46_0.png)
+
+Above is a comparison of the two methods with their respective predictions,
+and with the dotted line representing the "correct" values. In this case, the
+two models were not different enough from each other for their differences to
+be readily observed when plotted against each other, but there will be
+instances in the future wherein your two models do differ substantially, and
+this sort of plot will bolster your case for using one model over another.
+
+## Conclusion¶
+
+Here, we were able to build a KNN model with our training data and use it to
+predict values in our testing data. To do this, we:
+
+  * performed EDA
+  * preprocessed our data using `recipes`
+  * specified our model to be KNN
+  * fit it to our training data
+  * ran cross validation to produce accurate error statistics
+  * predicted values in our test set
+  * compared observed test set values with our predictions
+  * specified another model, lm
+  * performed a cross-validation
+  * discovered lm to be the better model
+
+I'm very excited to continue using tidymodels in R as a way to apply machine
+learning methods. If you're interested, I recommend checking out [Tidy
+Modeling with R by Max Kuhn and Julia Silge](https://www.tmwr.org/).
+

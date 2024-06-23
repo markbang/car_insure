@@ -1,0 +1,904 @@
+# Insurance Prediction¶
+
+In this notebook we will predict the insurance cost. This will include data
+analysis, data visualization, feature engineering and modelling. We will try
+multiple models and develop the best result. I hope you will like it :)
+
+In [1]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/insurance/insurance.csv
+    
+
+In [2]:
+
+    
+    
+    ## import libraries
+    
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import warnings
+    from pylab import rcParams
+    import matplotlib.pyplot as plt
+    rcParams['figure.figsize'] = 12,7
+    sns.color_palette("hls", 8)
+    
+
+Out[2]:
+
+In [3]:
+
+    
+    
+    df= pd.read_csv("/kaggle/input/insurance/insurance.csv") # Reading dataset
+    
+
+In [4]:
+
+    
+    
+    df.head() # looking at the first 5 rows 
+    
+
+Out[4]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520  
+  
+In [5]:
+
+    
+    
+    df.shape # looking at the shape. we have 1338 rows and 7 columns
+    
+
+Out[5]:
+
+    
+    
+    (1338, 7)
+
+In [6]:
+
+    
+    
+    df.info() # looking at information
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 1338 entries, 0 to 1337
+    Data columns (total 7 columns):
+     #   Column    Non-Null Count  Dtype  
+    ---  ------    --------------  -----  
+     0   age       1338 non-null   int64  
+     1   sex       1338 non-null   object 
+     2   bmi       1338 non-null   float64
+     3   children  1338 non-null   int64  
+     4   smoker    1338 non-null   object 
+     5   region    1338 non-null   object 
+     6   charges   1338 non-null   float64
+    dtypes: float64(2), int64(2), object(3)
+    memory usage: 73.3+ KB
+    
+
+In [7]:
+
+    
+    
+    df.describe().T # looking at statistical info
+    
+
+Out[7]:
+
+| count | mean | std | min | 25% | 50% | 75% | max  
+---|---|---|---|---|---|---|---|---  
+age | 1338.0 | 39.207025 | 14.049960 | 18.0000 | 27.00000 | 39.000 | 51.000000 | 64.00000  
+bmi | 1338.0 | 30.663397 | 6.098187 | 15.9600 | 26.29625 | 30.400 | 34.693750 | 53.13000  
+children | 1338.0 | 1.094918 | 1.205493 | 0.0000 | 0.00000 | 1.000 | 2.000000 | 5.00000  
+charges | 1338.0 | 13270.422265 | 12110.011237 | 1121.8739 | 4740.28715 | 9382.033 | 16639.912515 | 63770.42801  
+  
+In [8]:
+
+    
+    
+    df.isnull().sum() # checking null values
+    
+
+Out[8]:
+
+    
+    
+    age         0
+    sex         0
+    bmi         0
+    children    0
+    smoker      0
+    region      0
+    charges     0
+    dtype: int64
+
+Beautiful! There are no nulls in our dataset.
+
+In [9]:
+
+    
+    
+    # plotting numerical features 
+    
+    num_variable = (df.dtypes==float) | (df.dtypes=="int64")
+    num_variable = df.columns[num_variable].tolist()
+    
+    def plot_hist(train_df, variable):
+        plt.figure(figsize = (12,7))
+        plt.hist(train_df[variable], bins = 50)
+        plt.xlabel(variable)
+        plt.ylabel("Frequency")
+        plt.title("{} distribution with hist".format(variable))
+        plt.show()
+        
+    for i in num_variable:
+        plot_hist(df,i)
+    
+
+![](__results___files/__results___10_0.png)
+
+![](__results___files/__results___10_1.png)
+
+![](__results___files/__results___10_2.png)
+
+![](__results___files/__results___10_3.png)
+
+In [10]:
+
+    
+    
+    ##plotting the categorical features
+    
+    cat_variable = df.dtypes==object
+    cat_variable = df.columns[cat_variable].tolist()
+    
+    # Count of products per keys
+    def bar_plot(data,feature):
+        print(f'There are {len(set(data[feature]))} unique {feature}')
+        print('\n')
+        sns.countplot(x = feature,
+                  data = data,
+                  order = data[feature].value_counts(ascending=False)[0:20].index)
+        plt.xticks(rotation=90)
+        print(f'Count of {feature}')
+        print('\n')
+        print(data[feature].value_counts(ascending=False)[0:20])
+        plt.show()
+        print('\n')
+        
+    for i in cat_variable:
+        bar_plot(df,i)
+    
+    
+    
+    There are 2 unique sex
+    
+    
+    Count of sex
+    
+    
+    male      676
+    female    662
+    Name: sex, dtype: int64
+    
+
+![](__results___files/__results___11_1.png)
+
+    
+    
+    
+    There are 2 unique smoker
+    
+    
+    Count of smoker
+    
+    
+    no     1064
+    yes     274
+    Name: smoker, dtype: int64
+    
+
+![](__results___files/__results___11_3.png)
+
+    
+    
+    
+    There are 4 unique region
+    
+    
+    Count of region
+    
+    
+    southeast    364
+    southwest    325
+    northwest    325
+    northeast    324
+    Name: region, dtype: int64
+    
+
+![](__results___files/__results___11_5.png)
+
+    
+    
+    
+    
+
+  * Doing some analysis 
+
+In [11]:
+
+    
+    
+    sns.barplot(x='smoker', y='charges', hue='sex', data=df, palette='cool')
+    
+
+Out[11]:
+
+    
+    
+    <AxesSubplot:xlabel='smoker', ylabel='charges'>
+
+![](__results___files/__results___13_1.png)
+
+  * **_Let's examine the effect of smoking on insurance costs according to the gender variable.Looking at the graph, it is understood that although there is no obvious difference between men and women, the insurance costs of smokers are higher._**
+
+In [12]:
+
+    
+    
+    sns.barplot(x='children', y='charges', hue='sex', data=df, palette='viridis')
+    
+
+Out[12]:
+
+    
+    
+    <AxesSubplot:xlabel='children', ylabel='charges'>
+
+![](__results___files/__results___15_1.png)
+
+  * **_When the effect of the number of children on insurance costs is examined, it is interesting that the insurance costs of families with 5 children are lower._**
+
+In [13]:
+
+    
+    
+    df.groupby("age")[["charges"]].mean().sort_values("charges", ascending = False)
+    
+
+Out[13]:
+
+| charges  
+---|---  
+age |   
+64 | 23275.530837  
+61 | 22024.457609  
+60 | 21979.418507  
+63 | 19884.998461  
+43 | 19267.278653  
+62 | 19163.856573  
+59 | 18895.869532  
+54 | 18758.546475  
+52 | 18256.269719  
+37 | 18019.911877  
+47 | 17653.999593  
+57 | 16447.185250  
+55 | 16164.545488  
+53 | 16020.930755  
+44 | 15859.396587  
+51 | 15682.255867  
+50 | 15663.003301  
+56 | 15025.515837  
+45 | 14830.199856  
+48 | 14632.500445  
+46 | 14342.590639  
+58 | 13878.928112  
+42 | 13061.038669  
+30 | 12719.110358  
+49 | 12696.006264  
+23 | 12419.820040  
+33 | 12351.532987  
+36 | 12204.476138  
+27 | 12184.701721  
+39 | 11778.242945  
+40 | 11772.251310  
+34 | 11613.528121  
+35 | 11307.182031  
+24 | 10648.015962  
+29 | 10430.158727  
+31 | 10196.980573  
+20 | 10159.697736  
+22 | 10012.932802  
+25 | 9838.365311  
+19 | 9747.909335  
+41 | 9653.745650  
+32 | 9220.300291  
+28 | 9069.187564  
+38 | 8102.733674  
+18 | 7086.217556  
+26 | 6133.825309  
+21 | 4730.464330  
+  
+In [14]:
+
+    
+    
+    # creating new feature by using age column
+    
+    df["age_range"] = 1000
+    for i in range(len(df["age"])):
+        if df["age"][i]<30:
+            df["age_range"][i] = 1
+        elif df["age"][i] >=30 and df["age"][i]<45:
+            df["age_range"][i] = 2
+        elif df["age"][i] >=45:
+            df["age_range"][i] = 3
+    
+    
+    
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:6: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+      
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:8: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+      
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:10: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+      # Remove the CWD from sys.path while we load stuff.
+    
+
+In [15]:
+
+    
+    
+    df
+    
+
+Out[15]:
+
+| age | sex | bmi | children | smoker | region | charges | age_range  
+---|---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400 | 1  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230 | 1  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200 | 1  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061 | 2  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520 | 2  
+... | ... | ... | ... | ... | ... | ... | ... | ...  
+1333 | 50 | male | 30.970 | 3 | no | northwest | 10600.54830 | 3  
+1334 | 18 | female | 31.920 | 0 | no | northeast | 2205.98080 | 1  
+1335 | 18 | female | 36.850 | 0 | no | southeast | 1629.83350 | 1  
+1336 | 21 | female | 25.800 | 0 | no | southwest | 2007.94500 | 1  
+1337 | 61 | female | 29.070 | 0 | yes | northwest | 29141.36030 | 3  
+  
+1338 rows Ã 8 columns
+
+  * **_We created a new column with the name "age_range", with 1 for those younger than 30, 2 for those aged between 30 and 45, and 3 for those over 45._**
+
+In [16]:
+
+    
+    
+    df.groupby("age_range")[["charges"]].mean()
+    
+
+Out[16]:
+
+| charges  
+---|---  
+age_range |   
+1 | 9182.487125  
+2 | 12490.912530  
+3 | 17070.491773  
+  
+  * **_Looking at the average of insurance costs according to "age_range", those with a higher "age range" have higher insurance costs._**
+
+In [17]:
+
+    
+    
+    sns.barplot(x='age_range', y='charges', hue='children', data=df, palette='viridis')
+    
+
+Out[17]:
+
+    
+    
+    <AxesSubplot:xlabel='age_range', ylabel='charges'>
+
+![](__results___files/__results___23_1.png)
+
+  * ***It is seen that the insurance costs of people who have 5 children are lower than their age groups.****
+
+In [18]:
+
+    
+    
+    sns.barplot(x='region', y='charges', data=df, palette='viridis')
+    
+
+Out[18]:
+
+    
+    
+    <AxesSubplot:xlabel='region', ylabel='charges'>
+
+![](__results___files/__results___25_1.png)
+
+  * ***Compared to other regions, those living in the Southeast region have higher insurance costs.****
+
+In [19]:
+
+    
+    
+    sns.barplot(x='region', y='charges', data=df, hue= "age_range" , palette='viridis')
+    
+
+Out[19]:
+
+    
+    
+    <AxesSubplot:xlabel='region', ylabel='charges'>
+
+![](__results___files/__results___27_1.png)
+
+In [20]:
+
+    
+    
+    #creating new feature by using children 
+    df["have_children"] = ["No" if i == 0 else "Yes" for i in df["children"]]
+    
+
+In [21]:
+
+    
+    
+    df
+    
+
+Out[21]:
+
+| age | sex | bmi | children | smoker | region | charges | age_range | have_children  
+---|---|---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.900 | 0 | yes | southwest | 16884.92400 | 1 | No  
+1 | 18 | male | 33.770 | 1 | no | southeast | 1725.55230 | 1 | Yes  
+2 | 28 | male | 33.000 | 3 | no | southeast | 4449.46200 | 1 | Yes  
+3 | 33 | male | 22.705 | 0 | no | northwest | 21984.47061 | 2 | No  
+4 | 32 | male | 28.880 | 0 | no | northwest | 3866.85520 | 2 | No  
+... | ... | ... | ... | ... | ... | ... | ... | ... | ...  
+1333 | 50 | male | 30.970 | 3 | no | northwest | 10600.54830 | 3 | Yes  
+1334 | 18 | female | 31.920 | 0 | no | northeast | 2205.98080 | 1 | No  
+1335 | 18 | female | 36.850 | 0 | no | southeast | 1629.83350 | 1 | No  
+1336 | 21 | female | 25.800 | 0 | no | southwest | 2007.94500 | 1 | No  
+1337 | 61 | female | 29.070 | 0 | yes | northwest | 29141.36030 | 3 | No  
+  
+1338 rows Ã 9 columns
+
+  * **_We have created a new column as those who have children and those who do not. Thus, we will be able to examine the insurance costs of people with and without children._**
+
+In [22]:
+
+    
+    
+    sns.barplot(x='have_children', y='charges', data=df , palette='viridis')
+    
+
+Out[22]:
+
+    
+    
+    <AxesSubplot:xlabel='have_children', ylabel='charges'>
+
+![](__results___files/__results___31_1.png)
+
+  * **_It is seen that the insurance costs of those who do not have children are less. I think that this newly created variable will affect the model._**
+
+In [23]:
+
+    
+    
+    cat_variable.append("have_children") #Converting categorical variables to numeric variables
+    
+
+In [24]:
+
+    
+    
+    cat_variable
+    
+
+Out[24]:
+
+    
+    
+    ['sex', 'smoker', 'region', 'have_children']
+
+In [25]:
+
+    
+    
+    from sklearn.preprocessing import LabelEncoder
+    lb = LabelEncoder()
+    df[cat_variable] = df[cat_variable].apply(lambda col: lb.fit_transform(col.astype(str)))
+    
+
+In [26]:
+
+    
+    
+    df.head()
+    
+
+Out[26]:
+
+| age | sex | bmi | children | smoker | region | charges | age_range | have_children  
+---|---|---|---|---|---|---|---|---|---  
+0 | 19 | 0 | 27.900 | 0 | 1 | 3 | 16884.92400 | 1 | 0  
+1 | 18 | 1 | 33.770 | 1 | 0 | 2 | 1725.55230 | 1 | 1  
+2 | 28 | 1 | 33.000 | 3 | 0 | 2 | 4449.46200 | 1 | 1  
+3 | 33 | 1 | 22.705 | 0 | 0 | 1 | 21984.47061 | 2 | 0  
+4 | 32 | 1 | 28.880 | 0 | 0 | 1 | 3866.85520 | 2 | 0  
+  
+# Modelling¶
+
+  * **_Let's start the model!_**
+
+In [27]:
+
+    
+    
+    sns.heatmap(df.corr(),annot=True) #looking at correlation values
+    
+
+Out[27]:
+
+    
+    
+    <AxesSubplot:>
+
+![](__results___files/__results___39_1.png)
+
+  * **_When we look at the correlations of the variables, it is seen that the linear correlation with the smoker variable is quite high and the sex variables is quite low that's why we are going to drop this feature from the data for the model._**
+
+In [28]:
+
+    
+    
+    X = df.drop(columns=["charges","sex"])
+    y = df["charges"]
+    
+    from sklearn.model_selection import train_test_split
+    X_train,X_test,y_train,y_test = train_test_split(X,y, test_size=0.2)
+    
+
+  * **_We decide to create a model function to see all model that I choose. This function is going to give us all models' error rate and we are going to pick up one to use as a main model which has the lowest error and we are going to use fine tuning to get best paremeters and we can get better result with it._**
+
+In [29]:
+
+    
+    
+    from sklearn.metrics import mean_squared_error
+    
+
+In [30]:
+
+    
+    
+    def models():
+        #use logistic regression
+        from sklearn.linear_model import LinearRegression
+        lr = LinearRegression()
+        lr.fit(X_train,y_train)
+    
+        #use Kneighbors
+        from sklearn.neighbors import KNeighborsRegressor
+        knn = KNeighborsRegressor()
+        knn.fit(X_train,y_train)
+    
+        #use Support vector classifier (linear kernel)
+        from sklearn.svm import SVR
+        svc = SVR(kernel='linear')
+        svc.fit(X_train,y_train)
+    
+        #use decision tree
+        from sklearn.tree import DecisionTreeRegressor
+        tree=DecisionTreeRegressor()
+        tree.fit(X_train,y_train)
+    
+        #use Random Forest
+        from sklearn.ensemble import RandomForestRegressor
+        forest = RandomForestRegressor()
+        forest.fit(X_train,y_train)
+    
+        #use GradientBoosting
+        from sklearn.ensemble import GradientBoostingRegressor
+        gb = GradientBoostingRegressor()
+        gb.fit(X_train,y_train)
+        
+        
+        from xgboost import XGBRegressor
+        xgb = XGBRegressor()
+        xgb.fit(X_train,y_train)
+    
+        from lightgbm import LGBMRegressor
+        lgbm = LGBMRegressor()
+        lgbm.fit(X_train,y_train)
+        #Print the accuracy for ech model
+        print("Results")
+        print('[0] Logistic Regression Test Error: ',np.sqrt(mean_squared_error(y_test,lr.predict(X_test))))
+        print('[1] K neighbors Regression Test Error: ',np.sqrt(mean_squared_error(y_test,knn.predict(X_test))))
+        print('[2] SVR linear Regression Test Error: ',np.sqrt(mean_squared_error(y_test,svc.predict(X_test))))
+        print('[3] Decision Tree Regression Test Error: ',np.sqrt(mean_squared_error(y_test,tree.predict(X_test))))
+        print('[4] Random Forest Regression Test Error: ',np.sqrt(mean_squared_error(y_test,forest.predict(X_test))))
+        print('[5] Gradient Boosting Regression Test Error: ',np.sqrt(mean_squared_error(y_test,gb.predict(X_test))))
+        print('[6] XGBoost Regression Test Error: ',np.sqrt(mean_squared_error(y_test,xgb.predict(X_test))))
+        print('[7] LightGBM Regression Test Error: ',np.sqrt(mean_squared_error(y_test,lgbm.predict(X_test)))) 
+    
+        return lr,knn,svc,tree,forest,gb,xgb,lgbm
+    
+
+In [31]:
+
+    
+    
+    lr,knn,svc,tree,forest,gb,xgb,lgbm = models()
+    
+    
+    
+    Results
+    [0] Logistic Regression Test Error:  5670.4588532457865
+    [1] K neighbors Regression Test Error:  11123.425774391982
+    [2] SVR linear Regression Test Error:  12236.448920949819
+    [3] Decision Tree Regression Test Error:  6711.169650455729
+    [4] Random Forest Regression Test Error:  4653.084065509381
+    [5] Gradient Boosting Regression Test Error:  4280.969143898913
+    [6] XGBoost Regression Test Error:  4982.337292393104
+    [7] LightGBM Regression Test Error:  4667.2680873750405
+    
+
+  * **_According to the results we obtained, our model works best with Gradient Boosting. Then let's move on to model tuning!_**
+
+In [32]:
+
+    
+    
+    from sklearn.model_selection import train_test_split, GridSearchCV,cross_val_score
+    from sklearn.ensemble import GradientBoostingRegressor
+    
+
+In [33]:
+
+    
+    
+    gb_params = {
+        'learning_rate': [0.001, 0.01, 0.1, 0.2],
+        'max_depth': [3, 5, 8,50,100],
+        'n_estimators': [200, 500, 1000, 2000],
+        'subsample': [1,0.5,0.75],
+    }
+    
+
+In [34]:
+
+    
+    
+    gb = GradientBoostingRegressor()
+    gb_cv_model = GridSearchCV(gb, gb_params, cv = 10, n_jobs = -1, verbose = 0)
+    gb_cv_model.fit(X_train, y_train)
+    
+
+Out[34]:
+
+    
+    
+    GridSearchCV(cv=10, estimator=GradientBoostingRegressor(), n_jobs=-1,
+                 param_grid={'learning_rate': [0.001, 0.01, 0.1, 0.2],
+                             'max_depth': [3, 5, 8, 50, 100],
+                             'n_estimators': [200, 500, 1000, 2000],
+                             'subsample': [1, 0.5, 0.75]})
+
+In [47]:
+
+    
+    
+    gb_cv_model.best_params_
+    
+
+Out[47]:
+
+    
+    
+    {'learning_rate': 0.01, 'max_depth': 3, 'n_estimators': 500, 'subsample': 0.5}
+
+In [48]:
+
+    
+    
+    gb_cv_model.best_estimator_
+    
+
+Out[48]:
+
+    
+    
+    GradientBoostingRegressor(learning_rate=0.01, n_estimators=500, subsample=0.5)
+
+In [49]:
+
+    
+    
+    gb_tuned = gb_cv_model.best_estimator_
+    
+    gb_tuned = gb_tuned.fit(X_train,y_train)
+    
+
+In [50]:
+
+    
+    
+    y_pred = gb_tuned.predict(X_test)
+    np.sqrt(mean_squared_error(y_test, y_pred))
+    
+
+Out[50]:
+
+    
+    
+    4261.80253349787
+
+In [52]:
+
+    
+    
+    #create the mape function to evaluate the results
+    def mape(y_true, y_pred): 
+        y_true, y_pred = np.array(y_true), np.array(y_pred)
+        return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+    
+
+In [53]:
+
+    
+    
+    mape(y_test,y_pred)
+    
+
+Out[53]:
+
+    
+    
+    28.300791465194486
+
+In [54]:
+
+    
+    
+    result = pd.concat([pd.DataFrame(y_test).reset_index(), pd.DataFrame(y_pred,columns=["prediction"])],axis=1)
+    del result["index"]
+    result
+    
+
+Out[54]:
+
+| charges | prediction  
+---|---|---  
+0 | 2741.94800 | 3665.774901  
+1 | 7418.52200 | 7516.082438  
+2 | 14478.33015 | 9086.771105  
+3 | 8520.02600 | 9276.609969  
+4 | 7729.64575 | 8885.654651  
+... | ... | ...  
+263 | 4340.44090 | 6188.972114  
+264 | 12265.50690 | 14270.308155  
+265 | 8219.20390 | 9357.468164  
+266 | 8978.18510 | 11107.854796  
+267 | 1737.37600 | 2832.560961  
+  
+268 rows Ã 2 columns
+
+# Feature Importance¶
+
+In [55]:
+
+    
+    
+    Importance = pd.DataFrame({"Importance": gb_tuned.feature_importances_*100},
+                             index = X_train.columns)
+    
+
+In [56]:
+
+    
+    
+    Importance.sort_values(by = "Importance", 
+                           axis = 0, 
+                           ascending = True).plot(kind ="barh", color = "r")
+    
+    plt.xlabel("DeÄiÅken Ãnem DÃ¼zeyleri")
+    
+
+Out[56]:
+
+    
+    
+    Text(0.5, 0, 'DeÄiÅken Ãnem DÃ¼zeyleri')
+
+![](__results___files/__results___59_1.png)
+
+In [57]:
+
+    
+    
+    plt.figure(figsize=(20,10))
+    plt.plot(result["charges"], "black", linewidth=2)
+    plt.plot(result["prediction"], "r--", linewidth = 2)
+    plt.legend(["true","predicted"])
+    plt.title("Results of the model ")
+    plt.show()
+    
+
+![](__results___files/__results___60_0.png)
+
+In [58]:
+
+    
+    
+    plt.scatter(x=y_test,y=y_pred,c = 'c', marker = 'o', s = 35, alpha = 0.7)
+    
+
+Out[58]:
+
+    
+    
+    <matplotlib.collections.PathCollection at 0x7f5cc5f83050>
+
+![](__results___files/__results___61_1.png)
+
+  * If you like it plase vote! 
+
+In [ ]:
+
+    
+    
+     
+    
+

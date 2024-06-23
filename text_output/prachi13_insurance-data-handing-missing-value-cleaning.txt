@@ -1,0 +1,1509 @@
+In [1]:
+
+    
+    
+    # Importing the required libraries
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    %matplotlib inline
+    
+
+In [2]:
+
+    
+    
+    import warnings
+    warnings.filterwarnings("ignore")
+    
+
+In [3]:
+
+    
+    
+    df_train = pd.read_csv('/kaggle/input/insurance13m-persistency/Test.csv')
+    df_train.head()
+    
+
+Out[3]:
+
+| VAR1 | VAR2 | VAR3 | VAR4 | VAR5 | VAR6 | VAR7 | VAR8 | VAR9 | VAR10 | ... | VAR28 | VAR29 | VAR30 | VAR31 | VAR32 | VAR33 | VAR34 | VAR35 | VAR36 | VAR37  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 20692051 | 86.61 | Mumbai - Corporate | N | 33000 | 99.0 | N | 28.06642 | 11000000.0 | EDM | ... | 2018-04-09 | 1 | Resident Indian | 37 | 1 | N | Karnataka | EDM | 11000000.0 | NaN  
+1 | 19931311 | NaN | Karnal - Narayan Plaza | N | 99999 | 11.0 | N | 21.79931 | 999990.0 | HDFC BANK | ... | 2017-12-30 | 0 | Resident Indian | 10 | 1 | N | Haryana | HDFC BANK | 1999980.0 | North 1  
+2 | 19965894 | NaN | Pune City Mall | N | 60000 | 22.0 | Y | 21.30395 | 600000.0 | HDFC BANK | ... | 2018-10-01 | 0 | Resident Indian | 10 | 1 | N | Maharashtra | HDFC BANK | 1200000.0 | West  
+3 | 20976831 | 86.61 | Mumbai - Corporate | N | 6595 | 107.0 | N | 30.04082 | 5000000.0 | EDM | ... | 2018-12-18 | 1 | Resident Indian | 50 | 1 | N | Gujarat | EDM | 5000000.0 | NaN  
+4 | 20270101 | 0.9099 | Mumbai - Corporate | Y | 25323 | 64.0 | N | 24.93372 | 13180982.0 | HDFC BANK | ... | 2018-03-31 | 1 | Resident Indian | 31 | 1 | N | Karnataka | OL-HDFC BANK | 11017014.0 | NaN  
+  
+5 rows Ã 37 columns
+
+In [4]:
+
+    
+    
+    dic = pd.read_excel('/kaggle/input/insurance13m-persistency/Data_Dictionary.xlsx')
+    dic.head()
+    
+
+Out[4]:
+
+| Variable Flag | Variable Detail  
+---|---|---  
+0 | VAR1 | Masked Policy Identifier  
+1 | VAR2 | Mapped Agent 13M Persistency  
+2 | VAR3 | Mapped Agent Branch  
+3 | VAR4 | Application Life Assured Alcohol Declaration  
+4 | VAR5 | Applicant's Policy Annualized Premium  
+  
+In [5]:
+
+    
+    
+    df_train.columns
+    
+
+Out[5]:
+
+    
+    
+    Index(['VAR1', 'VAR2', 'VAR3', 'VAR4', 'VAR5', 'VAR6', 'VAR7', 'VAR8', 'VAR9',
+           'VAR10', 'VAR11', 'VAR12', 'VAR13', 'VAR14', 'VAR15', 'VAR16', 'VAR17',
+           'VAR18', 'VAR19', 'VAR20', 'VAR21', 'VAR22', 'VAR23', 'VAR24', 'VAR25',
+           'VAR26', 'VAR27', 'VAR28', 'VAR29', 'VAR30', 'VAR31', 'VAR32', 'VAR33',
+           'VAR34', 'VAR35', 'VAR36', 'VAR37'],
+          dtype='object')
+
+In [6]:
+
+    
+    
+    df_train.columns = dic['Variable Detail']
+    
+
+In [7]:
+
+    
+    
+    df = df_train.copy()
+    
+
+In [8]:
+
+    
+    
+    df.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 30000 entries, 0 to 29999
+    Data columns (total 37 columns):
+     #   Column                                                 Non-Null Count  Dtype  
+    ---  ------                                                 --------------  -----  
+     0   Masked Policy Identifier                               30000 non-null  int64  
+     1   Mapped Agent 13M Persistency                           13716 non-null  object 
+     2   Mapped Agent Branch                                    30000 non-null  object 
+     3   Application Life Assured Alcohol Declaration           19340 non-null  object 
+     4   Applicant's Policy Annualized Premium                  30000 non-null  int64  
+     5   Mapped Agent Vintage                                   30000 non-null  float64
+     6   Auto Debit of Premium Opted Flag(Yes/No)               30000 non-null  object 
+     7   Application Life Assured BMI                           19340 non-null  float64
+     8   Total Risk Exposure of HDFC Life w.r.t. Life Assured   29993 non-null  float64
+     9   Application  Sourcing Channel                          29964 non-null  object 
+     10  Application  Life Assured City                         29086 non-null  object 
+     11  Applicant's  Policy Contract Branch                    29862 non-null  object 
+     12  Application  Life Assured City Tier                    29086 non-null  object 
+     13  Application  Life Assured Age                          30000 non-null  int64  
+     14  Application  Life Assured Education                    30000 non-null  object 
+     15  Application  Life Assured Gender                       30000 non-null  object 
+     16  Application  Life Assured Income                       28203 non-null  float64
+     17  Application  Life Assured Industry                     28193 non-null  object 
+     18  Application  Life Assured Marital Status               30000 non-null  object 
+     19  Application  Life Assured Nationality                  30000 non-null  object 
+     20  Application  Life Assured Occupation                   29993 non-null  object 
+     21  Applicant's Policy PAR/NON PAR/ULIP Tag                30000 non-null  object 
+     22  Application Specific Sourcing Partner                  20410 non-null  object 
+     23  First Premium Payment Type                             29403 non-null  object 
+     24  Applicant's Policy Product Category                    30000 non-null  object 
+     25  Applicant's Policy Premium Payment Frequency           30000 non-null  object 
+     26  Applicant's Policy Product Name                        30000 non-null  object 
+     27  Application Login Date                                 30000 non-null  object 
+     28  Applicant's Policy Price Sensitivity(1-'Yes', 0-'No')  30000 non-null  int64  
+     29  Application Life Assured Residential Status            30000 non-null  object 
+     30  Applicant's Policy Risk Cessation Term                 30000 non-null  int64  
+     31  Applicant's Policy Rider Opted Flag(1-'Yes', 0-'No')   30000 non-null  int64  
+     32  Application Life Assured Smoker Declaration            19340 non-null  object 
+     33  Application Life Assured State                         29086 non-null  object 
+     34  Application Sourcing Sub Channel                       29964 non-null  object 
+     35  Applicant's Policy Sum Assured                         30000 non-null  float64
+     36  HDFC Life Operational Zone                             19620 non-null  object 
+    dtypes: float64(5), int64(6), object(26)
+    memory usage: 8.5+ MB
+    
+
+In [9]:
+
+    
+    
+    df['Mapped Agent 13M Persistency'][df['Mapped Agent 13M Persistency'] == '-'] = ''
+    
+
+In [10]:
+
+    
+    
+    df['Mapped Agent 13M Persistency'] = df['Mapped Agent 13M Persistency'].apply(pd.to_numeric)
+    
+
+In [11]:
+
+    
+    
+    df = df.drop('Masked Policy Identifier',axis =1)
+    
+
+In [12]:
+
+    
+    
+    (df.isna().sum()/df.shape[0] * 100).plot(kind = 'bar',figsize=(20,10))
+    
+
+Out[12]:
+
+    
+    
+    <AxesSubplot:xlabel='Variable Detail'>
+
+![](__results___files/__results___11_1.png)
+
+In [13]:
+
+    
+    
+    x = df.isna().sum()/df.shape[0] * 100
+    x[x > 0.0]  # missing values
+    
+
+Out[13]:
+
+    
+    
+    Variable Detail
+    Mapped Agent 13M Persistency                            55.823333
+    Application Life Assured Alcohol Declaration            35.533333
+    Application Life Assured BMI                            35.533333
+    Total Risk Exposure of HDFC Life w.r.t. Life Assured     0.023333
+    Application  Sourcing Channel                            0.120000
+    Application  Life Assured City                           3.046667
+    Applicant's  Policy Contract Branch                      0.460000
+    Application  Life Assured City Tier                      3.046667
+    Application  Life Assured Income                         5.990000
+    Application  Life Assured Industry                       6.023333
+    Application  Life Assured Occupation                     0.023333
+    Application Specific Sourcing Partner                   31.966667
+    First Premium Payment Type                               1.990000
+    Application Life Assured Smoker Declaration             35.533333
+    Application Life Assured State                           3.046667
+    Application Sourcing Sub Channel                         0.120000
+    HDFC Life Operational Zone                              34.600000
+    dtype: float64
+
+In [14]:
+
+    
+    
+    df.describe()
+    
+
+Out[14]:
+
+Variable Detail | Mapped Agent 13M Persistency | Applicant's Policy Annualized Premium | Mapped Agent Vintage | Application Life Assured BMI | Total Risk Exposure of HDFC Life w.r.t. Life Assured | Application Life Assured Age | Application Life Assured Income | Applicant's Policy Price Sensitivity(1-'Yes', 0-'No') | Applicant's Policy Risk Cessation Term | Applicant's Policy Rider Opted Flag(1-'Yes', 0-'No') | Applicant's Policy Sum Assured  
+---|---|---|---|---|---|---|---|---|---|---|---  
+count | 13253.000000 | 3.000000e+04 | 30000.000000 | 19340.000000 | 2.999300e+04 | 30000.000000 | 2.820300e+04 | 30000.000000 | 30000.000000 | 30000.000000 | 3.000000e+04  
+mean | 41.025196 | 5.959598e+04 | 29.388100 | 24.311458 | 2.170631e+06 | 37.764633 | 9.111984e+05 | 0.145933 | 15.616100 | 0.457167 | 2.362204e+06  
+std | 41.791619 | 1.040723e+05 | 29.217012 | 6.899816 | 7.939348e+06 | 10.941049 | 2.696604e+06 | 0.353045 | 9.235903 | 0.498170 | 8.081321e+06  
+min | 0.000000 | 8.740000e+02 | 0.000000 | 0.865650 | 0.000000e+00 | 0.000000 | 0.000000e+00 | 0.000000 | 5.000000 | 0.000000 | 0.000000e+00  
+25% | 0.830700 | 2.388000e+04 | 8.000000 | 22.313280 | 2.287030e+05 | 30.000000 | 3.000000e+05 | 0.000000 | 10.000000 | 0.000000 | 2.407430e+05  
+50% | 20.060000 | 3.500000e+04 | 21.000000 | 23.875430 | 5.000000e+05 | 37.000000 | 5.000000e+05 | 0.000000 | 10.000000 | 0.000000 | 5.000000e+05  
+75% | 86.000000 | 6.000000e+04 | 38.000000 | 25.711660 | 1.190323e+06 | 45.000000 | 8.000000e+05 | 0.000000 | 16.000000 | 1.000000 | 1.400000e+06  
+max | 100.000000 | 5.000000e+06 | 211.000000 | 367.766360 | 1.000000e+09 | 68.000000 | 2.488226e+08 | 1.000000 | 73.000000 | 1.000000 | 1.000000e+09  
+  
+In [15]:
+
+    
+    
+    # Categorical Columns in df
+    df_cat = df[['Mapped Agent Branch ', 'Application Life Assured Alcohol Declaration',
+           'Auto Debit of Premium Opted Flag(Yes/No)',
+           'Application  Sourcing Channel', 'Application  Life Assured City',
+           'Applicant\'s  Policy Contract Branch',
+           'Application  Life Assured Education',
+            'Application  Life Assured City Tier',
+           'Application  Life Assured Gender',
+           'Application  Life Assured Industry',
+           'Application  Life Assured Marital Status',
+           'Application  Life Assured Nationality',
+           'Application  Life Assured Occupation',
+           'Applicant\'s Policy PAR/NON PAR/ULIP Tag',
+           'Application Specific Sourcing Partner', 'First Premium Payment Type',
+           'Applicant\'s Policy Product Category',
+           'Applicant\'s Policy Premium Payment Frequency',
+           'Applicant\'s Policy Product Name', 'Application Login Date',
+           'Application Life Assured Residential Status',
+           'Application Life Assured Smoker Declaration',
+           'Application Life Assured State', 'Application Sourcing Sub Channel',
+           'HDFC Life Operational Zone']]
+    
+
+In [16]:
+
+    
+    
+    df1 = df.drop(df_cat.columns, axis =1 )
+    
+
+In [17]:
+
+    
+    
+    df1.head()
+    
+
+Out[17]:
+
+Variable Detail | Mapped Agent 13M Persistency | Applicant's Policy Annualized Premium | Mapped Agent Vintage | Application Life Assured BMI | Total Risk Exposure of HDFC Life w.r.t. Life Assured | Application Life Assured Age | Application Life Assured Income | Applicant's Policy Price Sensitivity(1-'Yes', 0-'No') | Applicant's Policy Risk Cessation Term | Applicant's Policy Rider Opted Flag(1-'Yes', 0-'No') | Applicant's Policy Sum Assured  
+---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 86.6100 | 33000 | 99.0 | 28.06642 | 11000000.0 | 39 | 2500000.0 | 1 | 37 | 1 | 11000000.0  
+1 | NaN | 99999 | 11.0 | 21.79931 | 999990.0 | 36 | 4000000.0 | 0 | 10 | 1 | 1999980.0  
+2 | NaN | 60000 | 22.0 | 21.30395 | 600000.0 | 24 | 900000.0 | 0 | 10 | 1 | 1200000.0  
+3 | 86.6100 | 6595 | 107.0 | 30.04082 | 5000000.0 | 30 | 924000.0 | 1 | 50 | 1 | 5000000.0  
+4 | 0.9099 | 25323 | 64.0 | 24.93372 | 13180982.0 | 45 | 1170000.0 | 1 | 31 | 1 | 11017014.0  
+  
+In [18]:
+
+    
+    
+    df1.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 30000 entries, 0 to 29999
+    Data columns (total 11 columns):
+     #   Column                                                 Non-Null Count  Dtype  
+    ---  ------                                                 --------------  -----  
+     0   Mapped Agent 13M Persistency                           13253 non-null  float64
+     1   Applicant's Policy Annualized Premium                  30000 non-null  int64  
+     2   Mapped Agent Vintage                                   30000 non-null  float64
+     3   Application Life Assured BMI                           19340 non-null  float64
+     4   Total Risk Exposure of HDFC Life w.r.t. Life Assured   29993 non-null  float64
+     5   Application  Life Assured Age                          30000 non-null  int64  
+     6   Application  Life Assured Income                       28203 non-null  float64
+     7   Applicant's Policy Price Sensitivity(1-'Yes', 0-'No')  30000 non-null  int64  
+     8   Applicant's Policy Risk Cessation Term                 30000 non-null  int64  
+     9   Applicant's Policy Rider Opted Flag(1-'Yes', 0-'No')   30000 non-null  int64  
+     10  Applicant's Policy Sum Assured                         30000 non-null  float64
+    dtypes: float64(6), int64(5)
+    memory usage: 2.5 MB
+    
+
+In [19]:
+
+    
+    
+    df1.isna().sum()
+    
+
+Out[19]:
+
+    
+    
+    Variable Detail
+    Mapped Agent 13M Persistency                             16747
+    Applicant's Policy Annualized Premium                        0
+    Mapped Agent Vintage                                         0
+    Application Life Assured BMI                             10660
+    Total Risk Exposure of HDFC Life w.r.t. Life Assured         7
+    Application  Life Assured Age                                0
+    Application  Life Assured Income                          1797
+    Applicant's Policy Price Sensitivity(1-'Yes', 0-'No')        0
+    Applicant's Policy Risk Cessation Term                       0
+    Applicant's Policy Rider Opted Flag(1-'Yes', 0-'No')         0
+    Applicant's Policy Sum Assured                               0
+    dtype: int64
+
+In [20]:
+
+    
+    
+    df1_miss = df1[['Mapped Agent 13M Persistency', 'Applicant\'s Policy Annualized Premium',
+           'Mapped Agent Vintage', 'Application Life Assured BMI',
+           'Total Risk Exposure of HDFC Life w.r.t. Life Assured',
+           'Application  Life Assured Age', 'Application  Life Assured Income']]
+    
+
+In [ ]:
+
+    
+    
+     
+    
+
+## Numeric Missing Values handling¶
+
+In [21]:
+
+    
+    
+    df1_miss.columns
+    
+
+Out[21]:
+
+    
+    
+    Index(['Mapped Agent 13M Persistency', 'Applicant's Policy Annualized Premium',
+           'Mapped Agent Vintage', 'Application Life Assured BMI',
+           'Total Risk Exposure of HDFC Life w.r.t. Life Assured',
+           'Application  Life Assured Age', 'Application  Life Assured Income'],
+          dtype='object', name='Variable Detail')
+
+In [22]:
+
+    
+    
+    df['Mapped Agent 13M Persistency'][df['Mapped Agent 13M Persistency'] == 0.0].shape
+    # 533 values have 0 values
+    
+
+Out[22]:
+
+    
+    
+    (142,)
+
+In [23]:
+
+    
+    
+    df['Mapped Agent 13M Persistency'] =df['Mapped Agent 13M Persistency'].apply(lambda x: x * 100 if (x < 1.0) else x )
+    
+
+In [24]:
+
+    
+    
+    (df['Mapped Agent 13M Persistency'] < 1).sum()  # equal to 0
+    
+
+Out[24]:
+
+    
+    
+    142
+
+In [25]:
+
+    
+    
+    df1_miss.columns.shape  # 28 columns have missing values
+    
+
+Out[25]:
+
+    
+    
+    (7,)
+
+In [26]:
+
+    
+    
+    df1_miss.isna().sum()/df_train.shape[0] * 100
+    
+
+Out[26]:
+
+    
+    
+    Variable Detail
+    Mapped Agent 13M Persistency                            55.823333
+    Applicant's Policy Annualized Premium                    0.000000
+    Mapped Agent Vintage                                     0.000000
+    Application Life Assured BMI                            35.533333
+    Total Risk Exposure of HDFC Life w.r.t. Life Assured     0.023333
+    Application  Life Assured Age                            0.000000
+    Application  Life Assured Income                         5.990000
+    dtype: float64
+
+In [27]:
+
+    
+    
+    df1_miss.describe()
+    
+
+Out[27]:
+
+Variable Detail | Mapped Agent 13M Persistency | Applicant's Policy Annualized Premium | Mapped Agent Vintage | Application Life Assured BMI | Total Risk Exposure of HDFC Life w.r.t. Life Assured | Application Life Assured Age | Application Life Assured Income  
+---|---|---|---|---|---|---|---  
+count | 13253.000000 | 3.000000e+04 | 30000.000000 | 19340.000000 | 2.999300e+04 | 30000.000000 | 2.820300e+04  
+mean | 41.025196 | 5.959598e+04 | 29.388100 | 24.311458 | 2.170631e+06 | 37.764633 | 9.111984e+05  
+std | 41.791619 | 1.040723e+05 | 29.217012 | 6.899816 | 7.939348e+06 | 10.941049 | 2.696604e+06  
+min | 0.000000 | 8.740000e+02 | 0.000000 | 0.865650 | 0.000000e+00 | 0.000000 | 0.000000e+00  
+25% | 0.830700 | 2.388000e+04 | 8.000000 | 22.313280 | 2.287030e+05 | 30.000000 | 3.000000e+05  
+50% | 20.060000 | 3.500000e+04 | 21.000000 | 23.875430 | 5.000000e+05 | 37.000000 | 5.000000e+05  
+75% | 86.000000 | 6.000000e+04 | 38.000000 | 25.711660 | 1.190323e+06 | 45.000000 | 8.000000e+05  
+max | 100.000000 | 5.000000e+06 | 211.000000 | 367.766360 | 1.000000e+09 | 68.000000 | 2.488226e+08  
+  
+In [28]:
+
+    
+    
+    stdToMeanRatio = df1_miss.std()/df1_miss.mean()
+    
+
+In [29]:
+
+    
+    
+    stdToMeanRatio
+    
+
+Out[29]:
+
+    
+    
+    Variable Detail
+    Mapped Agent 13M Persistency                            1.018682
+    Applicant's Policy Annualized Premium                   1.746298
+    Mapped Agent Vintage                                    0.994178
+    Application Life Assured BMI                            0.283809
+    Total Risk Exposure of HDFC Life w.r.t. Life Assured    3.657623
+    Application  Life Assured Age                           0.289717
+    Application  Life Assured Income                        2.959404
+    dtype: float64
+
+**We can see attributes like 'Applicant's Policy Annualized Premium', 'Mapped
+Agent Vintage', 'Total Risk Exposure of HDFC Life w.r.t. Life Assured',
+'Application Life Assured Income' have high std w.r.t mean so we can't impute
+mean values for these.**
+
+In [30]:
+
+    
+    
+    stdToMedianRatio = df1_miss.std()/df1_miss.median()
+    
+
+In [31]:
+
+    
+    
+    stdToMedianRatio
+    
+
+Out[31]:
+
+    
+    
+    Variable Detail
+    Mapped Agent 13M Persistency                             2.083331
+    Applicant's Policy Annualized Premium                    2.973495
+    Mapped Agent Vintage                                     1.391286
+    Application Life Assured BMI                             0.288992
+    Total Risk Exposure of HDFC Life w.r.t. Life Assured    15.878697
+    Application  Life Assured Age                            0.295704
+    Application  Life Assured Income                         5.393208
+    dtype: float64
+
+**We can see attributes like 'Applicant's Policy Annualized Premium', 'Mapped
+Agent Vintage', 'Total Risk Exposure of HDFC Life w.r.t. Life Assured',
+'Application Life Assured Income' have high std w.r.t median so we can't
+impute median values for these.**
+
+In [32]:
+
+    
+    
+    sns.boxplot(data= df1_miss ,palette='rainbow',orient='h')
+    
+
+Out[32]:
+
+    
+    
+    <AxesSubplot:ylabel='Variable Detail'>
+
+![](__results___files/__results___35_1.png)
+
+In [33]:
+
+    
+    
+    df.shape
+    
+
+Out[33]:
+
+    
+    
+    (30000, 36)
+
+In [34]:
+
+    
+    
+    # remove rows of 'Applicant's Policy Annualized Premium', 'Mapped Agent Vintage', 
+    #'Total Risk Exposure of HDFC Life w.r.t. Life Assured', 'Application  Life Assured Age' as missing % is very less
+    np.where(df[['Applicant\'s Policy Annualized Premium', 'Mapped Agent Vintage',
+             'Total Risk Exposure of HDFC Life w.r.t. Life Assured', 
+             'Application  Life Assured Age']].isna())
+    
+
+Out[34]:
+
+    
+    
+    (array([  582,  1541,  6982,  8146, 12292, 24829, 25969]),
+     array([2, 2, 2, 2, 2, 2, 2]))
+
+In [35]:
+
+    
+    
+    df.drop([ 359,  2015,  3018,  4156,  4400,  4808,  5391,  5435,  6628,
+             8240, 11753, 12737, 12906, 18095, 18330, 18528, 20737, 20870,
+            22059, 22297, 23046, 24600, 24689, 24793, 25973, 27316, 28465,
+            28469, 28637, 28809, 29104, 29778],inplace =True, axis =0)
+    
+
+In [36]:
+
+    
+    
+    df.shape
+    
+
+Out[36]:
+
+    
+    
+    (29968, 36)
+
+In [37]:
+
+    
+    
+    df1_miss.drop([ 359,  2015,  3018,  4156,  4400,  4808,  5391,  5435,  6628,
+             8240, 11753, 12737, 12906, 18095, 18330, 18528, 20737, 20870,
+            22059, 22297, 23046, 24600, 24689, 24793, 25973, 27316, 28465,
+            28469, 28637, 28809, 29104, 29778],inplace =True, axis =0)
+    
+
+In [38]:
+
+    
+    
+    df1.drop([ 359,  2015,  3018,  4156,  4400,  4808,  5391,  5435,  6628,
+             8240, 11753, 12737, 12906, 18095, 18330, 18528, 20737, 20870,
+            22059, 22297, 23046, 24600, 24689, 24793, 25973, 27316, 28465,
+            28469, 28637, 28809, 29104, 29778],inplace =True, axis =0)
+    
+
+In [39]:
+
+    
+    
+    df1_miss.shape
+    
+
+Out[39]:
+
+    
+    
+    (29968, 7)
+
+In [40]:
+
+    
+    
+    df1.shape
+    
+
+Out[40]:
+
+    
+    
+    (29968, 11)
+
+In [41]:
+
+    
+    
+    df1_miss.isna().sum()/df_train.shape[0] * 100
+    
+
+Out[41]:
+
+    
+    
+    Variable Detail
+    Mapped Agent 13M Persistency                            55.770000
+    Applicant's Policy Annualized Premium                    0.000000
+    Mapped Agent Vintage                                     0.000000
+    Application Life Assured BMI                            35.503333
+    Total Risk Exposure of HDFC Life w.r.t. Life Assured     0.023333
+    Application  Life Assured Age                            0.000000
+    Application  Life Assured Income                         5.986667
+    dtype: float64
+
+In [42]:
+
+    
+    
+    df1_miss.drop(['Applicant\'s Policy Annualized Premium', 'Mapped Agent Vintage',
+             'Total Risk Exposure of HDFC Life w.r.t. Life Assured', 
+             'Application  Life Assured Age'],inplace = True,axis = 1)
+    
+
+In [43]:
+
+    
+    
+    df1_miss.isna().sum()/df_train.shape[0] * 100
+    
+
+Out[43]:
+
+    
+    
+    Variable Detail
+    Mapped Agent 13M Persistency        55.770000
+    Application Life Assured BMI        35.503333
+    Application  Life Assured Income     5.986667
+    dtype: float64
+
+In [44]:
+
+    
+    
+    # imputing - Mapped Agent 13M Persistency
+    
+
+In [45]:
+
+    
+    
+    # imputing - Application Life Assured BMI
+    
+
+In [46]:
+
+    
+    
+    # imputing - Application  Life Assured Income
+    
+
+In [ ]:
+
+    
+    
+     
+    
+
+In [ ]:
+
+    
+    
+     
+    
+
+In [ ]:
+
+    
+    
+     
+    
+
+In [ ]:
+
+    
+    
+     
+    
+
+## Categorical Missing Values Handling¶
+
+In [47]:
+
+    
+    
+    # Categorical Columns in df
+    df_cat = df[['Mapped Agent Branch ', 'Application Life Assured Alcohol Declaration',
+           'Auto Debit of Premium Opted Flag(Yes/No)',
+           'Application  Sourcing Channel', 'Application  Life Assured City',
+           'Applicant\'s  Policy Contract Branch',
+           'Application  Life Assured Education',
+            'Application  Life Assured City Tier',
+           'Application  Life Assured Gender',
+           'Application  Life Assured Industry',
+           'Application  Life Assured Marital Status',
+           'Application  Life Assured Nationality',
+           'Application  Life Assured Occupation',
+           'Applicant\'s Policy PAR/NON PAR/ULIP Tag',
+           'Application Specific Sourcing Partner', 'First Premium Payment Type',
+           'Applicant\'s Policy Product Category',
+           'Applicant\'s Policy Premium Payment Frequency',
+           'Applicant\'s Policy Product Name', 'Application Login Date',
+           'Application Life Assured Residential Status',
+           'Application Life Assured Smoker Declaration',
+           'Application Life Assured State', 'Application Sourcing Sub Channel',
+           'HDFC Life Operational Zone']]
+    
+
+In [48]:
+
+    
+    
+    df_cat.shape
+    
+
+Out[48]:
+
+    
+    
+    (29968, 25)
+
+In [49]:
+
+    
+    
+    df_cat.isna().sum()
+    
+
+Out[49]:
+
+    
+    
+    Variable Detail
+    Mapped Agent Branch                                 0
+    Application Life Assured Alcohol Declaration    10651
+    Auto Debit of Premium Opted Flag(Yes/No)            0
+    Application  Sourcing Channel                      36
+    Application  Life Assured City                    914
+    Applicant's  Policy Contract Branch               137
+    Application  Life Assured Education                 0
+    Application  Life Assured City Tier               914
+    Application  Life Assured Gender                    0
+    Application  Life Assured Industry               1806
+    Application  Life Assured Marital Status            0
+    Application  Life Assured Nationality               0
+    Application  Life Assured Occupation                7
+    Applicant's Policy PAR/NON PAR/ULIP Tag             0
+    Application Specific Sourcing Partner            9579
+    First Premium Payment Type                        596
+    Applicant's Policy Product Category                 0
+    Applicant's Policy Premium Payment Frequency        0
+    Applicant's Policy Product Name                     0
+    Application Login Date                              0
+    Application Life Assured Residential Status         0
+    Application Life Assured Smoker Declaration     10651
+    Application Life Assured State                    914
+    Application Sourcing Sub Channel                   36
+    HDFC Life Operational Zone                      10369
+    dtype: int64
+
+In [50]:
+
+    
+    
+    df_cat_miss = df_cat[['Application Life Assured Alcohol Declaration',
+           'Application  Sourcing Channel', 'Application  Life Assured City',
+           'Applicant\'s  Policy Contract Branch',
+           'Application  Life Assured City Tier',
+           'Application  Life Assured Industry',
+           'Application Specific Sourcing Partner', 'First Premium Payment Type',
+           'Application Life Assured Smoker Declaration',
+           'Application Life Assured State', 'Application Sourcing Sub Channel',
+           'HDFC Life Operational Zone']]
+    
+
+In [51]:
+
+    
+    
+    df_cat_miss.head()
+    
+
+Out[51]:
+
+Variable Detail | Application Life Assured Alcohol Declaration | Application Sourcing Channel | Application Life Assured City | Applicant's Policy Contract Branch | Application Life Assured City Tier | Application Life Assured Industry | Application Specific Sourcing Partner | First Premium Payment Type | Application Life Assured Smoker Declaration | Application Life Assured State | Application Sourcing Sub Channel | HDFC Life Operational Zone  
+---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | N | EDM | bengaluru | Mumbai - HUB | Tier I | IT Industry | NaN | Online Netbanking | N | Karnataka | EDM | NaN  
+1 | N | HDFC BANK | Panipat | Panipat - G.T.Road | Tier III | Accounts | HDFC BANK | DD | N | Haryana | HDFC BANK | North 1  
+2 | N | HDFC BANK | Pune | Pune - Nandadeep Fc Road | Tier I | Navy | HDFC BANK | DD | N | Maharashtra | HDFC BANK | West  
+3 | N | EDM | vadodara | Mumbai - HUB | Tier II | Chemical | NaN | Online Credit/Debit Card/Teles Sales | N | Gujarat | EDM | NaN  
+4 | Y | HDFC BANK | Bangalore | Mumbai - HUB | Tier I | Consultant | NaN | Online Credit/Debit Card/Teles Sales | N | Karnataka | OL-HDFC BANK | NaN  
+  
+In [52]:
+
+    
+    
+    df_cat_miss.isna().sum()
+    
+
+Out[52]:
+
+    
+    
+    Variable Detail
+    Application Life Assured Alcohol Declaration    10651
+    Application  Sourcing Channel                      36
+    Application  Life Assured City                    914
+    Applicant's  Policy Contract Branch               137
+    Application  Life Assured City Tier               914
+    Application  Life Assured Industry               1806
+    Application Specific Sourcing Partner            9579
+    First Premium Payment Type                        596
+    Application Life Assured Smoker Declaration     10651
+    Application Life Assured State                    914
+    Application Sourcing Sub Channel                   36
+    HDFC Life Operational Zone                      10369
+    dtype: int64
+
+In [53]:
+
+    
+    
+    df.shape
+    
+
+Out[53]:
+
+    
+    
+    (29968, 36)
+
+In [54]:
+
+    
+    
+    df = df.dropna(how = 'any',subset = ['Application  Sourcing Channel', 'Applicant\'s  Policy Contract Branch',
+      'Application Sourcing Sub Channel'])
+    
+
+In [55]:
+
+    
+    
+    df.isna().sum()
+    
+
+Out[55]:
+
+    
+    
+    Variable Detail
+    Mapped Agent 13M Persistency                             16625
+    Mapped Agent Branch                                          0
+    Application Life Assured Alcohol Declaration             10537
+    Applicant's Policy Annualized Premium                        0
+    Mapped Agent Vintage                                         0
+    Auto Debit of Premium Opted Flag(Yes/No)                     0
+    Application Life Assured BMI                             10537
+    Total Risk Exposure of HDFC Life w.r.t. Life Assured         7
+    Application  Sourcing Channel                                0
+    Application  Life Assured City                             914
+    Applicant's  Policy Contract Branch                          0
+    Application  Life Assured City Tier                        914
+    Application  Life Assured Age                                0
+    Application  Life Assured Education                          0
+    Application  Life Assured Gender                             0
+    Application  Life Assured Income                          1794
+    Application  Life Assured Industry                        1804
+    Application  Life Assured Marital Status                     0
+    Application  Life Assured Nationality                        0
+    Application  Life Assured Occupation                         7
+    Applicant's Policy PAR/NON PAR/ULIP Tag                      0
+    Application Specific Sourcing Partner                     9425
+    First Premium Payment Type                                 537
+    Applicant's Policy Product Category                          0
+    Applicant's Policy Premium Payment Frequency                 0
+    Applicant's Policy Product Name                              0
+    Application Login Date                                       0
+    Applicant's Policy Price Sensitivity(1-'Yes', 0-'No')        0
+    Application Life Assured Residential Status                  0
+    Applicant's Policy Risk Cessation Term                       0
+    Applicant's Policy Rider Opted Flag(1-'Yes', 0-'No')         0
+    Application Life Assured Smoker Declaration              10537
+    Application Life Assured State                             914
+    Application Sourcing Sub Channel                             0
+    Applicant's Policy Sum Assured                               0
+    HDFC Life Operational Zone                               10219
+    dtype: int64
+
+In [56]:
+
+    
+    
+    df_cat = df_cat.dropna(how = 'any',subset = ['Application  Sourcing Channel', 'Applicant\'s  Policy Contract Branch',
+      'Application Sourcing Sub Channel'])
+    
+
+In [57]:
+
+    
+    
+    df_cat_miss = df_cat_miss.dropna(how = 'any',subset = ['Application  Sourcing Channel', 'Applicant\'s  Policy Contract Branch',
+      'Application Sourcing Sub Channel'])
+    
+
+In [58]:
+
+    
+    
+    df_cat_miss.drop(['Application  Sourcing Channel', 'Applicant\'s  Policy Contract Branch',
+      'Application Sourcing Sub Channel'],axis =1, inplace = True)
+    
+
+In [59]:
+
+    
+    
+    df_cat_miss.isna().sum()
+    
+
+Out[59]:
+
+    
+    
+    Variable Detail
+    Application Life Assured Alcohol Declaration    10537
+    Application  Life Assured City                    914
+    Application  Life Assured City Tier               914
+    Application  Life Assured Industry               1804
+    Application Specific Sourcing Partner            9425
+    First Premium Payment Type                        537
+    Application Life Assured Smoker Declaration     10537
+    Application Life Assured State                    914
+    HDFC Life Operational Zone                      10219
+    dtype: int64
+
+In [60]:
+
+    
+    
+    df_cat_miss['Application Life Assured Alcohol Declaration'].value_counts()
+    
+
+Out[60]:
+
+    
+    
+    N    18587
+    Y      671
+    Name: Application Life Assured Alcohol Declaration, dtype: int64
+
+In [61]:
+
+    
+    
+    df_cat_miss['Application  Life Assured City'].value_counts().head()
+    
+
+Out[61]:
+
+    
+    
+    mumbai       644
+    pune         480
+    Mumbai       475
+    chennai      453
+    bangalore    451
+    Name: Application  Life Assured City, dtype: int64
+
+In [62]:
+
+    
+    
+    df_cat_miss['Application  Life Assured City Tier'].value_counts()
+    
+
+Out[62]:
+
+    
+    
+    Tier III    15031
+    Tier I       7443
+    Tier II      6407
+    Name: Application  Life Assured City Tier, dtype: int64
+
+In [63]:
+
+    
+    
+    df_cat_miss['Application  Life Assured Industry'].value_counts().head()
+    
+
+Out[63]:
+
+    
+    
+    Business         2446
+    Agriculture      1782
+    Service          1424
+    Education        1082
+    Manufacturing     898
+    Name: Application  Life Assured Industry, dtype: int64
+
+In [64]:
+
+    
+    
+    df_cat_miss['Application Specific Sourcing Partner'].value_counts().head()
+    
+
+Out[64]:
+
+    
+    
+    HDFC BANK                     14986
+    HDFC Sales Private Limited     1011
+    RBL Bank Ltd                    604
+    HDFC SECURITIES LIMITED         342
+    IDFC First Bank Limited         342
+    Name: Application Specific Sourcing Partner, dtype: int64
+
+In [65]:
+
+    
+    
+    df_cat_miss['First Premium Payment Type'].value_counts()
+    
+
+Out[65]:
+
+    
+    
+    Cheque                                  6675
+    Online Credit/Debit Card/Teles Sales    6387
+    Online-Bill                             6022
+    DD                                      5041
+    Journal Entry                           1760
+    Online Netbanking                       1701
+    ECS,SI                                  1525
+    Credit Card Mandate                      129
+    Cash                                      18
+    Name: First Premium Payment Type, dtype: int64
+
+In [66]:
+
+    
+    
+    df_cat_miss['Application Life Assured Smoker Declaration'].value_counts()
+    
+
+Out[66]:
+
+    
+    
+    N    18899
+    Y      359
+    Name: Application Life Assured Smoker Declaration, dtype: int64
+
+In [67]:
+
+    
+    
+    df_cat_miss['Application Life Assured State'].value_counts()
+    
+
+Out[67]:
+
+    
+    
+    Maharashtra                  4460
+    Uttar Pradesh                2965
+    Gujarat                      2158
+    Punjab                       2043
+    Tamil Nadu                   1972
+    Delhi                        1742
+    Haryana                      1598
+    Karnataka                    1502
+    West Bengal                  1489
+    Rajasthan                    1125
+    Madhya Pradesh               1092
+    Telangana                    1008
+    Odisha                        841
+    Andhra Pradesh                830
+    Kerala                        730
+    Bihar                         629
+    Assam                         475
+    Jharkhand                     402
+    Chattisgarh                   365
+    Himachal Pradesh              285
+    Uttarakhand                   281
+    Jammu & Kashmir               231
+    Goa                           123
+    Chandigarh                    116
+    Manipur                       102
+    Meghalaya                      63
+    Dadra & Nagar Haveli           52
+    Daman & Diu                    41
+    Tripura                        40
+    Sikkim                         36
+    Pondicherry                    24
+    Mizoram                        23
+    Nagaland                       18
+    Arunachal Pradesh              16
+    Andaman & Nicobar Islands       4
+    Name: Application Life Assured State, dtype: int64
+
+In [68]:
+
+    
+    
+    df_cat_miss['HDFC Life Operational Zone'].value_counts()
+    
+
+Out[68]:
+
+    
+    
+    North 1    4853
+    West       4594
+    East       3863
+    North 2    2407
+    South 1    2352
+    South 2    1507
+    Name: HDFC Life Operational Zone, dtype: int64
+
+In [69]:
+
+    
+    
+    df_cat_miss.columns
+    
+
+Out[69]:
+
+    
+    
+    Index(['Application Life Assured Alcohol Declaration',
+           'Application  Life Assured City', 'Application  Life Assured City Tier',
+           'Application  Life Assured Industry',
+           'Application Specific Sourcing Partner', 'First Premium Payment Type',
+           'Application Life Assured Smoker Declaration',
+           'Application Life Assured State', 'HDFC Life Operational Zone'],
+          dtype='object', name='Variable Detail')
+
+In [70]:
+
+    
+    
+    ## dropping all missing values rows
+    
+
+In [71]:
+
+    
+    
+    df = df.dropna(how = 'any',subset = ['Application Life Assured Alcohol Declaration',
+           'Application  Life Assured City', 'Application  Life Assured City Tier',
+           'Application  Life Assured Industry',
+           'Application Specific Sourcing Partner', 'First Premium Payment Type',
+           'Application Life Assured Smoker Declaration',
+           'Application Life Assured State', 'HDFC Life Operational Zone'])
+    
+
+In [72]:
+
+    
+    
+    df_cat = df_cat.dropna(how = 'any',subset = ['Application Life Assured Alcohol Declaration',
+           'Application  Life Assured City', 'Application  Life Assured City Tier',
+           'Application  Life Assured Industry',
+           'Application Specific Sourcing Partner', 'First Premium Payment Type',
+           'Application Life Assured Smoker Declaration',
+           'Application Life Assured State', 'HDFC Life Operational Zone'])
+    
+
+In [73]:
+
+    
+    
+    df.shape
+    
+
+Out[73]:
+
+    
+    
+    (7507, 36)
+
+In [74]:
+
+    
+    
+    df_cat.shape
+    
+
+Out[74]:
+
+    
+    
+    (7507, 25)
+
+In [75]:
+
+    
+    
+    df.isna().sum()
+    
+
+Out[75]:
+
+    
+    
+    Variable Detail
+    Mapped Agent 13M Persistency                             4191
+    Mapped Agent Branch                                         0
+    Application Life Assured Alcohol Declaration                0
+    Applicant's Policy Annualized Premium                       0
+    Mapped Agent Vintage                                        0
+    Auto Debit of Premium Opted Flag(Yes/No)                    0
+    Application Life Assured BMI                                0
+    Total Risk Exposure of HDFC Life w.r.t. Life Assured        0
+    Application  Sourcing Channel                               0
+    Application  Life Assured City                              0
+    Applicant's  Policy Contract Branch                         0
+    Application  Life Assured City Tier                         0
+    Application  Life Assured Age                               0
+    Application  Life Assured Education                         0
+    Application  Life Assured Gender                            0
+    Application  Life Assured Income                            0
+    Application  Life Assured Industry                          0
+    Application  Life Assured Marital Status                    0
+    Application  Life Assured Nationality                       0
+    Application  Life Assured Occupation                        0
+    Applicant's Policy PAR/NON PAR/ULIP Tag                     0
+    Application Specific Sourcing Partner                       0
+    First Premium Payment Type                                  0
+    Applicant's Policy Product Category                         0
+    Applicant's Policy Premium Payment Frequency                0
+    Applicant's Policy Product Name                             0
+    Application Login Date                                      0
+    Applicant's Policy Price Sensitivity(1-'Yes', 0-'No')       0
+    Application Life Assured Residential Status                 0
+    Applicant's Policy Risk Cessation Term                      0
+    Applicant's Policy Rider Opted Flag(1-'Yes', 0-'No')        0
+    Application Life Assured Smoker Declaration                 0
+    Application Life Assured State                              0
+    Application Sourcing Sub Channel                            0
+    Applicant's Policy Sum Assured                              0
+    HDFC Life Operational Zone                                  0
+    dtype: int64
+
+In [76]:
+
+    
+    
+    df = df.dropna(how = 'any',subset =['Application Life Assured BMI','Application  Life Assured Income'])
+    
+
+In [77]:
+
+    
+    
+    df.isna().sum()
+    
+
+Out[77]:
+
+    
+    
+    Variable Detail
+    Mapped Agent 13M Persistency                             4191
+    Mapped Agent Branch                                         0
+    Application Life Assured Alcohol Declaration                0
+    Applicant's Policy Annualized Premium                       0
+    Mapped Agent Vintage                                        0
+    Auto Debit of Premium Opted Flag(Yes/No)                    0
+    Application Life Assured BMI                                0
+    Total Risk Exposure of HDFC Life w.r.t. Life Assured        0
+    Application  Sourcing Channel                               0
+    Application  Life Assured City                              0
+    Applicant's  Policy Contract Branch                         0
+    Application  Life Assured City Tier                         0
+    Application  Life Assured Age                               0
+    Application  Life Assured Education                         0
+    Application  Life Assured Gender                            0
+    Application  Life Assured Income                            0
+    Application  Life Assured Industry                          0
+    Application  Life Assured Marital Status                    0
+    Application  Life Assured Nationality                       0
+    Application  Life Assured Occupation                        0
+    Applicant's Policy PAR/NON PAR/ULIP Tag                     0
+    Application Specific Sourcing Partner                       0
+    First Premium Payment Type                                  0
+    Applicant's Policy Product Category                         0
+    Applicant's Policy Premium Payment Frequency                0
+    Applicant's Policy Product Name                             0
+    Application Login Date                                      0
+    Applicant's Policy Price Sensitivity(1-'Yes', 0-'No')       0
+    Application Life Assured Residential Status                 0
+    Applicant's Policy Risk Cessation Term                      0
+    Applicant's Policy Rider Opted Flag(1-'Yes', 0-'No')        0
+    Application Life Assured Smoker Declaration                 0
+    Application Life Assured State                              0
+    Application Sourcing Sub Channel                            0
+    Applicant's Policy Sum Assured                              0
+    HDFC Life Operational Zone                                  0
+    dtype: int64
+
+In [78]:
+
+    
+    
+    y = df['Mapped Agent 13M Persistency']
+    
+
+In [79]:
+
+    
+    
+    y.std()/y.mean()
+    
+
+Out[79]:
+
+    
+    
+    0.3569481002975336
+
+In [80]:
+
+    
+    
+    y.std()/y.median()
+    
+
+Out[80]:
+
+    
+    
+    0.3234953394839394
+
+In [81]:
+
+    
+    
+    x = df['Mapped Agent 13M Persistency'].median()
+    x
+    
+
+Out[81]:
+
+    
+    
+    80.32000000000001
+
+In [82]:
+
+    
+    
+    ## replacing missing values of 'Mapped Agent 13M Persistency' with median
+    df['Mapped Agent 13M Persistency'][df['Mapped Agent 13M Persistency'].isna()] = x
+    
+
+In [83]:
+
+    
+    
+    df.isna().sum()
+    
+
+Out[83]:
+
+    
+    
+    Variable Detail
+    Mapped Agent 13M Persistency                             0
+    Mapped Agent Branch                                      0
+    Application Life Assured Alcohol Declaration             0
+    Applicant's Policy Annualized Premium                    0
+    Mapped Agent Vintage                                     0
+    Auto Debit of Premium Opted Flag(Yes/No)                 0
+    Application Life Assured BMI                             0
+    Total Risk Exposure of HDFC Life w.r.t. Life Assured     0
+    Application  Sourcing Channel                            0
+    Application  Life Assured City                           0
+    Applicant's  Policy Contract Branch                      0
+    Application  Life Assured City Tier                      0
+    Application  Life Assured Age                            0
+    Application  Life Assured Education                      0
+    Application  Life Assured Gender                         0
+    Application  Life Assured Income                         0
+    Application  Life Assured Industry                       0
+    Application  Life Assured Marital Status                 0
+    Application  Life Assured Nationality                    0
+    Application  Life Assured Occupation                     0
+    Applicant's Policy PAR/NON PAR/ULIP Tag                  0
+    Application Specific Sourcing Partner                    0
+    First Premium Payment Type                               0
+    Applicant's Policy Product Category                      0
+    Applicant's Policy Premium Payment Frequency             0
+    Applicant's Policy Product Name                          0
+    Application Login Date                                   0
+    Applicant's Policy Price Sensitivity(1-'Yes', 0-'No')    0
+    Application Life Assured Residential Status              0
+    Applicant's Policy Risk Cessation Term                   0
+    Applicant's Policy Rider Opted Flag(1-'Yes', 0-'No')     0
+    Application Life Assured Smoker Declaration              0
+    Application Life Assured State                           0
+    Application Sourcing Sub Channel                         0
+    Applicant's Policy Sum Assured                           0
+    HDFC Life Operational Zone                               0
+    dtype: int64
+
+In [84]:
+
+    
+    
+    df['smoker_drinker'] = df['Application Life Assured Alcohol Declaration'] + df['Application Life Assured Smoker Declaration']
+    
+
+In [85]:
+
+    
+    
+    df['smoker_drinker'].value_counts()
+    
+
+Out[85]:
+
+    
+    
+    NN    7372
+    YN      67
+    YY      34
+    NY      34
+    Name: smoker_drinker, dtype: int64
+
+In [86]:
+
+    
+    
+    df['Perf+vintage'] = df['Mapped Agent 13M Persistency'] * df ['Mapped Agent Vintage']
+    
+
+In [87]:
+
+    
+    
+    df.to_csv('ootdata.csv', index=False)
+    
+

@@ -1,0 +1,3453 @@
+# GLM, Neural Network and Gradient Boosting for Insurance Pricing: Claim
+Frequency ModelingÂ¶
+
+by Daniel KÃ¶nig and Friedrich Loser. Version 3, March 2024
+
+What are the benefits of machine learning techniques for motor insurance
+pricing? To answer this question, the claims frequency for a large French
+motor third party liability insurance portfolio is modeled and predicted using
+classical and machine learning methods. There are several changes compared to
+version 2 (2020): The claims data is cleaned, the Poisson deviation is
+weighted. GLMs are supplemented by regularization and Generalized Additive
+Models (GAM). In gradient tree boosting (GBM), XGBoost is challenged by
+CatBoost and LightGBM and explainability is addressed with SHAP.
+
+It is shown that both neural networks and GBMs can at least be used to improve
+classical models, while GAMs perform better than GLMs. Furthermore, the GBMs
+are shown to be the superior forecasting models, even when monotone
+constraints are applied to account for plausible tariff structures. Finally,
+we recommend considering LightGBM and GAMs when modeling similar data.
+
+This R notebook is linked to a current Python notebook
+<https://www.kaggle.com/code/floser/use-case-claim-frequency-modeling-python>
+and uses hyperparameter optimization results.
+
+## Table of ContentsÂ¶
+
+  1. Data Exploration and Preparations
+  2. Classics: GLMs, GAMs and Regularization
+  3. Gradient Boosting and Explainability
+  4. Deep Learning Approach with Embeddings and the "CANN"
+  5. Back to GLM and GAM: Interactions
+  6. Cross Validation and Boxplots: Results
+  7. Summary
+
+# 1\. Data Exploration and PreparationsÂ¶
+
+## 1.1 Load, correct and inspect dataÂ¶
+
+We analyse data for motor third party liability claims (MTPL) in France. The
+data is available via the R library CASdatasets by Christophe Dutang. The
+specific datasets are called FreMTPL2freq and FreMTPL2sev. The former contains
+the information on the insurance policy and claims frequency and the latter
+the corresponding information on claims severity.
+
+The claim counts on the insurance policies with policy IDs â¤ 24500 in the
+dataset FreMTPL2freq do not have claim severity counterparts in the dataset
+FreMTPL2sev and thus seem not to be correct. For this reason we work with the
+claim counts extracted from FreMTPL2sev. More details can be found here
+(<https://www.kaggle.com/code/floser/comparing-claims-fremtpl2freq-sev>) and
+in Chapter 13.1 of "Statistical Foundations of Actuarial Learning and its
+Applications" by Mario WÃ¼thrich and Michael Merz (open-access book, 2023).
+
+InÂ [1]:
+
+    
+    
+    # Remark: All necessary libraries are pre-installed on Kaggle. We call them directly before usage 
+    
+    dat <- read.csv("../input/french-motor-claims-datasets-fremtpl2freq/freMTPL2freq.csv",
+                    header=TRUE, stringsAsFactors = TRUE)
+    
+    # inspect data set
+    dim(dat)  # count rows and colums
+    head(dat) # show first few policies
+    
+
+  1. 678013
+  2. 12
+
+A data.frame: 6 Ã 12 | IDpol| ClaimNb| Exposure| Area| VehPower| VehAge| DrivAge| BonusMalus| VehBrand| VehGas| Density| Region  
+---|---|---|---|---|---|---|---|---|---|---|---|---  
+| <dbl>| <int>| <dbl>| <fct>| <int>| <int>| <int>| <int>| <fct>| <fct>| <int>|
+<fct>  
+1|  1| 1| 0.10| D| 5| 0| 55| 50| B12| Regular| 1217| R82  
+2|  3| 1| 0.77| D| 5| 0| 55| 50| B12| Regular| 1217| R82  
+3|  5| 1| 0.75| B| 6| 2| 52| 50| B12| Diesel |  54| R22  
+4| 10| 1| 0.09| B| 7| 0| 46| 50| B12| Diesel |  76| R72  
+5| 11| 1| 0.84| B| 7| 0| 46| 50| B12| Diesel |  76| R72  
+6| 13| 1| 0.52| E| 6| 2| 38| 50| B12| Regular| 3003| R31  
+  
+InÂ [2]:
+
+    
+    
+    # new: take claim number from severity file (see https://www.kaggle.com/code/floser/comparing-claims-fremtpl2freq-sev)
+    sev <- read.csv("../input/fremtpl2sev/freMTPL2sev.csv")
+    sev$ClaimNb <- 1
+    sev_agg <- aggregate(sev,by=list(IDpol=sev$IDpol),FUN = sum)[c("IDpol","ClaimNb")]
+    # checks, sums and counts
+    head(sev_agg)
+    
+
+A data.frame: 6 Ã 2 | IDpol| ClaimNb  
+---|---|---  
+| <int>| <dbl>  
+1| 139| 1  
+2| 190| 1  
+3| 414| 1  
+4| 424| 2  
+5| 463| 1  
+6| 606| 1  
+  
+InÂ [3]:
+
+    
+    
+    # left join with claims frequency data (exposures, features and without questionable ClaimNb). 
+    dat <- merge(x=dat[,-2], y=sev_agg, by="IDpol", all.x=TRUE)
+    dat[is.na(dat)] <- 0
+    
+    # data preparations and corrections as used in Schelldorfer and WÃ¼thrich (2019)
+    dat$ClaimNb  <- pmin(dat$ClaimNb,4)   
+    dat$Exposure <- pmin(dat$Exposure,1) 
+    
+    # new: further data preparations
+    dat$DrivAge  <- pmin(dat$DrivAge,90)   
+    dat$VehAge  <- pmin(dat$VehAge,40)   
+    
+    # show summary statistics 
+    summary(dat)
+    
+    
+    
+         IDpol            Exposure        Area          VehPower     
+     Min.   :      1   Min.   :0.002732   A:103957   Min.   : 4.000  
+     1st Qu.:1157951   1st Qu.:0.180000   B: 75459   1st Qu.: 5.000  
+     Median :2272152   Median :0.490000   C:191880   Median : 6.000  
+     Mean   :2621857   Mean   :0.528545   D:151596   Mean   : 6.455  
+     3rd Qu.:4046274   3rd Qu.:0.990000   E:137167   3rd Qu.: 7.000  
+     Max.   :6114330   Max.   :1.000000   F: 17954   Max.   :15.000  
+                                                                     
+         VehAge          DrivAge       BonusMalus        VehBrand     
+     Min.   : 0.000   Min.   :18.0   Min.   : 50.00   B12    :166024  
+     1st Qu.: 2.000   1st Qu.:34.0   1st Qu.: 50.00   B1     :162736  
+     Median : 6.000   Median :44.0   Median : 50.00   B2     :159861  
+     Mean   : 7.037   Mean   :45.5   Mean   : 59.76   B3     : 53395  
+     3rd Qu.:11.000   3rd Qu.:55.0   3rd Qu.: 64.00   B5     : 34753  
+     Max.   :40.000   Max.   :90.0   Max.   :230.00   B6     : 28548  
+                                                      (Other): 72696  
+         VehGas          Density          Region          ClaimNb       
+     Diesel :332136   Min.   :    1   R24    :160601   Min.   :0.00000  
+     Regular:345877   1st Qu.:   92   R82    : 84752   1st Qu.:0.00000  
+                      Median :  393   R93    : 79315   Median :0.00000  
+                      Mean   : 1792   R11    : 69791   Mean   :0.03895  
+                      3rd Qu.: 1658   R53    : 42122   3rd Qu.:0.00000  
+                      Max.   :27000   R52    : 38751   Max.   :4.00000  
+                                      (Other):202681                    
+
+## 1.2 A glimpse on exposures and claim frequenciesÂ¶
+
+To get a first impression of claim frequencies, important features and their
+interactions, we start our analysis with a small binary decision tree of depth
+3.
+
+InÂ [4]:
+
+    
+    
+    library(rpart) # "Recursive partitioning for classification, regression and survival trees". Default metric: Gini impurity
+    tree <- rpart(cbind(Exposure,ClaimNb) ~ Area + VehPower + VehAge + DrivAge 
+                  + BonusMalus + VehBrand + VehGas + Density + Region, dat, 
+                  method="poisson", control=rpart.control(maxdepth=3,cp=0.001))      
+    #            complexity-parameter cp is used to control the number of splits
+    
+
+InÂ [5]:
+
+    
+    
+    library(repr) # Scale plot size:
+    options(repr.plot.width=12, repr.plot.height = 7)
+    
+    library(rpart.plot)
+    rpart.plot(tree) # display decision tree
+    
+
+![No description has been provided for this
+image](__results___files/__results___10_0.png)
+
+The first line in the root node indicates the overall 7.4% claim frequency,
+the second line #claims / #exposure and the third line the exposure-
+proportion, which is 100% at the root node.
+
+The root node is split (metric: gini impurity) into two more homogeneous
+groups by "BonusMalus < 58". Insurance policies that meet this condition are
+shown on the left. This applies to 67% of the policies that have a claims
+frequency of 5.3%. In contrast, the claim frequency on the right-hand side of
+the decision tree is 13% and rises to 26% in the next split if the bonus-malus
+level is 96 or higher.
+
+This small decision tree divides the data set into six more homogeneous groups
+with a claim frequency of 4.5% to 30%. Compared to version 2 of this notebook,
+the remarkable segment with a claim frequency of 66% is now missing, which is
+due to the claim data cleansing carried out above. This will have a
+significant impact on the results later on.
+
+## 1.3 Explorative data analysisÂ¶
+
+In this section we try to get more insight into the data. We use some
+functions of the R-"Tidyverse" and the pipe operator %>% to make the code more
+readable.
+
+InÂ [6]:
+
+    
+    
+    #library(tidyverse) # work quietly:
+    suppressMessages(library(tidyverse))
+    
+
+#### a) 1.3.1 Car brand, car age and fuelÂ¶
+
+As in version 2, we first consider the claim frequencies depending on car
+brand, car age and fuel for groups with a minimum exposure of 100.
+
+InÂ [7]:
+
+    
+    
+    # To focus on new car effects, all cars from the age of four belong to the same group in the following plot:
+    dat %>% 
+      mutate(VehAgeS=as.factor(pmin(VehAge, 4))) %>% 
+      group_by(VehBrand,VehAgeS,VehGas) %>% 
+      summarize(claim_frequency=sum(as.double(ClaimNb))/sum(Exposure), expo=sum(Exposure)) %>% 
+      filter(expo>=100)  %>% 
+      ggplot(aes(x=VehBrand, y=claim_frequency, color=VehAgeS)) + 
+      facet_grid(. ~ VehGas) + 
+      geom_point(size=5,shape=15) + theme_light(base_size = 16)
+    
+    
+    
+    `summarise()` has grouped output by 'VehBrand', 'VehAgeS'. You can override
+    using the `.groups` argument.
+    
+
+![No description has been provided for this
+image](__results___files/__results___15_1.png)
+
+We can see that the previously extremely high claim frequency for non-diesel
+new B12 cars is now actually below average. This is due to the data cleansing
+mentioned above.
+
+#### b) Car age and BonusMalusÂ¶
+
+Next we look at interactions of vehicle age and Bonus-Malus-ranges
+(deductible). The data are filtered to avoid the new-car-effects of car brand
+B12 and very small groups with BonusMalus greater than 125%. To avoid noisy
+effects of very small groups all cars from the age of twenty belong to the
+same group.
+
+InÂ [8]:
+
+    
+    
+    dat %>% 
+      filter(VehBrand!='B12' & BonusMalus<=125)  %>% 
+      mutate(VehAge=pmin(VehAge,20),
+             BonusMalusCeil=as.factor(ceiling(BonusMalus/25)*25)) %>% 
+      group_by(VehAge,BonusMalusCeil) %>% 
+      summarize(claim_frequency=sum(as.double(ClaimNb))/sum(Exposure)) %>% 
+      ggplot(aes(x=VehAge, y=claim_frequency, color=BonusMalusCeil)) + 
+      geom_point() + geom_smooth() + theme_light(base_size = 16)
+    
+    
+    
+    `summarise()` has grouped output by 'VehAge'. You can override using the
+    `.groups` argument.
+    `geom_smooth()` using method = 'loess' and formula = 'y ~ x'
+    
+
+![No description has been provided for this
+image](__results___files/__results___17_1.png)
+
+#### c) Driver age and BonusMalusÂ¶
+
+There might also be effects of driver age and Bonus-Malus. To avoid noisy
+effects of very small groups policies with BonusMalus>125 are excluded, driver
+age is grouped in five-year steps, all driver from the age of 85 belong to the
+same group and all cars from the age of twenty belong to the same group.
+
+InÂ [9]:
+
+    
+    
+    # To avoid noisy effects of very small groups we limit the on BonusMalus up to 125% driver age is grouped in five-year steps. 
+    # Further all driver from the age of 85 belong to the same group. 
+    dat %>% 
+      filter(BonusMalus<=125)  %>% 
+      mutate(DrivAge=ceiling(pmin(DrivAge,85)/5)*5,
+             BonusMalusCeil=as.factor(ceiling(BonusMalus/25)*25)) %>% 
+      group_by(DrivAge,BonusMalusCeil) %>% 
+      summarize(claim_frequency=sum(as.double(ClaimNb))/sum(Exposure)) %>% 
+      ggplot(aes(x=DrivAge, y=claim_frequency, color=BonusMalusCeil)) + 
+      geom_point() + geom_smooth() + theme_light(base_size = 16)
+    
+    
+    
+    `summarise()` has grouped output by 'DrivAge'. You can override using the
+    `.groups` argument.
+    `geom_smooth()` using method = 'loess' and formula = 'y ~ x'
+    
+
+![No description has been provided for this
+image](__results___files/__results___19_1.png)
+
+It could also be interesting to investigate this interaction via the number of
+claims in a violin plot:
+
+InÂ [10]:
+
+    
+    
+    # Violin plot DrivAge vs number of claims for BonusMalus-groups:
+    dat %>% filter(ClaimNb<4 & BonusMalus<=125) %>% 
+      mutate(BonusMalusCeil=as.factor(ceiling(BonusMalus/25)*25), 
+             ClaimNb=as.factor(ClaimNb)) %>% 
+      ggplot(aes(ClaimNb, DrivAge)) + 
+      geom_violin(aes(fill = ClaimNb)) +
+      facet_wrap(~BonusMalusCeil)
+    
+
+![No description has been provided for this
+image](__results___files/__results___21_0.png)
+
+The most striking is the different age distribution of the drivers with three
+claims, but this group is very small, see the following table:
+
+InÂ [11]:
+
+    
+    
+    # View distribution of all claims 
+    table(dat$ClaimNb)
+    
+    
+    
+         0      1      2      3      4 
+    653069  23571   1298     62     13 
+
+## 1.4 Feature preprocessing for GLMÂ¶
+
+We perform the feature preprocessing according to Schelldorfer and WÃ¼thrich
+(2019):
+
+InÂ [12]:
+
+    
+    
+    dat1 <- dat
+    dat1$AreaGLM <- as.integer(dat1$Area)
+    dat1$VehPowerGLM <- as.factor(pmin(dat1$VehPower,9))
+    VehAgeGLM <- cbind(c(0:110), c(1, rep(2,10), rep(3,100)))
+    dat1$VehAgeGLM <- as.factor(VehAgeGLM[dat1$VehAge+1,2])
+    dat1[,"VehAgeGLM"] <-relevel(dat1[,"VehAgeGLM"], ref="2")
+    DrivAgeGLM <- cbind(c(18:100), c(rep(1,21-18), rep(2,26-21), rep(3,31-26), rep(4,41-31), rep(5,51-41), rep(6,71-51), rep(7,101-71)))
+    dat1$DrivAgeGLM <- as.factor(DrivAgeGLM[dat1$DrivAge-17,2])
+    dat1[,"DrivAgeGLM"] <-relevel(dat1[,"DrivAgeGLM"], ref="5")
+    dat1$BonusMalusGLM <- as.integer(pmin(dat1$BonusMalus, 150))
+    dat1$DensityGLM <- as.numeric(log(dat1$Density))
+    dat1[,"Region"] <-relevel(dat1[,"Region"], ref="R24")
+    head(dat1) # show first few policies and generated features
+    
+
+A data.frame: 6 Ã 18 | IDpol| Exposure| Area| VehPower| VehAge| DrivAge| BonusMalus| VehBrand| VehGas| Density| Region| ClaimNb| AreaGLM| VehPowerGLM| VehAgeGLM| DrivAgeGLM| BonusMalusGLM| DensityGLM  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+| <dbl>| <dbl>| <fct>| <int>| <dbl>| <dbl>| <int>| <fct>| <fct>| <int>| <fct>|
+<dbl>| <int>| <fct>| <fct>| <fct>| <int>| <dbl>  
+1|  1| 0.10| D| 5| 0| 55| 50| B12| Regular| 1217| R82| 0| 4| 5| 1| 6| 50|
+7.104144  
+2|  3| 0.77| D| 5| 0| 55| 50| B12| Regular| 1217| R82| 0| 4| 5| 1| 6| 50|
+7.104144  
+3|  5| 0.75| B| 6| 2| 52| 50| B12| Diesel |  54| R22| 0| 2| 6| 2| 6| 50| 3.988984  
+4| 10| 0.09| B| 7| 0| 46| 50| B12| Diesel |  76| R72| 0| 2| 7| 1| 5| 50| 4.330733  
+5| 11| 0.84| B| 7| 0| 46| 50| B12| Diesel |  76| R72| 0| 2| 7| 1| 5| 50| 4.330733  
+6| 13| 0.52| E| 6| 2| 38| 50| B12| Regular| 3003| R31| 0| 5| 6| 2| 4| 50|
+8.007367  
+  
+## 1.5 Evaluation metrics and helper functionsÂ¶
+
+InÂ [13]:
+
+    
+    
+    # Modified function PDX: Weighted Poisson Deviance
+    PDW <- function(pred, obs, ex = rep(1, length(obs))) {
+      200 * sum( ex * ( pred - obs  + log((obs / pred) ^ (obs )))) / sum(ex)
+    }
+    
+    # Function PD2: Print Poisson Deviance learn/test
+    PDW2 <- function(txt, l.c, l.x, l.e, t.c, t.x, t.e) {
+        sprintf("%s, Learn/Test: %.2f%% / %.2f%%", txt, PDW(l.c, l.x, l.e), PDW(t.c, t.x, t.e)) 
+    }
+    
+    # Function CF2: Print claim frequency
+    CF2 <- function(txt, l.c, l.x, t.c, t.x) {
+        sprintf("%s: %.2f%% / %.2f%%", txt, sum(l.c)/sum(l.x)*100, sum(t.c)/sum(t.x)*100) 
+    }
+    
+    # Function Benchmark.GLM2: Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement
+    Benchmark.GLM2 <- function(txt, pred) {
+      index <- ((PDW(pred, test$ClaimNb, test$Exposure) - PDW(test$fit.cf, test$ClaimNb, test$Exposure)) / (PDW(test$fitGLM2, test$ClaimNb, test$Exposure) - PDW(test$fit.cf, test$ClaimNb, test$Exposure))) * 100
+      sprintf("GLM2-Improvement-Index (PD test) of %s: %.1f%%", txt, index) 
+    }
+    
+
+## 1.6 choosing learning (training) and test sampleÂ¶
+
+In this case, the learning sample randomly takes 80% and the test sample 20%
+of the data sets.
+
+InÂ [14]:
+
+    
+    
+    # for later use (Ch.5) we create five 20%-subsamples ("folds") and take the last fold as the holdout data set
+    k <- 5
+    set.seed(42)
+    fold <- sample(1:k, nrow(dat1), replace = TRUE)
+    dat1$fold <- fold
+    learn <- dat1[dat1$fold != 5,]    # 80%
+    test <- dat1[ dat1$fold == 5,]    # 20%
+    CF2("Claim Frequency (Actual) Learn/Test", learn$ClaimNb,learn$Exposure, test$ClaimNb,test$Exposure)
+    
+
+'Claim Frequency (Actual) Learn/Test: 7.37% / 7.38%'
+
+InÂ [15]:
+
+    
+    
+    # # Export data partition (for later use in other notebooks)
+    # write_csv(dat1[,c("IDpol","fold")],"freMTPL2freq_folds2.csv")
+    
+
+InÂ [16]:
+
+    
+    
+    # # Check it by reading back
+    # dat_folds <- read.csv("freMTPL2freq_folds2.csv",header=TRUE)
+    # head(dat_folds)
+    
+
+## 1.7 Model INT (intercept-only)Â¶
+
+The model "INT" consists solely of the intercept. It should give an impression
+of how much or little of the overall variation can be explained by classical
+and machine learning models.
+
+InÂ [17]:
+
+    
+    
+    # Model INT "predictions"
+    cf <- sum(learn$ClaimNb)/sum(learn$Exposure) # claim frequency
+    learn$fit.cf <- cf*learn$Exposure
+    test$fit.cf <- cf*test$Exposure
+    # Print Poisson Deviance (weighted)
+    PDW2("Poisson Deviance INT", learn$fit.cf,learn$ClaimNb,learn$Exposure, test$fit.cf,test$ClaimNb,test$Exposure)
+    
+
+'Poisson Deviance INT, Learn/Test: 31.19% / 31.09%'
+
+InÂ [18]:
+
+    
+    
+    # Print claim frequency actual vs predicted (Intercept model)
+    CF2("Claim Frequency INT, Test-Sample, Actual/Predicted", test$ClaimNb,test$Exposure, test$fit.cf,test$Exposure)
+    
+
+'Claim Frequency INT, Test-Sample, Actual/Predicted: 7.38% / 7.37%'
+
+As expected, the predicted claim frequency of the test sample corresponds to
+the actual claim frequency of the learning sample.
+
+# 2\. Classics: GLMs, GAMs and RegularizationÂ¶
+
+"The industry has widely adopted generalized linear models (GLMs) as a
+standard approach to modeling claims" is stated in this 2019 machine learning
+report: <https://www.soa.org/globalassets/assets/files/resources/research-
+report/2019/machine-learning-methods.pdf>. Thus we consider GLMs as well known
+and give it a try on this data set. We then proceed with regularized GLMs and
+Generalized Additive Models (GAM).
+
+## 2.1 Basic "GLM1" (using classes)Â¶
+
+Our first GLM is developed in Schelldorfer and WÃ¼thrich (2019) and uses
+classes of metric features (see Ch. "1.4 Feature preprocessing for GLM").
+
+InÂ [19]:
+
+    
+    
+    f.glm1 <- ClaimNb ~ VehPowerGLM + VehAgeGLM + DrivAgeGLM + BonusMalusGLM + VehBrand + VehGas + DensityGLM + Region + AreaGLM
+    d.glm1 <- glm(f.glm1, data = learn, offset = log(Exposure), family = poisson())
+    
+    summary(d.glm1) # print fit statistics and parameter list
+    
+    
+    
+    Call:
+    glm(formula = f.glm1, family = poisson(), data = learn, offset = log(Exposure))
+    
+    Deviance Residuals: 
+        Min       1Q   Median       3Q      Max  
+    -1.4931  -0.3254  -0.2462  -0.1384   6.9332  
+    
+    Coefficients:
+                    Estimate Std. Error z value Pr(>|z|)    
+    (Intercept)   -4.5227265  0.0473647 -95.487  < 2e-16 ***
+    VehPowerGLM5   0.0626375  0.0244436   2.563 0.010391 *  
+    VehPowerGLM6   0.0942109  0.0239607   3.932 8.43e-05 ***
+    VehPowerGLM7   0.0955517  0.0237326   4.026 5.67e-05 ***
+    VehPowerGLM8   0.1200975  0.0336752   3.566 0.000362 ***
+    VehPowerGLM9   0.2540995  0.0266308   9.542  < 2e-16 ***
+    VehAgeGLM1    -0.0178035  0.0341030  -0.522 0.601635    
+    VehAgeGLM3    -0.1941130  0.0163407 -11.879  < 2e-16 ***
+    DrivAgeGLM1    0.0997383  0.0503293   1.982 0.047511 *  
+    DrivAgeGLM2   -0.3304309  0.0328160 -10.069  < 2e-16 ***
+    DrivAgeGLM3   -0.4804987  0.0281611 -17.062  < 2e-16 ***
+    DrivAgeGLM4   -0.2773341  0.0202739 -13.679  < 2e-16 ***
+    DrivAgeGLM6   -0.0813527  0.0188474  -4.316 1.59e-05 ***
+    DrivAgeGLM7   -0.0787498  0.0314712  -2.502 0.012340 *  
+    BonusMalusGLM  0.0272205  0.0004093  66.500  < 2e-16 ***
+    VehBrandB10   -0.0378894  0.0447860  -0.846 0.397546    
+    VehBrandB11    0.1838866  0.0463435   3.968 7.25e-05 ***
+    VehBrandB12   -0.2753847  0.0244116 -11.281  < 2e-16 ***
+    VehBrandB13    0.0029657  0.0506768   0.059 0.953333    
+    VehBrandB14   -0.2997794  0.1037728  -2.889 0.003867 ** 
+    VehBrandB2    -0.0074167  0.0192296  -0.386 0.699727    
+    VehBrandB3     0.0399072  0.0267539   1.492 0.135794    
+    VehBrandB4     0.0301620  0.0364371   0.828 0.407794    
+    VehBrandB5     0.0762915  0.0309608   2.464 0.013735 *  
+    VehBrandB6     0.0406915  0.0344908   1.180 0.238088    
+    VehGasRegular -0.1745916  0.0149061 -11.713  < 2e-16 ***
+    DensityGLM     0.0579629  0.0158251   3.663 0.000250 ***
+    RegionR11      0.0190747  0.0308414   0.618 0.536262    
+    RegionR21      0.0115139  0.1272169   0.091 0.927885    
+    RegionR22      0.1611698  0.0653272   2.467 0.013621 *  
+    RegionR23     -0.0163804  0.0777787  -0.211 0.833197    
+    RegionR25     -0.0046431  0.0548234  -0.085 0.932507    
+    RegionR26      0.0654880  0.0606658   1.079 0.280370    
+    RegionR31      0.0565348  0.0400175   1.413 0.157729    
+    RegionR41     -0.0779725  0.0532070  -1.465 0.142797    
+    RegionR42      0.0183462  0.1160150   0.158 0.874349    
+    RegionR43     -0.1392395  0.1896257  -0.734 0.462774    
+    RegionR52      0.0418185  0.0318130   1.315 0.188675    
+    RegionR53      0.0224345  0.0295733   0.759 0.448087    
+    RegionR54      0.0665003  0.0420765   1.580 0.114001    
+    RegionR72      0.0151557  0.0386237   0.392 0.694766    
+    RegionR73     -0.2220488  0.0609347  -3.644 0.000268 ***
+    RegionR74      0.2976844  0.0835566   3.563 0.000367 ***
+    RegionR82      0.2151110  0.0237243   9.067  < 2e-16 ***
+    RegionR83     -0.1109556  0.0998720  -1.111 0.266578    
+    RegionR91      0.0272673  0.0379669   0.718 0.472643    
+    RegionR93      0.1517281  0.0266134   5.701 1.19e-08 ***
+    RegionR94      0.1439164  0.0993546   1.449 0.147474    
+    AreaGLM        0.0248988  0.0212956   1.169 0.242323    
+    ---
+    Signif. codes:  0 â***â 0.001 â**â 0.01 â*â 0.05 â.â 0.1 â â 1
+    
+    (Dispersion parameter for poisson family taken to be 1)
+    
+        Null deviance: 137452  on 542961  degrees of freedom
+    Residual deviance: 131357  on 542913  degrees of freedom
+    AIC: 172067
+    
+    Number of Fisher Scoring iterations: 6
+    
+
+InÂ [20]:
+
+    
+    
+    # make predictions
+    learn$fitGLM1 <- fitted(d.glm1)
+    test$fitGLM1 <- predict(d.glm1, newdata=test, type="response")
+    
+    # Print claim frequency actual vs predicted
+    CF2("Claim Frequency GLM1, Test-Sample, Actual/Predicted", test$ClaimNb,test$Exposure, test$fitGLM1,test$Exposure)
+    
+    # Print Poisson Deviance
+    PDW2("Poisson Deviance GLM1", learn$fitGLM1,learn$ClaimNb,learn$Exposure, test$fitGLM1,test$ClaimNb,test$Exposure)
+    
+
+'Claim Frequency GLM1, Test-Sample, Actual/Predicted: 7.38% / 7.38%'
+
+'Poisson Deviance GLM1, Learn/Test: 29.54% / 29.53%'
+
+## 2.2 Basic "GLM2" (driver age polynomial)Â¶
+
+Our second GLM is developed in Schelldorfer and WÃ¼thrich (2019) with a focus
+on driver age and called GLM2.
+
+InÂ [21]:
+
+    
+    
+    f.glm2 <- ClaimNb ~ VehPowerGLM + VehAgeGLM + BonusMalusGLM + VehBrand + VehGas + DensityGLM + Region + AreaGLM + DrivAge + log(DrivAge) +  I(DrivAge^2) + I(DrivAge^3) + I(DrivAge^4)
+    d.glm2 <- glm(f.glm2, data=learn, offset=log(Exposure), family=poisson())
+    
+    summary(d.glm2) # print fit statistics and parameter list
+    
+    
+    
+    Call:
+    glm(formula = f.glm2, family = poisson(), data = learn, offset = log(Exposure))
+    
+    Deviance Residuals: 
+        Min       1Q   Median       3Q      Max  
+    -1.4896  -0.3252  -0.2461  -0.1385   6.9037  
+    
+    Coefficients:
+                    Estimate Std. Error z value Pr(>|z|)    
+    (Intercept)    7.849e+01  6.916e+00  11.349  < 2e-16 ***
+    VehPowerGLM5   6.417e-02  2.444e-02   2.625 0.008664 ** 
+    VehPowerGLM6   9.621e-02  2.396e-02   4.015 5.95e-05 ***
+    VehPowerGLM7   9.563e-02  2.374e-02   4.029 5.61e-05 ***
+    VehPowerGLM8   1.171e-01  3.368e-02   3.478 0.000506 ***
+    VehPowerGLM9   2.522e-01  2.663e-02   9.470  < 2e-16 ***
+    VehAgeGLM1    -1.772e-02  3.410e-02  -0.520 0.603359    
+    VehAgeGLM3    -1.981e-01  1.634e-02 -12.123  < 2e-16 ***
+    BonusMalusGLM  2.740e-02  4.114e-04  66.612  < 2e-16 ***
+    VehBrandB10   -3.800e-02  4.478e-02  -0.848 0.396168    
+    VehBrandB11    1.845e-01  4.634e-02   3.981 6.87e-05 ***
+    VehBrandB12   -2.727e-01  2.442e-02 -11.170  < 2e-16 ***
+    VehBrandB13    2.148e-04  5.068e-02   0.004 0.996617    
+    VehBrandB14   -2.989e-01  1.038e-01  -2.881 0.003969 ** 
+    VehBrandB2    -5.823e-03  1.923e-02  -0.303 0.762105    
+    VehBrandB3     4.071e-02  2.676e-02   1.522 0.128131    
+    VehBrandB4     3.044e-02  3.644e-02   0.835 0.403492    
+    VehBrandB5     7.651e-02  3.096e-02   2.471 0.013478 *  
+    VehBrandB6     4.174e-02  3.449e-02   1.210 0.226264    
+    VehGasRegular -1.736e-01  1.492e-02 -11.630  < 2e-16 ***
+    DensityGLM     5.759e-02  1.582e-02   3.639 0.000273 ***
+    RegionR11      1.852e-02  3.085e-02   0.600 0.548310    
+    RegionR21      1.877e-02  1.272e-01   0.148 0.882710    
+    RegionR22      1.679e-01  6.533e-02   2.570 0.010157 *  
+    RegionR23     -1.706e-02  7.778e-02  -0.219 0.826385    
+    RegionR25     -4.436e-03  5.483e-02  -0.081 0.935514    
+    RegionR26      6.327e-02  6.067e-02   1.043 0.296984    
+    RegionR31      6.222e-02  4.002e-02   1.555 0.119984    
+    RegionR41     -7.274e-02  5.321e-02  -1.367 0.171634    
+    RegionR42      2.474e-02  1.160e-01   0.213 0.831132    
+    RegionR43     -1.376e-01  1.896e-01  -0.725 0.468200    
+    RegionR52      3.943e-02  3.182e-02   1.239 0.215270    
+    RegionR53      2.350e-02  2.958e-02   0.795 0.426838    
+    RegionR54      6.571e-02  4.207e-02   1.562 0.118327    
+    RegionR72      1.701e-02  3.862e-02   0.441 0.659552    
+    RegionR73     -2.206e-01  6.093e-02  -3.620 0.000295 ***
+    RegionR74      2.953e-01  8.356e-02   3.535 0.000408 ***
+    RegionR82      2.132e-01  2.372e-02   8.986  < 2e-16 ***
+    RegionR83     -1.088e-01  9.987e-02  -1.090 0.275836    
+    RegionR91      2.475e-02  3.797e-02   0.652 0.514521    
+    RegionR93      1.512e-01  2.661e-02   5.684 1.32e-08 ***
+    RegionR94      1.465e-01  9.935e-02   1.475 0.140309    
+    AreaGLM        2.503e-02  2.129e-02   1.175 0.239864    
+    DrivAge        4.001e+00  4.016e-01   9.963  < 2e-16 ***
+    log(DrivAge)  -4.788e+01  4.237e+00 -11.299  < 2e-16 ***
+    I(DrivAge^2)  -5.768e-02  6.750e-03  -8.546  < 2e-16 ***
+    I(DrivAge^3)   4.606e-04  6.387e-05   7.211 5.55e-13 ***
+    I(DrivAge^4)  -1.465e-06  2.435e-07  -6.019 1.76e-09 ***
+    ---
+    Signif. codes:  0 â***â 0.001 â**â 0.01 â*â 0.05 â.â 0.1 â â 1
+    
+    (Dispersion parameter for poisson family taken to be 1)
+    
+        Null deviance: 137452  on 542961  degrees of freedom
+    Residual deviance: 131294  on 542914  degrees of freedom
+    AIC: 172002
+    
+    Number of Fisher Scoring iterations: 6
+    
+
+InÂ [22]:
+
+    
+    
+    # make predictions
+    learn$fitGLM2 <- fitted(d.glm2)
+    test$fitGLM2 <- predict(d.glm2, newdata=test, type="response")
+    dat$fitGLM2 <- predict(d.glm2, newdata=dat1, type="response") # for the CANN
+    
+    # Print claim frequency actual vs predicted
+    CF2("Claim Frequency GLM2, Test-Sample, Actual/Predicted", test$ClaimNb,test$Exposure, test$fitGLM2,test$Exposure)
+    
+    # Print Poisson Deviance
+    PDW2("Poisson Deviance GLM2", learn$fitGLM2,learn$ClaimNb,learn$Exposure, test$fitGLM2,test$ClaimNb,test$Exposure)
+    
+
+'Claim Frequency GLM2, Test-Sample, Actual/Predicted: 7.38% / 7.38%'
+
+'Poisson Deviance GLM2, Learn/Test: 29.53% / 29.51%'
+
+The predicted claim frequency is in the learn/test-range and thus fine.
+
+How does Poisson Deviance change?
+
+InÂ [23]:
+
+    
+    
+    # Print Poisson Deviance
+    PDW2("Poisson Deviance GLM2", learn$fitGLM2,learn$ClaimNb,learn$Exposure, test$fitGLM2,test$ClaimNb,test$Exposure)
+    
+
+'Poisson Deviance GLM2, Learn/Test: 29.53% / 29.51%'
+
+This is not a significant improvement in the Poisson deviance compared to
+31.19% / 31.09% of the intercept model INT ("no model", unit premium).
+Obviously, there are no features that can clearly predict MTPL insurance
+claims.
+
+## 2.3 GLMs with Regularization (LASSO & Ridge Regression)Â¶
+
+Almost half of the coefficients of the two fitted GLMs are not significant.
+Therefore, there is a risk of overfitting, which we want to counter in this
+section with regularization via a "penalty term" in the loss function for too
+high model complexity. The penalty amount is usually determined by cross-
+validation and prevents the coefficients from becoming too large and leading
+to overfitting. L1 regularization ("LASSO") can result in some coefficients
+being set to zero, which is a form of feature selection, while L2
+regularization ("Ridge Regression") results in the corresponding coefficients
+getting close to zero but not reaching exactly zero.
+
+For an introduction, we recommend chapter 6 of the open-access book "An
+Introduction to Statistical Learning" by James et al. (2ed), see
+<https://www.statlearning.com/>.
+
+### 2.3.1 LASSOÂ¶
+
+InÂ [24]:
+
+    
+    
+    # data preparation
+    suppressMessages(library(glmnet))
+    
+    f.lasso <- as.formula(ClaimNb ~ (VehPowerGLM + VehAgeGLM + DrivAgeGLM + BonusMalusGLM + VehBrand + VehGas + DensityGLM + Region + AreaGLM)^2) 
+    x <- sparse.model.matrix(f.lasso, dat1)[, -1]
+    
+    learn.glmnet <- x[dat1$fold != 5,]    # 80% 
+    test.glmnet <- x[dat1$fold == 5,]    # 20%
+    
+    # claim number and offset
+    fit.lasso <- cv.glmnet(x=learn.glmnet, y=learn$ClaimNb, offset = log(learn$Exposure), alpha = 1, family = "poisson", nfolds = 5)
+    
+
+InÂ [25]:
+
+    
+    
+    # Plot the regularization path
+    options(repr.plot.width=12, repr.plot.height = 9) 
+    plot(fit.lasso,label = TRUE)
+    print(fit.lasso)
+    
+    
+    
+    Warning message in plot.window(...):
+    â"label" is not a graphical parameterâ
+    Warning message in plot.xy(xy, type, ...):
+    â"label" is not a graphical parameterâ
+    Warning message in axis(side = side, at = at, labels = labels, ...):
+    â"label" is not a graphical parameterâ
+    Warning message in axis(side = side, at = at, labels = labels, ...):
+    â"label" is not a graphical parameterâ
+    Warning message in box(...):
+    â"label" is not a graphical parameterâ
+    Warning message in title(...):
+    â"label" is not a graphical parameterâ
+    
+    
+    
+    Call:  cv.glmnet(x = learn.glmnet, y = learn$ClaimNb, offset = log(learn$Exposure),      nfolds = 5, alpha = 1, family = "poisson") 
+    
+    Measure: Poisson Deviance 
+    
+           Lambda Index Measure       SE Nonzero
+    min 0.0003724    43   0.242 0.001083     145
+    1se 0.0016499    27   0.243 0.001019      18
+    
+
+![No description has been provided for this
+image](__results___files/__results___48_2.png)
+
+InÂ [26]:
+
+    
+    
+    # Show non-zero coefficients
+    
+    # Extract coefficients as a matrix and convert to a dataframe
+    df_lasso_coef <- as.data.frame(as.matrix(coef(fit.lasso, s = 0.01)))
+    #df_lasso_coef$variable <- rownames(df_lasso_coef)
+    # Filter out rows where coef is not equal to 0
+    (df_lasso_coef_filtered <- subset(df_lasso_coef, s1 != 0))
+    
+
+A data.frame: 3 Ã 1 | s1  
+---|---  
+| <dbl>  
+(Intercept)| -3.4151603942  
+BonusMalusGLM|  0.0127574981  
+BonusMalusGLM:DensityGLM|  0.0001400847  
+  
+InÂ [27]:
+
+    
+    
+    # cross-validation
+    
+    {t1 <- proc.time()
+       cv.lasso <- cv.glmnet(x = learn.glmnet, y=learn$ClaimNb, alpha = 1, offset = log(learn$Exposure), family = "poisson", nfolds = 5)
+       (proc.time()-t1)}
+    
+    plot(cv.lasso)
+    
+    cv.lasso$lambda.min
+    
+    
+    
+       user  system elapsed 
+    505.195   3.584 508.953 
+
+0.000408682275203199
+
+![No description has been provided for this
+image](__results___files/__results___50_2.png)
+
+InÂ [28]:
+
+    
+    
+    # Show (a few) non-zero coefficients
+    df_lasso_coef <- as.data.frame(as.matrix(coef(cv.lasso, s = "lambda.min")))
+    df_lasso_coef_filtered <- subset(df_lasso_coef, s1 != 0)
+    dim(df_lasso_coef_filtered)
+    head(df_lasso_coef_filtered)
+    
+
+  1. 125
+  2. 1
+
+A data.frame: 6 Ã 1 | s1  
+---|---  
+| <dbl>  
+(Intercept)| -4.485352224  
+VehAgeGLM3| -0.152185624  
+DrivAgeGLM2| -0.223179253  
+DrivAgeGLM3| -0.317206396  
+DrivAgeGLM4| -0.005295672  
+BonusMalusGLM|  0.027282892  
+  
+InÂ [29]:
+
+    
+    
+    test$fitLASSO <-  predict(cv.lasso, newx = test.glmnet, newoffset = log(test$Exposure), type = "response", s = "lambda.min")[,1] 
+    learn$fitLASSO <- predict(cv.lasso, newx = learn.glmnet, newoffset = log(learn$Exposure), type = "response" , s = "lambda.min")[,1] 
+    
+    # Print claim frequency actual vs predicted 
+    CF2('Claim Frequency LASSO, Test-Sample, Actual/Predicted', test$ClaimNb,test$Exposure, test$fitLASSO,test$Exposure)
+    
+    # Print Poisson Deviance
+    PDW2("Poisson Deviance LASSO",
+    learn$fitLASSO,learn$ClaimNb,learn$Exposure,
+    test$fitLASSO,test$ClaimNb,test$Exposure)
+    
+    # Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement 
+    Benchmark.GLM2("LASSO", test$fitLASSO)
+    
+
+'Claim Frequency LASSO, Test-Sample, Actual/Predicted: 7.38% / 7.38%'
+
+'Poisson Deviance LASSO, Learn/Test: 29.50% / 29.53%'
+
+'GLM2-Improvement-Index (PD test) of LASSO: 99.1%'
+
+### 2.3.2 Ridge (Poisson) RegressionÂ¶
+
+InÂ [30]:
+
+    
+    
+    {t1 <- proc.time()
+    cvRIDGE <- cv.glmnet(x=learn.glmnet, y=learn$ClaimNb/learn$Exposure, alpha = 0, weights = learn$Exposure, family = "poisson", nfolds = 5) 
+     (proc.time()-t1)}
+    
+    plot(cvRIDGE)
+    
+    cvRIDGE$lambda.min
+    
+    test$fitRIDGE <-  exp(predict(cvRIDGE, newx = test.glmnet, s = "lambda.min"))[,1] * test$Exposure
+    learn$fitRIDGE <- exp(predict(cvRIDGE, newx = learn.glmnet, s = "lambda.min"))[,1] * learn$Exposure
+    
+    # Print claim frequency actual vs predicted
+    CF2('Claim Frequency RIDGE, Test-Sample, Actual/Predicted', test$ClaimNb,test$Exposure, test$fitRIDGE,test$Exposure)
+    
+    # Print Poisson Deviance
+    PDW2("Poisson Deviance RIDGE", learn$fitRIDGE,learn$ClaimNb,learn$Exposure, test$fitRIDGE,test$ClaimNb,test$Exposure)
+    
+    # Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement
+    Benchmark.GLM2("RIDGE", test$fitRIDGE)
+    
+    
+    
+       user  system elapsed 
+    426.996   2.936 430.022 
+
+0.0205600475635974
+
+'Claim Frequency RIDGE, Test-Sample, Actual/Predicted: 7.38% / 7.38%'
+
+'Poisson Deviance RIDGE, Learn/Test: 29.42% / 29.64%'
+
+'GLM2-Improvement-Index (PD test) of RIDGE: 92.1%'
+
+![No description has been provided for this
+image](__results___files/__results___54_5.png)
+
+## 2.4 Generalized Additive Model (GAM)Â¶
+
+Generalized additive models (GAMs) extend GLMs to account for certain non-
+linear relationships, while maintaining additivity. Consequently, GAMs are
+more flexible than GLMs. For a brief introduction to GAMs, we recommend the
+book "Extending the Linear Model with R" by Faraway (2016), while for a quick
+execution we recommend the bam function of the mgcv package.
+
+The models are usually fit by penalized likelihood maximization, in which the
+loss function is modified by the addition of a penalty for each smooth
+function, penalizing itâs âwigglinessâ.
+
+InÂ [31]:
+
+    
+    
+    suppressMessages(library(mgcv))
+    
+    # bam(): Generalized additive models for very large datasets, see https://cran.r-project.org/web/packages/mgcv/mgcv.pdf
+    #        "The advantage of bam is much lower memory footprint than gam, but it can also be much faster, for large datasets."
+    
+    {t1 <- proc.time()
+      d.gam3 <- bam(ClaimNb ~ s(VehAge) + s(DrivAge) + s(BonusMalusGLM) + VehPowerGLM + VehGas + VehBrand + AreaGLM + DensityGLM + Region + offset(log(Exposure)), 
+                    ,data=learn, scale=-1, family=poisson)
+    (proc.time()-t1)}
+    summary(d.gam3) # print fit statistics
+    
+    
+    
+       user  system elapsed 
+    125.090  85.436  55.365 
+    
+    
+    Family: poisson 
+    Link function: log 
+    
+    Formula:
+    ClaimNb ~ s(VehAge) + s(DrivAge) + s(BonusMalusGLM) + VehPowerGLM + 
+        VehGas + VehBrand + AreaGLM + DensityGLM + Region + offset(log(Exposure))
+    
+    Parametric coefficients:
+                    Estimate Std. Error t value Pr(>|t|)    
+    (Intercept)   -3.083e+00  5.383e-02 -57.277  < 2e-16 ***
+    VehPowerGLM5   5.594e-02  3.227e-02   1.734 0.083006 .  
+    VehPowerGLM6   8.751e-02  3.173e-02   2.758 0.005814 ** 
+    VehPowerGLM7   9.256e-02  3.135e-02   2.953 0.003148 ** 
+    VehPowerGLM8   1.225e-01  4.447e-02   2.756 0.005860 ** 
+    VehPowerGLM9   2.609e-01  3.519e-02   7.414 1.22e-13 ***
+    VehGasRegular -1.575e-01  1.975e-02  -7.974 1.54e-15 ***
+    VehBrandB10   -3.060e-02  5.915e-02  -0.517 0.604956    
+    VehBrandB11    1.781e-01  6.118e-02   2.912 0.003593 ** 
+    VehBrandB12   -2.844e-01  3.363e-02  -8.455  < 2e-16 ***
+    VehBrandB13   -2.282e-03  6.687e-02  -0.034 0.972772    
+    VehBrandB14   -3.076e-01  1.369e-01  -2.247 0.024670 *  
+    VehBrandB2    -1.067e-02  2.539e-02  -0.420 0.674439    
+    VehBrandB3     3.216e-02  3.534e-02   0.910 0.362887    
+    VehBrandB4     1.292e-02  4.809e-02   0.269 0.788198    
+    VehBrandB5     6.730e-02  4.089e-02   1.646 0.099740 .  
+    VehBrandB6     2.598e-02  4.555e-02   0.570 0.568412    
+    AreaGLM        2.496e-02  2.812e-02   0.888 0.374674    
+    DensityGLM     5.259e-02  2.090e-02   2.517 0.011848 *  
+    RegionR11     -2.217e-03  4.072e-02  -0.054 0.956583    
+    RegionR21     -8.991e-03  1.679e-01  -0.054 0.957296    
+    RegionR22      1.433e-01  8.621e-02   1.662 0.096507 .  
+    RegionR23     -4.780e-02  1.027e-01  -0.466 0.641505    
+    RegionR25     -2.125e-02  7.235e-02  -0.294 0.769024    
+    RegionR26      5.280e-02  8.008e-02   0.659 0.509661    
+    RegionR31      4.736e-02  5.280e-02   0.897 0.369721    
+    RegionR41     -5.783e-02  7.024e-02  -0.823 0.410326    
+    RegionR42      3.833e-02  1.531e-01   0.250 0.802369    
+    RegionR43     -1.314e-01  2.503e-01  -0.525 0.599510    
+    RegionR52      3.261e-02  4.199e-02   0.777 0.437427    
+    RegionR53      1.151e-02  3.904e-02   0.295 0.768181    
+    RegionR54      5.558e-02  5.553e-02   1.001 0.316831    
+    RegionR72      4.931e-03  5.097e-02   0.097 0.922938    
+    RegionR73     -2.405e-01  8.041e-02  -2.991 0.002785 ** 
+    RegionR74      2.732e-01  1.103e-01   2.477 0.013247 *  
+    RegionR82      1.866e-01  3.134e-02   5.957 2.58e-09 ***
+    RegionR83     -1.301e-01  1.318e-01  -0.987 0.323544    
+    RegionR91     -8.731e-05  5.013e-02  -0.002 0.998610    
+    RegionR93      1.294e-01  3.512e-02   3.686 0.000228 ***
+    RegionR94      1.133e-01  1.312e-01   0.864 0.387528    
+    ---
+    Signif. codes:  0 â***â 0.001 â**â 0.01 â*â 0.05 â.â 0.1 â â 1
+    
+    Approximate significance of smooth terms:
+                       edf Ref.df      F p-value    
+    s(VehAge)        3.861  4.739  28.51  <2e-16 ***
+    s(DrivAge)       8.171  8.777  51.25  <2e-16 ***
+    s(BonusMalusGLM) 8.327  8.848 326.05  <2e-16 ***
+    ---
+    Signif. codes:  0 â***â 0.001 â**â 0.01 â*â 0.05 â.â 0.1 â â 1
+    
+    R-sq.(adj) =  0.0277   Deviance explained =  7.4%
+    fREML = 9.2106e+05  Scale est. = 1.741     n = 542962
+
+InÂ [32]:
+
+    
+    
+    # make predictions
+    learn$fitGAM3 <- fitted(d.gam3)
+    test$fitGAM3 <- predict(d.gam3, newdata=test, type="response")
+    # Print claim frequency actual vs predicted
+    CF2("Claim Frequency GLM2, Test-Sample, Actual/Predicted", test$ClaimNb,test$Exposure, test$fitGAM3,test$Exposure)
+    
+    # Print Poisson Deviance
+    PDW2('Poisson Deviance GAM3', learn$fitGAM3,learn$ClaimNb,learn$Exposure, test$fitGAM3,test$ClaimNb,test$Exposure)
+    
+    # Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement
+    Benchmark.GLM2("GAM3", test$fitGAM3)
+    
+
+'Claim Frequency GLM2, Test-Sample, Actual/Predicted: 7.38% / 7.37%'
+
+'Poisson Deviance GAM3, Learn/Test: 29.21% / 29.20%'
+
+'GLM2-Improvement-Index (PD test) of GAM3: 120.0%'
+
+This is a remarkable improvement. Let's view the built-in visualizations and
+examine residuals and marginal effects of the spline functions:
+
+InÂ [33]:
+
+    
+    
+    # 3D-plot 
+    vis.gam(d.gam3, theta=-135)
+    
+
+![No description has been provided for this
+image](__results___files/__results___59_0.png)
+
+InÂ [34]:
+
+    
+    
+    # Plot residuals of spline-functions
+    plot(d.gam3, residuals=TRUE)
+    
+
+![No description has been provided for this
+image](__results___files/__results___60_0.png)
+
+![No description has been provided for this
+image](__results___files/__results___60_1.png)
+
+![No description has been provided for this
+image](__results___files/__results___60_2.png)
+
+InÂ [35]:
+
+    
+    
+    # plot marginal effects
+    library(ggplot2)
+    library(ggeffects)
+    
+    ggpredict(d.gam3, c("BonusMalusGLM", "DrivAge")) %>%
+      plot() +
+      theme_minimal()
+    
+    
+    
+    Model uses a transformed offset term. Predictions may not be correct.
+      It is recommended to fix the offset term using the `condition` argument,
+      e.g. `condition = c(Exposure = 1)`.
+      You could also transform the offset variable before fitting the model
+      and use `offset(Exposure)` in the model formula.
+    
+    
+
+![No description has been provided for this
+image](__results___files/__results___61_1.png)
+
+InÂ [36]:
+
+    
+    
+    ggpredict(d.gam3, c("DrivAge", "BonusMalusGLM")) %>%
+      plot() +
+      theme_minimal()
+    
+    
+    
+    Model uses a transformed offset term. Predictions may not be correct.
+      It is recommended to fix the offset term using the `condition` argument,
+      e.g. `condition = c(Exposure = 1)`.
+      You could also transform the offset variable before fitting the model
+      and use `offset(Exposure)` in the model formula.
+    
+    
+
+![No description has been provided for this
+image](__results___files/__results___62_1.png)
+
+InÂ [37]:
+
+    
+    
+    ggpredict(d.gam3, c("DrivAge", "VehAge")) %>%
+      plot() +
+      theme_minimal()
+    
+    
+    
+    Model uses a transformed offset term. Predictions may not be correct.
+      It is recommended to fix the offset term using the `condition` argument,
+      e.g. `condition = c(Exposure = 1)`.
+      You could also transform the offset variable before fitting the model
+      and use `offset(Exposure)` in the model formula.
+    
+    
+
+![No description has been provided for this
+image](__results___files/__results___63_1.png)
+
+InÂ [38]:
+
+    
+    
+    ggpredict(d.gam3, c("VehAge", "DrivAge")) %>%
+      plot() +
+      theme_minimal()
+    
+    
+    
+    Model uses a transformed offset term. Predictions may not be correct.
+      It is recommended to fix the offset term using the `condition` argument,
+      e.g. `condition = c(Exposure = 1)`.
+      You could also transform the offset variable before fitting the model
+      and use `offset(Exposure)` in the model formula.
+    
+    
+
+![No description has been provided for this
+image](__results___files/__results___64_1.png)
+
+The relationships recognizable here and other possible relationships are
+systematically examined in Chapter 5 and, if necessary, incorporated into the
+GLM models as interactions.
+
+## 2.5 Other Approaches and SummaryÂ¶
+
+Encouraged by the successful and fast implementation and execution of the GAMs
+with mgcv functions, we tried Generalized Additive Mixed Models (GAMMs) and,
+as in version 2 of this notebook, Generalized Linear Mixed Models (GLMMs, now
+for the entire data set) as further interesting and related models.
+Unfortunately, in addition to very long runtimes, considerable convergence
+problems also occurred. Therefore, these approaches were not pursued further.
+
+In summary, the regularized (or penalized) GLMs LASSO and Ridge Regression
+have a similar Poisson deviation to GLM2 and have not led to an improvement.
+The individual predictions and their summations are quite similar to those of
+GLM2:
+
+InÂ [39]:
+
+    
+    
+    summary(test[,c(22:25)])
+    
+    
+    
+        fitGLM2             fitLASSO            fitRIDGE        
+     Min.   :0.0000771   Min.   :0.0000871   Min.   :0.0000446  
+     1st Qu.:0.0116528   1st Qu.:0.0119156   1st Qu.:0.0117709  
+     Median :0.0325933   Median :0.0332890   Median :0.0332188  
+     Mean   :0.0388732   Mean   :0.0388728   Mean   :0.0388962  
+     3rd Qu.:0.0545922   3rd Qu.:0.0548097   3rd Qu.:0.0549220  
+     Max.   :1.6123148   Max.   :1.3968238   Max.   :1.5390656  
+        fitGAM3         
+     Min.   :0.0000489  
+     1st Qu.:0.0113883  
+     Median :0.0311378  
+     Mean   :0.0388232  
+     3rd Qu.:0.0532217  
+     Max.   :0.9186659  
+
+InÂ [40]:
+
+    
+    
+    head(test[,c(2:7,22:25)])
+    
+
+A data.frame: 6 Ã 10 | Exposure| Area| VehPower| VehAge| DrivAge| BonusMalus| fitGLM2| fitLASSO| fitRIDGE| fitGAM3  
+---|---|---|---|---|---|---|---|---|---|---  
+| <dbl>| <fct>| <int>| <dbl>| <dbl>| <int>| <dbl>| <dbl>| <dbl>| <dbl[1d]>  
+2| 0.77| D| 5| 0| 55| 50| 0.043237633| 0.042273331| 0.033083808| 0.038588702  
+12| 0.87| C| 7| 0| 56| 50| 0.048637388| 0.047245206| 0.045920546| 0.043075455  
+21| 0.03| A| 6| 2| 55| 50| 0.001256530| 0.001234614| 0.002060968| 0.001120073  
+22| 0.81| E| 7| 0| 73| 50| 0.043599397| 0.051576266| 0.048254999| 0.041834420  
+23| 0.06| E| 7| 0| 73| 50| 0.003229585| 0.003820464| 0.003574444| 0.003098846  
+36| 0.47| D| 4| 0| 23| 85| 0.040890913| 0.041349609| 0.028132735| 0.039236161  
+  
+The reason for this could be that the data set has a very limited number of
+features compared to its size and we have not considered interactions at this
+point.
+
+In contrast, the GAM model performed quite well and could be an interesting
+alternative to GLMs if there are important numerical features with a non-
+linear relationship to the dependent variable. With this option in hand, we
+end classical modeling and turn to machine learning methods.
+
+# 3\. Gradient Boosting and ExplainabilityÂ¶
+
+Boosting is an approach to improve the predictions that result from a decision
+tree (see example in chapter 1.2). In contrast to fitting a single large,
+potentially overfitting decision tree to the data, the boosting approach
+learns slowly instead. With gradient boosting, a decision tree is fitted to
+the residuals of the current model (instead of the result Y). This new
+decision tree is added into the fitting function with a weight "eta", which is
+referred to as the "learning rate", in order to update the residuals again.
+Typically, eta is less than 10% and the process is repeated over a hundred
+times. Boosting can over-fit if this process is repeated too often and the
+trees are too deep. The depth of the decision trees, the learning rate (eta)
+and the "number of rounds" are important hyper parameters that have to be
+tuned.
+
+Currently, gradient tree boosting machines are the most powerful and fairly
+easy to use tools for machine learning. This has also been demonstrated in
+version 2 of this notebook on unadjusted data. Now we want to try out
+alternatives to XGBoost and find out how these tools perform when the signal
+is very fuzzy, as in our case with the cleaned data. After first demonstrating
+the full potential of an unconstrained boosting model, we use a monotonically
+increasing constraint on the BonusMalus as an exemplary consideration of a
+tariff system.
+
+In a second part, we will look at the explainability of the models and use
+tools such as SHAP.
+
+### 3.1 Gradient Boosting with XGBoostÂ¶
+
+XGBoost (eXtreme Gradient Boosting) was the first fast gradient boosting
+implementation in 2014 and is known for winning many data science competitions
+and is still very popular with R users. It can be downloaded from CRAN and
+there is a lot of information available, even general information for
+actuaries, e.g. <https://www.actuaries.org.uk/news-and-insights/news/article-
+fitting-data-xgboost> (11 October 2019).
+
+XGBoost requires carefully tuned hyperparameters. In our case, we use the most
+important parameters from the associated Python notebook.
+
+#### 3.1.1 Data PreparationÂ¶
+
+InÂ [41]:
+
+    
+    
+    num_features <- c('BonusMalus','DrivAge','VehPower','VehAge','Density')
+    cat_features <- c('Area','VehBrand','VehGas','Region')
+    features <- c(num_features, cat_features)
+    
+    # Feature pre-processing for XGBoost and lightGBM
+    
+    df_feat <- dat[,c(features)]
+    df_feat$Area <- as.integer(df_feat$Area)
+    print(paste("Features before one-hot-encoding:",dim(df_feat)[2]))
+    
+    # one-hot encoding for Region and VehBrand
+    df_feat <- as.data.frame(model.matrix( ~ 0 +. ,data = df_feat)) 
+    print(paste("Features after one-hot-encoding: ",dim(df_feat)[2]))
+    
+    # split data into learn and test
+    X_learn <- df_feat[dat1$fold != 5,]    # 80%
+    X_test  <- df_feat[dat1$fold == 5,]    # 20%
+    
+    
+    
+    [1] "Features before one-hot-encoding: 9"
+    [1] "Features after one-hot-encoding:  39"
+    
+
+InÂ [42]:
+
+    
+    
+    # create monotonic constraints vector: increasing: +1, decreasing: -1, unconstraint: 0
+    mtc <- c(rep( 0, length(X_learn)))
+    head(X_learn,2) # check feature names
+    mtc[1] <- 1 # BonusMalus increasing 
+    print(mtc)
+    
+
+A data.frame: 2 Ã 39 | BonusMalus| DrivAge| VehPower| VehAge| Density| Area| VehBrandB1| VehBrandB10| VehBrandB11| VehBrandB12| â¯| RegionR53| RegionR54| RegionR72| RegionR73| RegionR74| RegionR82| RegionR83| RegionR91| RegionR93| RegionR94  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| â¯|
+<dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>  
+1| 50| 55| 5| 0| 1217| 4| 0| 0| 0| 1| â¯| 0| 0| 0| 0| 0| 1| 0| 0| 0| 0  
+3| 50| 52| 6| 2|  54| 2| 0| 0| 0| 1| â¯| 0| 0| 0| 0| 0| 0| 0| 0| 0| 0  
+      
+    
+     [1] 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    [39] 0
+    
+
+InÂ [43]:
+
+    
+    
+    suppressMessages(library(xgboost))
+    # construct xgb.DMatrices (these are the internal data structures used by XGBoost during training)  
+    dtrain <- xgb.DMatrix(data = data.matrix(X_learn), label = learn$ClaimNb/learn$Exposure, weight=learn$Exposure)
+    # make label wrong (shouldn't change anything): change to fold-number
+    dtest <- xgb.DMatrix(data = data.matrix(X_test), label = test$fold/test$Exposure, weight=test$Exposure)
+    
+
+#### 3.1.2 XGBoost without constraintsÂ¶
+
+For comparison with unconstraint classical models we first show the full
+potential of an unconstraint XGBoost model for this dataset and task.
+
+InÂ [44]:
+
+    
+    
+    # train model (using tuned hyperparameters, see corresponding Python notebook)
+    {t1 <- proc.time()
+      fit.xgb0 <- xgb.train(data=dtrain, objective='count:poisson', 
+                           nrounds = 500, max_depth = 5, eta = 0.05, tree_method = "hist")
+    (proc.time()-t1)}
+    
+    
+    
+       user  system elapsed 
+    125.343   0.155  32.089 
+
+InÂ [45]:
+
+    
+    
+    ## make predictions
+    learn$fitXGB0 <- predict(fit.xgb0 , newdata = dtrain) * learn$Exposure
+    test$fitXGB0 <- predict(fit.xgb0, newdata = dtest) * test$Exposure
+    
+    # Print claim frequency actual vs predicted
+    CF2('Claim Frequency XGB, Test-Sample, Actual/Predicted', test$ClaimNb,test$Exposure, test$fitXGB0,test$Exposure)
+    
+    # Print Poisson Deviance
+    PDW2("Poisson Deviance XGB", learn$fitXGB0,learn$ClaimNb,learn$Exposure, test$fitXGB0,test$ClaimNb,test$Exposure)
+    
+    # Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement
+    test$fit.cf <- test$Exposure * sum(learn$ClaimNb)/sum(learn$Exposure) # (recalculate INT-Model)
+    Benchmark.GLM2("XGB unconstraint", test$fitXGB0)
+    
+
+'Claim Frequency XGB, Test-Sample, Actual/Predicted: 7.38% / 7.38%'
+
+'Poisson Deviance XGB, Learn/Test: 28.20% / 28.74%'
+
+'GLM2-Improvement-Index (PD test) of XGB unconstraint: 149.0%'
+
+#### 3.1.3 XGBoost with monotonic constraintÂ¶
+
+We now apply a monotonically increasing condition with BonusMalus to account
+for a tariff structure (as an example).
+
+InÂ [46]:
+
+    
+    
+    # train model (using tuned hyperparameters, see corresponding Python notebook)
+    {t1 <- proc.time()
+      fit.xgb <- xgb.train(data=dtrain, objective='count:poisson', monotone_constraints = mtc,
+                           nrounds = 500, max_depth = 5, eta = 0.05, tree_method = "hist")
+    (proc.time()-t1)}
+    
+    
+    
+       user  system elapsed 
+    126.935   0.151  32.408 
+
+InÂ [47]:
+
+    
+    
+    ## make predictions
+    learn$fitXGB <- predict(fit.xgb , newdata = dtrain) * learn$Exposure
+    test$fitXGB <- predict(fit.xgb, newdata = dtest) * test$Exposure
+    
+    # Print claim frequency actual vs predicted
+    CF2('Claim Frequency XGB, Test-Sample, Actual/Predicted', test$ClaimNb,test$Exposure, test$fitXGB,test$Exposure)
+    
+    # Print Poisson Deviance
+    PDW2("Poisson Deviance XGB", learn$fitXGB,learn$ClaimNb,learn$Exposure, test$fitXGB,test$ClaimNb,test$Exposure)
+    
+    # Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement
+    test$fit.cf <- test$Exposure * sum(learn$ClaimNb)/sum(learn$Exposure) # (recalculate INT-Model)
+    Benchmark.GLM2("XGB", test$fitXGB)
+    
+
+'Claim Frequency XGB, Test-Sample, Actual/Predicted: 7.38% / 7.38%'
+
+'Poisson Deviance XGB, Learn/Test: 28.51% / 28.98%'
+
+'GLM2-Improvement-Index (PD test) of XGB: 133.8%'
+
+The unrestricted XGBoost model performs best by far. The monotonic constraint
+reduces the improvement by around a third, but the constraint model still
+performs remarkably better than all classic models from chapter 2.
+
+## 3.2 CatBoost: The Superior Challenger?Â¶
+
+CatBoost is a powerful ML tool that can process categorical data, requires
+minimal data pre-processing and interfaces with several programming languages
+including R, see <https://catboost.ai/en/docs/concepts/r-quickstart>. It is
+the newest tool in our comparison and has shown remarkable success on this
+binary classification task right away:
+<https://www.kaggle.com/code/floser/binary-classification-credit-scoring>.
+
+When tested on the original MTPL data set (before data cleaning, see version 2
+of this notebook) and without monotonic constraints, CatBoost was able to
+shine with an impressive improvement index of over 200. Is it now also better
+than the top dog XGBoost?
+
+InÂ [48]:
+
+    
+    
+    library(catboost)
+    
+    learn_pool <- catboost.load_pool(data = learn[features], label = learn$ClaimNb, 
+                                     cat_features = cat_features, baseline = as.matrix(learn$Exposure))
+    
+    # make label wrong (shouldn't change anything): change to fold-number
+    test_pool <- catboost.load_pool(data = test[features], label = test$fold, 
+                                     cat_features = cat_features, baseline = as.matrix(test$Exposure))
+    
+
+InÂ [49]:
+
+    
+    
+    # create monotonic constraints vector: increasing: +1, decreasing: -1, unconstraint: 0
+    mtcc <- c(rep( 0, length(features)))
+    mtcc[1] <- 1 # BonusMalus increasing 
+    print(mtcc)
+    head(learn[features],3)
+    
+    
+    
+    [1] 1 0 0 0 0 0 0 0 0
+    
+
+A data.frame: 3 Ã 9 | BonusMalus| DrivAge| VehPower| VehAge| Density| Area| VehBrand| VehGas| Region  
+---|---|---|---|---|---|---|---|---|---  
+| <int>| <dbl>| <int>| <dbl>| <int>| <fct>| <fct>| <fct>| <fct>  
+1| 50| 55| 5| 0| 1217| D| B12| Regular| R82  
+3| 50| 52| 6| 2|  54| B| B12| Diesel | R22  
+4| 50| 46| 7| 0|  76| B| B12| Diesel | R72  
+  
+InÂ [50]:
+
+    
+    
+    # train model (using tuned hyperparameters, see corresponding Python notebook)
+    fit_params <- list(logging_level='Silent', loss_function='Poisson', monotone_constraints = mtcc, random_seed=42,
+                      iterations = 500, learning_rate = 0.15, depth = 3)
+    {t1 <- proc.time()
+      CB <- catboost.train(learn_pool, params = fit_params)
+    (proc.time()-t1)}
+    
+    
+    
+    Model shrinkage in combination with baseline column is not implemented yet. Reset model_shrink_rate to 0.
+    
+    
+    
+       user  system elapsed 
+    506.149  32.767 144.459 
+
+InÂ [51]:
+
+    
+    
+    # Variable importance plot
+    catboost.get_feature_importance(CB, test_pool) %>% 
+      as.data.frame() %>% 
+      setNames("Importance") %>% 
+      rownames_to_column("Feature") %>% 
+      ggplot(aes(x = reorder(Feature, Importance), y = Importance)) +
+      geom_bar(stat = "identity") +
+      coord_flip()
+    
+
+![No description has been provided for this
+image](__results___files/__results___88_0.png)
+
+InÂ [52]:
+
+    
+    
+    test$fitCB <- exp(catboost.predict(CB,test_pool))
+    learn$fitCB <-  exp(catboost.predict(CB,learn_pool))
+    
+    # Print claim frequency actual vs predicted
+    CF2('Claim Frequency CatBoost, Test-Sample, Actual/Predicted', test$ClaimNb,test$Exposure, test$fitCB,test$Exposure)
+    
+    # Print Poisson Deviance
+    PDW2("Poisson Deviance CatBoost", learn$fitCB,learn$ClaimNb,learn$Exposure, test$fitCB,test$ClaimNb,test$Exposure)
+    
+    # Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement
+    Benchmark.GLM2("CB", test$fitCB)
+    
+
+'Claim Frequency CatBoost, Test-Sample, Actual/Predicted: 7.38% / 7.38%'
+
+'Poisson Deviance CatBoost, Learn/Test: 28.89% / 29.04%'
+
+'GLM2-Improvement-Index (PD test) of CB: 129.8%'
+
+Unfortunately, model shrinkage in combination with the baseline column is not
+yet implemented. CatBoost performs worse than XGBoost and is quite slow (and
+even worse and slower with default values). We therefore move on to the next
+promising competitor.
+
+### 3.3 lightGBM: A better alternative?Â¶
+
+LightGBM is a fast and powerful gradient tree boosting machine and has
+replaced XGBoost as the top winning tool in ML competitions after its release
+in 2017. For information about the R package see
+<https://lightgbm.readthedocs.io/en/stable/R/index.html>
+
+InÂ [53]:
+
+    
+    
+    suppressMessages(library(lightgbm))
+    
+    # LGB matrices (frequency-weighted-version)
+    # https://towardsdatascience.com/how-to-handle-the-exposure-offset-with-boosted-trees-fd09cc946837
+    llearn <- lgb.Dataset(data = data.matrix(X_learn), label = learn$ClaimNb/learn$Exposure, weight=learn$Exposure)
+    
+
+InÂ [54]:
+
+    
+    
+    # train lgb-model (using default hyperparameters, see corresponding Python notebook)
+    {t2 <- proc.time()
+      LGB <- lgb.train(data=llearn, objective='poisson', monotone_constraints = mtc, num_leaves=31, learning_rate=0.1, n_estimators=100)
+    (proc.time()-t2)}
+    
+    
+    
+       user  system elapsed 
+     13.290   0.055   3.631 
+
+InÂ [55]:
+
+    
+    
+    ## make predictions
+    learn$fitLGB <- predict(LGB, data.matrix(X_learn)) * learn$Exposure
+    test$fitLGB <- predict(LGB, data.matrix(X_test)) * test$Exposure
+    
+    # Print claim frequency actual vs predicted
+    CF2('Claim Frequency lightGBM, Test-Sample, Actual/Predicted', test$ClaimNb,test$Exposure, test$fitLGB,test$Exposure)
+    
+    # Print Poisson Deviance
+    PDW2("Poisson Deviance lightGBM", learn$fitLGB,learn$ClaimNb,learn$Exposure, test$fitLGB,test$ClaimNb,test$Exposure)
+    
+    # Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement
+    test$fit.cf <- test$Exposure * sum(learn$ClaimNb)/sum(learn$Exposure) # (recalculate INT-Model)
+    Benchmark.GLM2("LGB", test$fitLGB)
+    
+
+'Claim Frequency lightGBM, Test-Sample, Actual/Predicted: 7.38% / 7.38%'
+
+'Poisson Deviance lightGBM, Learn/Test: 28.57% / 28.96%'
+
+'GLM2-Improvement-Index (PD test) of LGB: 134.6%'
+
+This was by far the fastest training of a boosting model. The resulting
+LightGBM model is even slightly better than the corresponding constraint
+XGBoost model. So let's try to explain the predictions of this remarkable
+LightGBM model.
+
+### 3.4 Explaining lightGBMs predictions with TreeSHAPÂ¶
+
+In this section, we show how the model-agnostic explainable AI method SHAP
+provides insights into the previously created LightGBM model. SHAP (SHapley
+Additive exPlanations) is an explainable AI method that helps interpret the
+output of any machine learning model. It fairly calculates the contribution of
+each feature to the final prediction. SHAP values range from negative to
+positive, with higher values indicating a greater impact on the outcome. It is
+based on the concept of Shapley values, a cooperative game theory that assigns
+a value to each player's contribution to a group's outcome. SHAP can be used
+to explain the model's decision for a single prediction instance or to provide
+a global overview of the model's behavior.
+
+For more information and an implementation in R, we recommend the tutorial
+"SHAP for Actuaries: Explain any Model" of M. Mayer, D. Meier, and M.V.
+WÃ¼thrich (2023), <https://github.com/actuarial-data-
+science/Tutorials/tree/master/14%20-%20SHAP>.
+
+InÂ [56]:
+
+    
+    
+    # SHAP
+    install.packages(c("shapviz","kernelshap"))
+    library(shapviz)
+    library(kernelshap)
+    
+    
+    
+    Installing packages into â/usr/local/lib/R/site-libraryâ
+    (as âlibâ is unspecified)
+    
+    
+
+InÂ [57]:
+
+    
+    
+    # Generate explainer object with TreeSHAP to explain the LightGBM model
+    {t2 <- proc.time()
+     shap_lgb_test <- shapviz(LGB, X_pred = data.matrix(X_test))  
+    (proc.time()-t2)}
+    
+    
+    
+       user  system elapsed 
+    195.473   0.145  51.455 
+
+#### a) GloballyÂ¶
+
+InÂ [58]:
+
+    
+    
+    #SHAP importance: summary plot
+    sv_importance(shap_lgb_test, kind = "bee")
+    
+
+![No description has been provided for this
+image](__results___files/__results___100_0.png)
+
+InÂ [59]:
+
+    
+    
+    # SHAP feature importance
+    sv_importance(shap_lgb_test, show_numbers = TRUE)
+    
+
+![No description has been provided for this
+image](__results___files/__results___101_0.png)
+
+As expected BonusMalus ist the most important feature, followed by DrivAge,
+Density and VehAge.
+
+InÂ [60]:
+
+    
+    
+    # SHAP dependence plots (note the different y-scales)
+    options(repr.plot.width=20, repr.plot.height = 15)
+    
+    theme_set(theme_gray(base_size = 7))
+    
+    sv_dependence(shap_lgb_test, colnames(X_test), jitter_width = 0.05, alpha = 0.2) &
+      ylim(-0.8, 1.2)
+    
+    options(repr.plot.width=12, repr.plot.height = 7)
+    
+    
+    
+    Warning message:
+    âRemoved 3162 rows containing missing values (`geom_point()`).â
+    
+
+![No description has been provided for this
+image](__results___files/__results___103_1.png)
+
+#### B) LocallyÂ¶
+
+InÂ [61]:
+
+    
+    
+    head(test,4)
+    
+
+A data.frame: 4 Ã 29 | IDpol| Exposure| Area| VehPower| VehAge| DrivAge| BonusMalus| VehBrand| VehGas| Density| â¯| fit.cf| fitGLM1| fitGLM2| fitLASSO| fitRIDGE| fitGAM3| fitXGB0| fitXGB| fitCB| fitLGB  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+| <dbl>| <dbl>| <fct>| <int>| <dbl>| <dbl>| <int>| <fct>| <fct>| <int>| â¯|
+<dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl[1d]>| <dbl>| <dbl>| <dbl>| <dbl>  
+2|  3| 0.77| D| 5| 0| 55| 50| B12| Regular| 1217| â¯| 0.056722609|
+0.041457824| 0.04323763| 0.042273331| 0.033083808| 0.038588702| 0.037185138|
+0.031311153| 0.02240850| 0.041027549  
+12| 27| 0.87| C| 7| 0| 56| 50| B12| Diesel |  173| â¯| 0.064089182| 0.047130784| 0.04863739| 0.047245206| 0.045920546| 0.043075455| 0.049509484| 0.051933848| 0.02586555| 0.058206341  
+21| 47| 0.03| A| 6| 2| 55| 50| B12| Regular|  37| â¯| 0.002209972|
+0.001197806| 0.00125653| 0.001234614| 0.002060968| 0.001120073| 0.001520915|
+0.001512679| 0.01092709| 0.001324615  
+22| 49| 0.81| E| 7| 0| 73| 50| B12| Regular| 3317| â¯| 0.059669239|
+0.046084251| 0.04359940| 0.051576266| 0.048254999| 0.041834420| 0.049795545|
+0.052937178| 0.02546205| 0.054498501  
+  
+InÂ [62]:
+
+    
+    
+    # Waterfall plot of first observation (log-scale)
+    sv_waterfall(shap_lgb_test, row_id = 1)
+    
+
+![No description has been provided for this
+image](__results___files/__results___106_0.png)
+
+InÂ [63]:
+
+    
+    
+    # Waterfall plot of sixth observation
+    sv_waterfall(shap_lgb_test, row_id = 6)
+    
+
+![No description has been provided for this
+image](__results___files/__results___107_0.png)
+
+InÂ [64]:
+
+    
+    
+    # Waterfall plot of seventh observation
+    sv_waterfall(shap_lgb_test, row_id = 7)
+    
+
+![No description has been provided for this
+image](__results___files/__results___108_0.png)
+
+InÂ [65]:
+
+    
+    
+    # Waterfall plot of eighth observation
+    sv_waterfall(shap_lgb_test, row_id = 8)
+    
+
+![No description has been provided for this
+image](__results___files/__results___109_0.png)
+
+In summary, we see that waterfall charts are a very accessible way to explain
+the contribution of features to the predicted value.
+
+### 3.5 Advantages and Disadvantages of Gradient BoostingÂ¶
+
+The applied gradient boosting method uses decision tree based model ensembles.
+The main advantage of powerful gradient boosting tools such as XGBoost and
+LightGBM is the high prediction quality that can be achieved with them, as
+shown above. Although the computing time required for this is generally longer
+than for GLMs, it is usually shorter than for comparable high-performance,
+giant neural networks and can also be reduced by an order of magnitude through
+the use of GPUs.
+
+The resulting score code can be quite extensive and, depending on existing
+systems, may require new technologies in its application. If the data does not
+reflect the current market situation, the score code should not simply be
+adjusted. Instead, it is recommended to modify the data before modeling
+accordingly (for example, using a simulation).
+
+Compared to easily understandable small decision trees, a boosted sequence of
+hundreds of (rather deep) trees is of course difficult to visualize directly.
+Section 3.4 showed how the results can be interpreted and explained both
+globally and locally using SHAP.
+
+# 4\. Deep Learning Approach with Embeddings and the "CANN"Â¶
+
+This is basically a replication of the deep learning models published by
+Schelldorfer and WÃ¼thrich (2019). The neural networks implemented are fairly
+small, the focus in this article is not on optimizing hyperparameters.
+Instead, very interesting ideas such as embeddings and the combined actuarial
+neural network (CANN) are demonstrated. For further information we recommend
+the article and the references therein. A brief overview can be found in this
+presentation (page 6 to 8): <https://ethz.ch/content/dam/ethz/special-
+interest/math/risklab-dam/documents/risk-day/risk-
+day-2019/Schelldorfer_2019_09_11.pdf>.
+
+Most of the code in this chapter was written and generously shared by Mario
+Wuthrich, see <https://github.com/JSchelldorfer/ActuarialDataScience>,
+Tutorial 3, file "01 CANN approach.r" (February 5, 2019). Due to error
+messages with Keras version 2.13, layer_add was replaced by layer_multiply and
+further changes were made to the code and the optimization parameters, which
+led to an improvement in model performance.
+
+## 4.1 Pre-ProcessingÂ¶
+
+InÂ [66]:
+
+    
+    
+    # feature pre-processing 
+    
+    # min-max-scaler:
+    PreProcess.Continuous <- function(var1, dat2){
+      names(dat2)[names(dat2) == var1]  <- "V1"
+      dat2$X <- as.numeric(dat2$V1)
+      dat2$X <- 2*(dat2$X-min(dat2$X))/(max(dat2$X)-min(dat2$X))-1
+      names(dat2)[names(dat2) == "V1"]  <- var1
+      names(dat2)[names(dat2) == "X"]  <- paste(var1,"X", sep="")
+      dat2
+    }
+    
+    # pre-procecessing function:
+    Features.PreProcess <- function(dat2){
+      dat2 <- PreProcess.Continuous("Area", dat2)   
+      dat2 <- PreProcess.Continuous("VehPower", dat2)   
+      dat2$VehAge <- pmin(dat2$VehAge,20)
+      dat2 <- PreProcess.Continuous("VehAge", dat2)   
+      dat2$DrivAge <- pmin(dat2$DrivAge,90)
+      dat2 <- PreProcess.Continuous("DrivAge", dat2)   
+      dat2$BonusMalus <- pmin(dat2$BonusMalus,150)
+      dat2 <- PreProcess.Continuous("BonusMalus", dat2)   
+      dat2$VehBrandX <- as.integer(dat2$VehBrand)-1
+      dat2$VehGasX <- as.integer(dat2$VehGas)-1.5
+      dat2$Density <- round(log(dat2$Density),2)
+      dat2 <- PreProcess.Continuous("Density", dat2)   
+      dat2$RegionX <- as.integer(dat2$Region)-1  # char R11,,R94 to number 0,,21
+      dat2
+    }
+    
+    dat2 <- Features.PreProcess(dat)  # original variables and fitGLM2 (CANN)
+    
+    # Generate small random sample to inspect transformations
+    sample_n(dat2, 5)
+    
+
+A data.frame: 5 Ã 22 IDpol| Exposure| Area| VehPower| VehAge| DrivAge|
+BonusMalus| VehBrand| VehGas| Density| â¯| fitGLM2| AreaX| VehPowerX|
+VehAgeX| DrivAgeX| BonusMalusX| VehBrandX| VehGasX| DensityX| RegionX  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+<dbl>| <dbl>| <fct>| <int>| <dbl>| <dbl>| <dbl>| <fct>| <fct>| <dbl>| â¯|
+<dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>  
+1116884| 0.02| C| 7|  1| 59|  50| B2 | Diesel | 5.66| â¯| 0.001273272| -0.2| -0.4545455| -0.9|  0.13888889| -1.00| 6| -0.5| 0.10980392|  4  
+3147795| 1.00| C| 6|  6| 35|  90| B1 | Diesel | 5.26| â¯| 0.155806047| -0.2| -0.6363636| -0.4| -0.52777778| -0.20| 0| -0.5| 0.03137255|  4  
+3164475| 0.36| E| 7|  4| 56|  62| B1 | Diesel | 9.05| â¯| 0.052346961|  0.6| -0.4545455| -0.6|  0.05555556| -0.76| 0| -0.5| 0.77450980| 17  
+6114143| 0.03| D| 4|  0| 48| 100| B12| Regular| 7.34| â¯| 0.005412603|  0.2|
+-1.0000000| -1.0| -0.16666667|  0.00| 3|  0.5| 0.43921569| 19  
+3127283| 1.00| D| 8| 17| 41|  50| B10| Diesel | 6.33| â¯| 0.058511972|  0.2| -0.2727273|  0.7| -0.36111111| -1.00| 1| -0.5| 0.24117647|  7  
+  
+InÂ [67]:
+
+    
+    
+    # choosing learning and test sample (based on folds)
+    dat2$fold <- fold
+    learn0 <- dat2[dat2$fold != 5,]    # 80%
+    test0 <- dat2[ dat2$fold == 5,]    # 20%
+    learn1 <- learn0
+    test1 <- test0
+    
+    CF2("Claim Frequency (Actual) Learn/Test", learn$ClaimNb,learn$Exposure, test$ClaimNb,test$Exposure)
+    
+
+'Claim Frequency (Actual) Learn/Test: 7.37% / 7.38%'
+
+InÂ [68]:
+
+    
+    
+    # setting up the matrices
+    features_nn <- c(14:18, 20:21) # definition of feature variables (non-categorical)
+    q0 <- length(features_nn)
+    # learning data
+    Xlearn <- as.matrix(learn0[, features_nn])  # design matrix learning sample
+    Brlearn <- as.matrix(learn0$VehBrandX)
+    Relearn <- as.matrix(learn0$RegionX)
+    Ylearn <- as.matrix(learn0$ClaimNb)
+    # testing data
+    Xtest <- as.matrix(test0[, features_nn])    # design matrix test sample
+    Brtest <- as.matrix(test0$VehBrandX)
+    Retest <- as.matrix(test0$RegionX)
+    Ytest <- as.matrix(test0$ClaimNb)
+    # choosing the right volumes for EmbNN and CANN
+    Vlearn <- as.matrix(learn0$Exposure)
+    Vtest <- as.matrix(test0$Exposure)
+    
+    print(paste("Number of basic features (without VehBrand and Region):",q0))
+    (lambda.hom <- sum(learn0$ClaimNb)/sum(learn0$Exposure))
+    
+    
+    
+    [1] "Number of basic features (without VehBrand and Region): 7"
+    
+
+0.0736657266004856
+
+## 4.2 Setting up the Common Neural Network Architecture with EmbeddingsÂ¶
+
+InÂ [69]:
+
+    
+    
+    # hyperparameters of the neural network architecture (as specified in "01 CANN approach.r") 
+    q1 <- 20 # Number of neuron in hidden layer 1
+    q2 <- 15
+    q3 <- 10
+    d <- 2   # dimensions embedding layers for categorical features
+    (BrLabel <- length(unique(learn0$VehBrandX))) 
+    (ReLabel <- length(unique(learn0$RegionX)))
+    
+
+11
+
+22
+
+InÂ [70]:
+
+    
+    
+    library(keras)
+    
+    neural_net <- function() {
+    
+    # Initialize neural net and set Tensorflow's random seed
+    k_clear_session()
+    set.seed(42)
+    tensorflow::tf$random$set_seed(42)
+    
+    # define the network architecture
+    Design   <- layer_input(shape = c(q0), dtype = 'float32')
+    VehBrand <- layer_input(shape = c(1),  dtype = 'int8')
+    Region   <- layer_input(shape = c(1),  dtype = 'int8')
+    Vol      <- layer_input(shape = c(1),  dtype = 'float32')
+    
+    BrandEmb = VehBrand %>% 
+      layer_embedding(input_dim = BrLabel, output_dim = d, input_length = 1) %>%
+      layer_flatten()
+    
+    RegionEmb = Region %>% 
+      layer_embedding(input_dim = ReLabel, output_dim = d, input_length = 1) %>%
+      layer_flatten()
+    
+    Network = list(Design, BrandEmb, RegionEmb) %>% 
+      layer_concatenate() %>% 
+      layer_dense(units=q1, activation='tanh') %>%
+      layer_dense(units=q2, activation='tanh') %>%
+      layer_dense(units=q3, activation='tanh') %>%
+      layer_dense(units=1, activation='exponential', name='Network', 
+                  weights=list(array(0, dim=c(q3,1)), array(log(lambda.hom), dim=c(1))))
+    
+    Response = list(Network, Vol) %>% layer_multiply()
+    
+    model = keras_model(inputs = c(Design, VehBrand, Region, Vol), outputs = c(Response))
+    
+    model %>% compile(loss = 'poisson', optimizer = optimizer_nadam(), weighted_metrics = 'poisson')
+    
+    return(model)
+    
+    }
+    
+    # Check names of tf.random
+    names(tensorflow::tf$random)
+    
+
+  1. 'Algorithm'
+  2. 'all_candidate_sampler'
+  3. 'categorical'
+  4. 'create_rng_state'
+  5. 'experimental'
+  6. 'fixed_unigram_candidate_sampler'
+  7. 'gamma'
+  8. 'Generator'
+  9. 'get_global_generator'
+  10. 'learned_unigram_candidate_sampler'
+  11. 'log_uniform_candidate_sampler'
+  12. 'normal'
+  13. 'poisson'
+  14. 'set_global_generator'
+  15. 'set_seed'
+  16. 'shuffle'
+  17. 'stateless_binomial'
+  18. 'stateless_categorical'
+  19. 'stateless_gamma'
+  20. 'stateless_normal'
+  21. 'stateless_parameterized_truncated_normal'
+  22. 'stateless_poisson'
+  23. 'stateless_truncated_normal'
+  24. 'stateless_uniform'
+  25. 'truncated_normal'
+  26. 'uniform'
+  27. 'uniform_candidate_sampler'
+
+## 4.3 Fitting the Neural Network with Embeddings (NNemb)Â¶
+
+InÂ [71]:
+
+    
+    
+    # Create, compile and summarize a neural network with the parameterization defined above
+    model1 <- neural_net()
+    summary(model1)
+    
+    
+    
+    Model: "model"
+    ________________________________________________________________________________
+     Layer (type)             Output Shape      Param #  Connected to               
+    ================================================================================
+     input_2 (InputLayer)     [(None, 1)]       0        []                         
+     input_3 (InputLayer)     [(None, 1)]       0        []                         
+     embedding (Embedding)    (None, 1, 2)      22       ['input_2[0][0]']          
+     embedding_1 (Embedding)  (None, 1, 2)      44       ['input_3[0][0]']          
+     input_1 (InputLayer)     [(None, 7)]       0        []                         
+     flatten (Flatten)        (None, 2)         0        ['embedding[0][0]']        
+     flatten_1 (Flatten)      (None, 2)         0        ['embedding_1[0][0]']      
+     concatenate (Concatenate  (None, 11)       0        ['input_1[0][0]',          
+     )                                                    'flatten[0][0]',          
+                                                          'flatten_1[0][0]']        
+     dense_2 (Dense)          (None, 20)        240      ['concatenate[0][0]']      
+     dense_1 (Dense)          (None, 15)        315      ['dense_2[0][0]']          
+     dense (Dense)            (None, 10)        160      ['dense_1[0][0]']          
+     Network (Dense)          (None, 1)         11       ['dense[0][0]']            
+     input_4 (InputLayer)     [(None, 1)]       0        []                         
+     multiply (Multiply)      (None, 1)         0        ['Network[0][0]',          
+                                                          'input_4[0][0]']          
+    ================================================================================
+    Total params: 792
+    Trainable params: 792
+    Non-trainable params: 0
+    ________________________________________________________________________________
+    
+
+InÂ [72]:
+
+    
+    
+    set.seed(42) # set seed again
+    # fitting the neural network (as specified in "01 CANN approach.r") 
+    {t1 <- proc.time()
+      fit <- model1 %>% fit(list(Xlearn, Brlearn, Relearn, Vlearn), Ylearn, epochs=300, 
+                           batch_size=5000, verbose=0, validation_split=0.2)
+      (proc.time()-t1)}
+    
+    plot(fit)
+    
+    
+    
+       user  system elapsed 
+    413.852  26.653 264.933 
+
+![No description has been provided for this
+image](__results___files/__results___121_1.png)
+
+InÂ [73]:
+
+    
+    
+    # calculating the predictions
+    learn0$fitNNemb <- as.vector(model1 %>% predict(list(Xlearn, Brlearn, Relearn, Vlearn)))
+    test0$fitNNemb <- as.vector(model1 %>% predict(list(Xtest, Brtest, Retest, Vtest)))
+    
+    # Print claim frequency actual vs predicted
+    CF2("Claim Frequency NNemb, Test-Sample, Actual/Predicted", test0$ClaimNb,test0$Exposure, test0$fitNNemb,test0$Exposure)
+    
+    # Print Poisson Deviance
+    PDW2("Poisson Deviance NNemb", learn0$fitNNemb,as.vector(unlist(learn0$ClaimNb)),learn0$Exposure, test0$fitNNemb,as.vector(unlist(test0$ClaimNb)),test0$Exposure)
+    
+    # Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement
+    test$fit.cf <- test$Exposure * sum(learn$ClaimNb)/sum(learn$Exposure) # (recalculate INT-Model)
+    Benchmark.GLM2("NNemb", test0$fitNNemb)
+    
+
+'Claim Frequency NNemb, Test-Sample, Actual/Predicted: 7.38% / 7.28%'
+
+'Poisson Deviance NNemb, Learn/Test: 28.91% / 29.05%'
+
+'GLM2-Improvement-Index (PD test) of NNemb: 129.3%'
+
+## 4.4 The Combined Actuarial Neural Network with GLM2 (CANN)Â¶
+
+InÂ [74]:
+
+    
+    
+    # Incorporating model GLM2 into a CANN
+    Vlearn <- as.matrix(learn$fitGLM2)
+    Vtest <- as.matrix(test$fitGLM2)
+    (lambda.hom <- sum(learn$ClaimNb)/sum(learn$fitGLM2))
+    
+
+0.999999981489039
+
+InÂ [75]:
+
+    
+    
+    # Create, compile and summarize a neural network with the parameterization defined above
+    model2 <- neural_net()
+    summary(model2)
+    
+    
+    
+    Model: "model"
+    ________________________________________________________________________________
+     Layer (type)             Output Shape      Param #  Connected to               
+    ================================================================================
+     input_2 (InputLayer)     [(None, 1)]       0        []                         
+     input_3 (InputLayer)     [(None, 1)]       0        []                         
+     embedding (Embedding)    (None, 1, 2)      22       ['input_2[0][0]']          
+     embedding_1 (Embedding)  (None, 1, 2)      44       ['input_3[0][0]']          
+     input_1 (InputLayer)     [(None, 7)]       0        []                         
+     flatten (Flatten)        (None, 2)         0        ['embedding[0][0]']        
+     flatten_1 (Flatten)      (None, 2)         0        ['embedding_1[0][0]']      
+     concatenate (Concatenate  (None, 11)       0        ['input_1[0][0]',          
+     )                                                    'flatten[0][0]',          
+                                                          'flatten_1[0][0]']        
+     dense_2 (Dense)          (None, 20)        240      ['concatenate[0][0]']      
+     dense_1 (Dense)          (None, 15)        315      ['dense_2[0][0]']          
+     dense (Dense)            (None, 10)        160      ['dense_1[0][0]']          
+     Network (Dense)          (None, 1)         11       ['dense[0][0]']            
+     input_4 (InputLayer)     [(None, 1)]       0        []                         
+     multiply (Multiply)      (None, 1)         0        ['Network[0][0]',          
+                                                          'input_4[0][0]']          
+    ================================================================================
+    Total params: 792
+    Trainable params: 792
+    Non-trainable params: 0
+    ________________________________________________________________________________
+    
+
+InÂ [76]:
+
+    
+    
+    # re-fitting the neural network with GLM2-CANN
+    {t1 <- proc.time()
+      fit <- model2 %>% fit(list(Xlearn, Brlearn, Relearn, Vlearn), Ylearn, epochs=100, 
+                           batch_size=5000, verbose=0, validation_split=0.2)
+      (proc.time()-t1)}
+    
+    plot(fit)
+    
+    
+    
+       user  system elapsed 
+    124.001   7.613  71.409 
+
+![No description has been provided for this
+image](__results___files/__results___126_1.png)
+
+InÂ [77]:
+
+    
+    
+    # calculating the predictions
+    learn1$fitNNGLM <- as.vector(model2 %>% predict(list(Xlearn, Brlearn, Relearn, Vlearn)))
+    test1$fitNNGLM <- as.vector(model2 %>% predict(list(Xtest, Brtest, Retest, Vtest)))
+    
+    # Print claim frequency actual vs predicted
+    CF2("Claim Frequency CANN, Test-Sample, Actual/Predicted", test1$ClaimNb,test1$Exposure, test1$fitNNGLM,test1$Exposure)
+    
+    # Print Poisson Deviance
+    PDW2("Poisson Deviance CANN", learn1$fitNNGLM,as.vector(unlist(learn1$ClaimNb)),learn1$Exposure, test1$fitNNGLM,as.vector(unlist(test1$ClaimNb)),test1$Exposure)
+    
+    # Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement
+    test$fit.cf <- test$Exposure * sum(learn$ClaimNb)/sum(learn$Exposure) # (recalculate INT-Model)
+    Benchmark.GLM2("CANN", test1$fitNNGLM)
+    
+
+'Claim Frequency CANN, Test-Sample, Actual/Predicted: 7.38% / 7.92%'
+
+'Poisson Deviance CANN, Learn/Test: 29.09% / 29.22%'
+
+'GLM2-Improvement-Index (PD test) of CANN: 118.3%'
+
+## 4.5 Visualization of 2Dim-Embeddings: NNemb vs. CANNÂ¶
+
+Source: <https://www.kaggle.com/code/floser/glm-nn-embeddings-and-gbm-for-
+claim-frequency>
+
+### a) "VehBrand"Â¶
+
+InÂ [78]:
+
+    
+    
+    # Get weights embedding VehBrand for model1 (NNemb) and model2 (CANN)
+    Brand <- c('B1','B10','B11','B12','B13','B14','B2','B3','B4','B5','B6')
+    emb_B1 <- get_weights(model1)[[1]]
+    emb_B1 <- cbind(Brand, as.data.frame(emb_B1)) 
+    colnames(emb_B1)<-c("Brand","dim1","dim2")
+    emb_B2 <- get_weights(model2)[[1]]
+    emb_B2 <- cbind(Brand, as.data.frame(emb_B2)) 
+    colnames(emb_B2)<-c("Brand","dim1","dim2")
+    
+
+InÂ [79]:
+
+    
+    
+    # Plot embeddings
+    par(mfrow=c(1,2)) 
+    plot(data=emb_B1, dim2~dim1, pch=3, col="red",cex=0.0, main='NNemb embedding VehBrand')
+    with(data=emb_B1, text(dim2~dim1, labels=Brand, col="blue",cex=1.1), pos=1)
+    plot(data=emb_B2, dim2~dim1, pch=3, col="red",cex=0.0, main='CANN embedding VehBrand')
+    with(data=emb_B2, text(dim2~dim1, labels=Brand, col="blue",cex=1.1), pos=1)
+    
+
+![No description has been provided for this
+image](__results___files/__results___130_0.png)
+
+### b) "Region"Â¶
+
+InÂ [80]:
+
+    
+    
+    # Get weights embedding Region for model1 (NNemb) and model2 (CANN)
+    Region <- c('R11','R21','R22','R23','R24','R25','R26','R31','R41','R42','R43',
+               'R52','R53','R54','R72','R73','R74','R82','R83','R91','R93','R94')
+    emb_R1 <- get_weights(model1)[[2]]
+    emb_R1 <- cbind(Region, as.data.frame(emb_R1)) 
+    colnames(emb_R1)<-c("Region","dim1","dim2")
+    emb_R2 <- get_weights(model2)[[2]]
+    emb_R2 <- cbind(Region, as.data.frame(emb_R2)) 
+    colnames(emb_R2)<-c("Region","dim1","dim2")
+    
+
+InÂ [81]:
+
+    
+    
+    # Plot embeddings
+    par(mfrow=c(1,2)) 
+    plot(data=emb_R1, dim2~dim1, pch=3, col="red",cex=0.0, main='NNemb embedding Region')
+    with(data=emb_R1, text(dim2~dim1, labels=Region, col="blue",cex=1.1), pos=1)
+    plot(data=emb_R2, dim2~dim1, pch=3, col="red",cex=0.0, main='CANN embedding Region')
+    with(data=emb_R2, text(dim2~dim1, labels=Region, col="blue",cex=1.1), pos=1)
+    
+
+![No description has been provided for this
+image](__results___files/__results___133_0.png)
+
+## 4.6 The monotonic CANN (NNGLMc)Â¶
+
+To obtain monotonous behavior in BonusMalus, we remove it from the feature
+list of the neural network.
+
+InÂ [82]:
+
+    
+    
+    # changing the matrices (exclude BonusMalus, col18)
+    features_nn <- c(14:17, 20:21) # definition of feature variables (non-categorical)
+    q0 <- length(features_nn)
+    print(paste("Number of basic features (without VehBrand and Region):",q0))
+    # learning data
+    Xlearn <- as.matrix(learn0[, features_nn])  # design matrix learning sample
+    Brlearn <- as.matrix(learn0$VehBrandX)
+    Relearn <- as.matrix(learn0$RegionX)
+    Ylearn <- as.matrix(learn0$ClaimNb)
+    # testing data
+    Xtest <- as.matrix(test0[, features_nn])    # design matrix test sample
+    Brtest <- as.matrix(test0$VehBrandX)
+    Retest <- as.matrix(test0$RegionX)
+    Ytest <- as.matrix(test0$ClaimNb)
+    
+    # Incorporating model GLM2 into a CANN
+    Vlearn <- as.matrix(learn$fitGLM2)
+    Vtest <- as.matrix(test$fitGLM2)
+    (lambda.hom <- sum(learn$ClaimNb)/sum(learn$fitGLM2))
+    
+    
+    
+    [1] "Number of basic features (without VehBrand and Region): 6"
+    
+
+0.999999981489039
+
+InÂ [83]:
+
+    
+    
+    # Create, compile and summarize a neural network with the parameterization defined above
+    model <- neural_net()
+    summary(model)
+    
+    
+    
+    Model: "model"
+    ________________________________________________________________________________
+     Layer (type)             Output Shape      Param #  Connected to               
+    ================================================================================
+     input_2 (InputLayer)     [(None, 1)]       0        []                         
+     input_3 (InputLayer)     [(None, 1)]       0        []                         
+     embedding (Embedding)    (None, 1, 2)      22       ['input_2[0][0]']          
+     embedding_1 (Embedding)  (None, 1, 2)      44       ['input_3[0][0]']          
+     input_1 (InputLayer)     [(None, 6)]       0        []                         
+     flatten (Flatten)        (None, 2)         0        ['embedding[0][0]']        
+     flatten_1 (Flatten)      (None, 2)         0        ['embedding_1[0][0]']      
+     concatenate (Concatenate  (None, 10)       0        ['input_1[0][0]',          
+     )                                                    'flatten[0][0]',          
+                                                          'flatten_1[0][0]']        
+     dense_2 (Dense)          (None, 20)        220      ['concatenate[0][0]']      
+     dense_1 (Dense)          (None, 15)        315      ['dense_2[0][0]']          
+     dense (Dense)            (None, 10)        160      ['dense_1[0][0]']          
+     Network (Dense)          (None, 1)         11       ['dense[0][0]']            
+     input_4 (InputLayer)     [(None, 1)]       0        []                         
+     multiply (Multiply)      (None, 1)         0        ['Network[0][0]',          
+                                                          'input_4[0][0]']          
+    ================================================================================
+    Total params: 772
+    Trainable params: 772
+    Non-trainable params: 0
+    ________________________________________________________________________________
+    
+
+The model is now 20 weights smaller.
+
+InÂ [84]:
+
+    
+    
+    # re-fitting the neural network with GLM2-CANN
+    {t1 <- proc.time()
+      fit <- model %>% fit(list(Xlearn, Brlearn, Relearn, Vlearn), Ylearn, epochs=20, 
+                           batch_size=5000, verbose=0, validation_split=0.2)
+      (proc.time()-t1)}
+    
+    plot(fit)
+    
+    
+    
+       user  system elapsed 
+     27.167   1.626  16.332 
+
+![No description has been provided for this
+image](__results___files/__results___138_1.png)
+
+InÂ [85]:
+
+    
+    
+    # calculating the predictions
+    learn1$fitNNGLMc <- as.vector(model %>% predict(list(Xlearn, Brlearn, Relearn, Vlearn)))
+    test1$fitNNGLMc <- as.vector(model %>% predict(list(Xtest, Brtest, Retest, Vtest)))
+    
+    # Print Poisson Deviance
+    PDW2("Poisson Deviance NNGLMc", learn1$fitNNGLMc,as.vector(unlist(learn1$ClaimNb)),learn1$Exposure, test1$fitNNGLMc,as.vector(unlist(test1$ClaimNb)),test1$Exposure)
+    
+    # Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement
+    test$fit.cf <- test$Exposure * sum(learn$ClaimNb)/sum(learn$Exposure) # (recalculate INT-Model)
+    Benchmark.GLM2("NNGLMc", test1$fitNNGLMc)
+    
+
+'Poisson Deviance NNGLMc, Learn/Test: 29.54% / 29.54%'
+
+'GLM2-Improvement-Index (PD test) of NNGLMc: 98.0%'
+
+Depending on the random initialization of the weights, the performance of the
+monotonic CANN (NNGLMc) is comparable to the performance of the classical GLM2
+model despite fluctuations. Since this is not an improvement, but much more
+complicated, we will not pursue this path further.
+
+# 5\. Back to GLM and GAM: InteractionsÂ¶
+
+We have observed in Sections 4 and 5 that machine learning techniques such as
+Gradient Boosting consistently outperform the classical GLM approach. These
+machine learning methods excel in capturing complex interactions and nonlinear
+relationships within the data. So, how can we leverage this insight to enhance
+our GLMs? And does this work as well for GAMs? In this section, we
+specifically concentrate on identifying and integrating relevant interactions.
+
+## 5.1 Interactions with EIXÂ¶
+
+The EIX package provides tools to explore the structure of XGBoost and
+LightGBM models. Specifically, it helps us to identify feature interactions
+that contribute significantly to the model performance withinthe XGBoost and
+LightGBM models.
+
+InÂ [86]:
+
+    
+    
+    # from xgboost model
+    install.packages("EIX")
+    library(EIX)
+    
+    {t1 <- proc.time()
+      inter.xgb <-interactions(fit.xgb, dtrain)
+    (proc.time()-t1)}
+    
+    
+    
+    Installing package into â/usr/local/lib/R/site-libraryâ
+    (as âlibâ is unspecified)
+    
+    
+    
+    
+       user  system elapsed 
+    168.165   0.505 168.279 
+
+InÂ [87]:
+
+    
+    
+    # from lgb
+    {t1 <- proc.time()
+      inter.lgb <-interactions(LGB, llearn)
+    (proc.time()-t1)}
+    
+    
+    
+       user  system elapsed 
+     79.441   0.309  79.703 
+
+InÂ [88]:
+
+    
+    
+    # Summarize one-hot-encoded features
+    to_delete <- c("1|2|3|4|5|6|7|8|9|0")
+    
+    df.inter.xgb <- as.data.frame(inter.xgb)
+    df.inter.xgb$Parent <- str_remove_all(inter.xgb$Parent, to_delete)
+    df.inter.xgb$Child <- str_remove_all(inter.xgb$Child, to_delete)
+    df.inter.xgb$sumGain <- df.inter.xgb$sumGain / sum(df.inter.xgb$sumGain) * 100
+    
+    df.inter.xgb %>%
+      group_by(Parent, Child) %>%
+      summarise(sumGain = sum(sumGain),
+                frequency = sum(frequency)) %>%
+      ungroup() %>%
+      arrange(desc(sumGain)) %>%
+      ggplot(mapping = aes(
+        x = reorder(Child, desc(sumGain)),
+        y = Parent,
+        fill = sumGain  )) +
+      xlab(label = "Child") +
+      labs(fill = "Gain in %") +
+      geom_tile(aes(fill = sumGain), color = "white") +
+      scale_fill_gradient(low = "white", high = "red3") +
+      theme_minimal() +
+      theme(
+        axis.text.x = element_text(
+          angle = 90,
+          vjust = 1,
+          size = 10,
+          hjust = 1  ),
+          legend.position = "right"  ) +
+      coord_fixed()
+    
+    
+    
+    `summarise()` has grouped output by 'Parent'. You can override using the
+    `.groups` argument.
+    
+
+![No description has been provided for this
+image](__results___files/__results___146_1.png)
+
+InÂ [89]:
+
+    
+    
+    df.inter.lgb <- as.data.frame(inter.lgb)
+    df.inter.lgb$Parent <- str_remove_all(inter.lgb$Parent, to_delete)
+    df.inter.lgb$Child <- str_remove_all(inter.lgb$Child, to_delete)
+    df.inter.lgb$sumGain <- df.inter.lgb$sumGain / sum(df.inter.lgb$sumGain) * 100
+    
+    df.inter.lgb %>%
+      group_by(Parent, Child) %>%
+      summarise(sumGain = sum(sumGain),
+                frequency = sum(frequency)) %>%
+      ungroup() %>%
+      arrange(desc(sumGain)) %>%
+      ggplot(mapping = aes(
+        x = reorder(Child, desc(sumGain)),
+        y = Parent,
+        fill = sumGain  )) +
+      xlab(label = "Child") +
+      labs(fill = "Gain in %") +
+      geom_tile(aes(fill = sumGain), color = "white") +
+      scale_fill_gradient(low = "white", high = "blue3") +
+      theme_minimal() +
+      theme(
+        axis.text.x = element_text(
+          angle = 90,
+          vjust = 1,
+          size = 10,
+          hjust = 1  ),
+          legend.position = "right"  ) +
+      coord_fixed()
+    
+    
+    
+    `summarise()` has grouped output by 'Parent'. You can override using the
+    `.groups` argument.
+    
+
+![No description has been provided for this
+image](__results___files/__results___147_1.png)
+
+Interactions which include the Age of the driver are most important in both
+models. The highest gain is achieved vy the interaction DrivAge:BonusMalus.
+Overall, it can be said that the interaction importance of the 2-way
+interactions in both models is mostly the same.
+
+## 5.2 Interactions with SHAPÂ¶
+
+Another way to identify interactions comes with the treeshap package
+previously used in 3.4. Due to longer processing times, we limit the
+interaction analysis with SHAP to the DriveAge feature. We furthermore use the
+already generated SHAP-Explainer for LightGBM.
+
+InÂ [90]:
+
+    
+    
+    # Interactions: we use the explainer object from 3.4
+    inter.lgb.drivage <- as.data.frame(potential_interactions(shap_lgb_test, "DrivAge"))
+    names(inter.lgb.drivage)[1] <- "interaction_value"
+    # make new column "interaction" out of rownames and "DrivAge
+    inter.lgb.drivage$interaction <- paste0(rownames(inter.lgb.drivage), ":DrivAge")
+    # plot interaction_value top 10
+    inter.lgb.drivage %>% 
+      arrange(desc(interaction_value)) %>% 
+      head(10) %>% 
+      ggplot(aes(x = reorder(interaction, interaction_value), y = interaction_value)) +
+      geom_col() +
+       coord_flip() +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    
+
+![No description has been provided for this
+image](__results___files/__results___150_0.png)
+
+As we have already found out under 5.1, the most important interaction with
+the feature DriveAge is DriveAge:BonusMalus.
+
+## 5.3 Friedmann's H-statisticÂ¶
+
+A classic approach to measuring interactions in models is Friedmann's
+H-statistic. In contrast the EIX-package mentioned above, this method is not
+restricted to certain model classes. Unfortunately, this method is also quite
+computationally intensive. Therefore we limit the calcultaion to the XGBoost
+model.
+
+A nice introduction to this concept can be found in chapter 8 of the open-
+access book "Interpretable Machine Learning" by Chrisoph Molnar (2ed), see
+<https://christophm.github.io/interpretable-ml-book/>.
+
+We use the flashlight-package for the calculation of Friedmann's H.
+
+InÂ [91]:
+
+    
+    
+    install.packages("flashlight")
+    library(flashlight)
+    
+    # get names after one-hot-encoding
+    features_1 <- names(df_feat)
+    
+    # create flashlight-object fpr xgboost model
+    fl_xgb <- flashlight(
+      model = fit.xgb, 
+      label = "XGBoost", 
+      predict_function = function(fit, X) predict(fit, as.matrix(X[,c(features_1)]) ),
+      data = cbind(X_test,"ClaimNb" = test$ClaimNb, "Exposure" = test$Exposure),
+      y = "ClaimNb",
+      w = "Exposure",
+      linkinv = log,
+      metrics = list(`Poisson Deviance` = PDW)
+    )
+    
+    
+    
+    Installing package into â/usr/local/lib/R/site-libraryâ
+    (as âlibâ is unspecified)
+    
+    
+
+InÂ [92]:
+
+    
+    
+    # Interaction (absolute)
+    interact_abs <- light_interaction(
+      fl_xgb, 
+      v = c("DrivAge", "BonusMalus" ,"VehPower" , "VehAge", "Density",  "Area"), 
+      normalize = FALSE,
+      pairwise = TRUE, 
+      use_linkinv = TRUE,
+      seed = 42
+    )
+    plot(interact_abs,  rotate_x = TRUE)
+    
+
+![No description has been provided for this
+image](__results___files/__results___155_0.png)
+
+The evaluation of the interactions in the XGBoost model using Friedmann's H
+also confirms the results from 5.1 and 5.2: DriveAge:BonusMalus is the most
+important interaction.
+
+## 5.4 Back to GLM and GAMÂ¶
+
+The aim of the previous sections was to find important interactions in the
+machine learning models. We will now use these interactions in the classical
+GLM. We have seen the high importance of the interaction DrivAge:BonusMalus in
+the previous sections. But other interactions also seem to be important. We
+will include these in the following GLMs. Finally, we transfer this approach
+to a Generalized Additive Model (GAM).
+
+### 5.4.1 "GLM4" featuring neural net residual analysesÂ¶
+
+The interactions in this model were found using neural network residual
+analyzes, see "From Generalized Linear Models to Neural Networks, and Back" by
+Mario WÃ¼thrich (SSRN-Preprint 3491790, 11.12.2019). Note: The interactions
+were developed on the basis of the original (unadjusted) data set.
+
+InÂ [93]:
+
+    
+    
+    f.glm4 <- "ClaimNb ~ AreaGLM + VehPowerGLM * VehAgeGLM + VehAgeGLM * VehBrand + VehGas * VehAgeGLM + DensityGLM + Region + BonusMalusGLM * log(DrivAge) + log(BonusMalusGLM) + I(BonusMalusGLM^2) + I(BonusMalusGLM^3) + I(BonusMalusGLM^4) + DrivAge + I(DrivAge^2) + I(DrivAge^3) + I(DrivAge^4)"
+    d.glm4 <- glm(f.glm4, data=learn, offset=log(Exposure), family=poisson())
+    summary(d.glm4)
+    
+    
+    
+    Call:
+    glm(formula = f.glm4, family = poisson(), data = learn, offset = log(Exposure))
+    
+    Deviance Residuals: 
+        Min       1Q   Median       3Q      Max  
+    -1.3657  -0.3203  -0.2415  -0.1379   6.9277  
+    
+    Coefficients:
+                                 Estimate Std. Error z value Pr(>|z|)    
+    (Intercept)                -5.733e+02  5.585e+01 -10.265  < 2e-16 ***
+    AreaGLM                     2.379e-02  2.131e-02   1.117 0.264171    
+    VehPowerGLM5                5.468e-02  3.016e-02   1.813 0.069872 .  
+    VehPowerGLM6                9.540e-02  2.967e-02   3.215 0.001304 ** 
+    VehPowerGLM7                8.769e-02  2.984e-02   2.939 0.003296 ** 
+    VehPowerGLM8                1.178e-01  4.285e-02   2.748 0.005991 ** 
+    VehPowerGLM9                2.792e-01  3.317e-02   8.418  < 2e-16 ***
+    VehAgeGLM1                  1.347e-01  1.268e-01   1.062 0.288024    
+    VehAgeGLM3                 -1.253e-01  5.345e-02  -2.344 0.019102 *  
+    VehBrandB10                -6.811e-02  5.753e-02  -1.184 0.236418    
+    VehBrandB11                 1.551e-01  5.866e-02   2.644 0.008187 ** 
+    VehBrandB12                -2.479e-01  2.742e-02  -9.042  < 2e-16 ***
+    VehBrandB13                 4.203e-02  5.955e-02   0.706 0.480308    
+    VehBrandB14                -2.260e-01  1.443e-01  -1.566 0.117345    
+    VehBrandB2                  1.261e-02  2.429e-02   0.519 0.603715    
+    VehBrandB3                  6.500e-02  3.229e-02   2.013 0.044084 *  
+    VehBrandB4                  4.980e-02  4.262e-02   1.168 0.242615    
+    VehBrandB5                  1.058e-01  3.783e-02   2.798 0.005139 ** 
+    VehBrandB6                  7.448e-02  4.058e-02   1.835 0.066486 .  
+    VehGasRegular              -1.538e-01  1.795e-02  -8.568  < 2e-16 ***
+    DensityGLM                  5.408e-02  1.584e-02   3.415 0.000638 ***
+    RegionR11                   4.339e-03  3.087e-02   0.141 0.888215    
+    RegionR21                  -4.746e-03  1.273e-01  -0.037 0.970250    
+    RegionR22                   1.463e-01  6.536e-02   2.238 0.025215 *  
+    RegionR23                  -4.865e-02  7.781e-02  -0.625 0.531796    
+    RegionR25                  -1.855e-02  5.483e-02  -0.338 0.735165    
+    RegionR26                   5.473e-02  6.069e-02   0.902 0.367190    
+    RegionR31                   4.773e-02  4.003e-02   1.192 0.233118    
+    RegionR41                  -5.112e-02  5.324e-02  -0.960 0.336956    
+    RegionR42                   4.462e-02  1.160e-01   0.384 0.700623    
+    RegionR43                  -1.268e-01  1.897e-01  -0.668 0.503858    
+    RegionR52                   3.417e-02  3.182e-02   1.074 0.282920    
+    RegionR53                   2.053e-02  2.958e-02   0.694 0.487633    
+    RegionR54                   5.442e-02  4.209e-02   1.293 0.195983    
+    RegionR72                   4.048e-03  3.863e-02   0.105 0.916554    
+    RegionR73                  -2.452e-01  6.095e-02  -4.023 5.74e-05 ***
+    RegionR74                   2.767e-01  8.358e-02   3.310 0.000932 ***
+    RegionR82                   1.911e-01  2.374e-02   8.052 8.12e-16 ***
+    RegionR83                  -1.254e-01  9.990e-02  -1.256 0.209223    
+    RegionR91                   1.959e-03  3.800e-02   0.052 0.958891    
+    RegionR93                   1.284e-01  2.661e-02   4.827 1.39e-06 ***
+    RegionR94                   1.136e-01  9.943e-02   1.143 0.253124    
+    BonusMalusGLM              -1.161e+01  1.133e+00 -10.244  < 2e-16 ***
+    log(DrivAge)               -5.050e+01  4.250e+00 -11.884  < 2e-16 ***
+    log(BonusMalusGLM)          2.704e+02  2.361e+01  11.452  < 2e-16 ***
+    I(BonusMalusGLM^2)          9.054e-02  9.868e-03   9.175  < 2e-16 ***
+    I(BonusMalusGLM^3)         -4.001e-04  4.923e-05  -8.127 4.41e-16 ***
+    I(BonusMalusGLM^4)          7.184e-07  1.003e-07   7.161 8.02e-13 ***
+    DrivAge                     4.255e+00  4.013e-01  10.603  < 2e-16 ***
+    I(DrivAge^2)               -6.071e-02  6.736e-03  -9.013  < 2e-16 ***
+    I(DrivAge^3)                4.783e-04  6.368e-05   7.512 5.83e-14 ***
+    I(DrivAge^4)               -1.500e-06  2.425e-07  -6.187 6.14e-10 ***
+    VehPowerGLM5:VehAgeGLM1     6.171e-02  1.166e-01   0.529 0.596775    
+    VehPowerGLM6:VehAgeGLM1    -8.147e-02  1.279e-01  -0.637 0.524016    
+    VehPowerGLM7:VehAgeGLM1    -8.714e-04  1.131e-01  -0.008 0.993853    
+    VehPowerGLM8:VehAgeGLM1     1.401e-01  1.310e-01   1.070 0.284748    
+    VehPowerGLM9:VehAgeGLM1     1.321e-01  1.148e-01   1.151 0.249868    
+    VehPowerGLM5:VehAgeGLM3     9.182e-03  5.523e-02   0.166 0.867944    
+    VehPowerGLM6:VehAgeGLM3    -1.927e-02  5.316e-02  -0.362 0.717038    
+    VehPowerGLM7:VehAgeGLM3    -2.026e-03  5.163e-02  -0.039 0.968705    
+    VehPowerGLM8:VehAgeGLM3    -8.131e-02  7.504e-02  -1.084 0.278573    
+    VehPowerGLM9:VehAgeGLM3    -1.479e-01  5.965e-02  -2.479 0.013169 *  
+    VehAgeGLM1:VehBrandB10     -5.287e-02  2.278e-01  -0.232 0.816469    
+    VehAgeGLM3:VehBrandB10      1.033e-01  9.548e-02   1.082 0.279392    
+    VehAgeGLM1:VehBrandB11     -3.448e-01  2.534e-01  -1.361 0.173646    
+    VehAgeGLM3:VehBrandB11      1.423e-01  9.884e-02   1.440 0.149964    
+    VehAgeGLM1:VehBrandB12     -2.198e-01  1.083e-01  -2.029 0.042411 *  
+    VehAgeGLM3:VehBrandB12      1.724e-01  9.281e-02   1.858 0.063176 .  
+    VehAgeGLM1:VehBrandB13      4.728e-01  2.565e-01   1.844 0.065243 .  
+    VehAgeGLM3:VehBrandB13     -1.907e-01  1.216e-01  -1.568 0.116854    
+    VehAgeGLM1:VehBrandB14      6.046e-01  4.444e-01   1.361 0.173602    
+    VehAgeGLM3:VehBrandB14     -2.305e-01  2.155e-01  -1.070 0.284802    
+    VehAgeGLM1:VehBrandB2      -7.301e-03  1.267e-01  -0.058 0.954043    
+    VehAgeGLM3:VehBrandB2      -5.217e-02  4.112e-02  -1.269 0.204614    
+    VehAgeGLM1:VehBrandB3      -1.125e-01  1.554e-01  -0.724 0.469055    
+    VehAgeGLM3:VehBrandB3      -7.880e-02  6.016e-02  -1.310 0.190248    
+    VehAgeGLM1:VehBrandB4       2.179e-01  1.970e-01   1.106 0.268551    
+    VehAgeGLM3:VehBrandB4      -1.486e-01  8.806e-02  -1.688 0.091441 .  
+    VehAgeGLM1:VehBrandB5      -5.074e-02  2.207e-01  -0.230 0.818158    
+    VehAgeGLM3:VehBrandB5      -9.513e-02  6.743e-02  -1.411 0.158340    
+    VehAgeGLM1:VehBrandB6      -8.562e-02  2.147e-01  -0.399 0.690060    
+    VehAgeGLM3:VehBrandB6      -1.312e-01  8.091e-02  -1.621 0.105013    
+    VehAgeGLM1:VehGasRegular   -1.945e-01  7.150e-02  -2.721 0.006512 ** 
+    VehAgeGLM3:VehGasRegular   -1.528e-02  3.374e-02  -0.453 0.650690    
+    BonusMalusGLM:log(DrivAge) -8.838e-03  1.471e-03  -6.007 1.89e-09 ***
+    ---
+    Signif. codes:  0 â***â 0.001 â**â 0.01 â*â 0.05 â.â 0.1 â â 1
+    
+    (Dispersion parameter for poisson family taken to be 1)
+    
+        Null deviance: 137452  on 542961  degrees of freedom
+    Residual deviance: 130477  on 542877  degrees of freedom
+    AIC: 171258
+    
+    Number of Fisher Scoring iterations: 7
+    
+
+InÂ [94]:
+
+    
+    
+    learn$fitGLM4 <- fitted(d.glm4)
+    test$fitGLM4 <- predict(d.glm4, newdata=test, type="response")
+    
+    # Print Poisson Deviance
+    PDW2('Poisson Deviance GLM4', learn$fitGLM4,learn$ClaimNb,learn$Exposure, test$fitGLM4,test$ClaimNb,test$Exposure)
+    
+    # Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement
+    Benchmark.GLM2("GLM4", test$fitGLM4)
+    
+
+'Poisson Deviance GLM4, Learn/Test: 29.25% / 29.23%'
+
+'GLM2-Improvement-Index (PD test) of GLM4: 117.5%'
+
+Obviously, this is a major improvement compared to the Basic-GLM "GLM1" and
+"GLM2". We will see in the next paragraph, if the interactions we found can
+compete with that result.
+
+### 5.4.2 "GLM5" Improved GLM with Interactions from XGBoost and LightGBMÂ¶
+
+The interactions in this model were found with XGBoost and LightGBM residual
+analyzes in 5.1 to 5.3 and are consistent with those developed based on the
+original (unadjusted) dataset, see version 2.
+
+InÂ [95]:
+
+    
+    
+    f.glm5 <- "ClaimNb ~ AreaGLM + VehPowerGLM * VehAgeGLM  + VehAgeGLM *VehBrand + VehGas * VehAgeGLM + DensityGLM + Region + BonusMalusGLM * log(DrivAge) +  VehAgeGLM *log(BonusMalusGLM) + I(BonusMalusGLM^2) + I(BonusMalusGLM^3) + I(BonusMalusGLM^4) + DrivAge * DensityGLM + I(DrivAge^2) + I(DrivAge^3) + I(DrivAge^4)"
+    d.glm5 <- glm(f.glm5, data=learn, offset=log(Exposure), family=poisson())
+    summary(d.glm5)
+    
+    
+    
+    Call:
+    glm(formula = f.glm5, family = poisson(), data = learn, offset = log(Exposure))
+    
+    Deviance Residuals: 
+        Min       1Q   Median       3Q      Max  
+    -1.4654  -0.3201  -0.2412  -0.1381   6.9668  
+    
+    Coefficients:
+                                    Estimate Std. Error z value Pr(>|z|)    
+    (Intercept)                   -5.783e+02  5.587e+01 -10.351  < 2e-16 ***
+    AreaGLM                        2.279e-02  2.131e-02   1.069 0.284917    
+    VehPowerGLM5                   5.356e-02  3.017e-02   1.775 0.075847 .  
+    VehPowerGLM6                   9.363e-02  2.968e-02   3.155 0.001605 ** 
+    VehPowerGLM7                   8.379e-02  2.986e-02   2.807 0.005008 ** 
+    VehPowerGLM8                   1.133e-01  4.287e-02   2.643 0.008229 ** 
+    VehPowerGLM9                   2.739e-01  3.320e-02   8.250  < 2e-16 ***
+    VehAgeGLM1                     2.592e+00  6.139e-01   4.223 2.41e-05 ***
+    VehAgeGLM3                    -1.416e+00  2.387e-01  -5.932 3.00e-09 ***
+    VehBrandB10                   -6.986e-02  5.753e-02  -1.214 0.224599    
+    VehBrandB11                    1.557e-01  5.866e-02   2.654 0.007950 ** 
+    VehBrandB12                   -2.477e-01  2.742e-02  -9.033  < 2e-16 ***
+    VehBrandB13                    4.263e-02  5.955e-02   0.716 0.474108    
+    VehBrandB14                   -2.283e-01  1.443e-01  -1.582 0.113657    
+    VehBrandB2                     1.236e-02  2.429e-02   0.509 0.610817    
+    VehBrandB3                     6.814e-02  3.230e-02   2.110 0.034873 *  
+    VehBrandB4                     5.175e-02  4.263e-02   1.214 0.224730    
+    VehBrandB5                     1.072e-01  3.783e-02   2.833 0.004614 ** 
+    VehBrandB6                     7.656e-02  4.059e-02   1.886 0.059272 .  
+    VehGasRegular                 -1.534e-01  1.795e-02  -8.545  < 2e-16 ***
+    DensityGLM                     4.683e-02  1.974e-02   2.372 0.017707 *  
+    RegionR11                      1.099e-02  3.085e-02   0.356 0.721745    
+    RegionR21                     -3.606e-03  1.273e-01  -0.028 0.977395    
+    RegionR22                      1.468e-01  6.535e-02   2.247 0.024650 *  
+    RegionR23                     -4.585e-02  7.781e-02  -0.589 0.555723    
+    RegionR25                     -1.848e-02  5.484e-02  -0.337 0.736175    
+    RegionR26                      5.713e-02  6.068e-02   0.941 0.346499    
+    RegionR31                      5.297e-02  4.002e-02   1.323 0.185713    
+    RegionR41                     -4.617e-02  5.325e-02  -0.867 0.385982    
+    RegionR42                      5.076e-02  1.160e-01   0.437 0.661822    
+    RegionR43                     -1.258e-01  1.897e-01  -0.663 0.507217    
+    RegionR52                      3.463e-02  3.183e-02   1.088 0.276485    
+    RegionR53                      2.207e-02  2.959e-02   0.746 0.455786    
+    RegionR54                      5.163e-02  4.209e-02   1.226 0.220013    
+    RegionR72                      3.111e-03  3.863e-02   0.081 0.935815    
+    RegionR73                     -2.452e-01  6.095e-02  -4.023 5.76e-05 ***
+    RegionR74                      2.799e-01  8.359e-02   3.349 0.000812 ***
+    RegionR82                      1.911e-01  2.373e-02   8.051 8.23e-16 ***
+    RegionR83                     -1.249e-01  9.990e-02  -1.250 0.211355    
+    RegionR91                     -4.823e-04  3.801e-02  -0.013 0.989875    
+    RegionR93                      1.284e-01  2.662e-02   4.824 1.41e-06 ***
+    RegionR94                      1.193e-01  9.943e-02   1.200 0.230127    
+    BonusMalusGLM                 -1.166e+01  1.134e+00 -10.289  < 2e-16 ***
+    log(DrivAge)                  -4.907e+01  4.258e+00 -11.523  < 2e-16 ***
+    log(BonusMalusGLM)             2.715e+02  2.362e+01  11.495  < 2e-16 ***
+    I(BonusMalusGLM^2)             9.099e-02  9.870e-03   9.220  < 2e-16 ***
+    I(BonusMalusGLM^3)            -4.024e-04  4.924e-05  -8.173 3.02e-16 ***
+    I(BonusMalusGLM^4)             7.231e-07  1.003e-07   7.207 5.72e-13 ***
+    DrivAge                        4.131e+00  4.019e-01  10.279  < 2e-16 ***
+    I(DrivAge^2)                  -5.881e-02  6.742e-03  -8.722  < 2e-16 ***
+    I(DrivAge^3)                   4.616e-04  6.372e-05   7.244 4.34e-13 ***
+    I(DrivAge^4)                  -1.440e-06  2.425e-07  -5.936 2.92e-09 ***
+    VehPowerGLM5:VehAgeGLM1        4.938e-02  1.167e-01   0.423 0.672144    
+    VehPowerGLM6:VehAgeGLM1       -1.272e-01  1.282e-01  -0.992 0.320975    
+    VehPowerGLM7:VehAgeGLM1       -4.675e-02  1.136e-01  -0.412 0.680584    
+    VehPowerGLM8:VehAgeGLM1        7.801e-02  1.317e-01   0.592 0.553639    
+    VehPowerGLM9:VehAgeGLM1        6.191e-02  1.158e-01   0.535 0.592845    
+    VehPowerGLM5:VehAgeGLM3        8.175e-03  5.523e-02   0.148 0.882331    
+    VehPowerGLM6:VehAgeGLM3       -1.693e-02  5.317e-02  -0.318 0.750178    
+    VehPowerGLM7:VehAgeGLM3        2.056e-03  5.164e-02   0.040 0.968238    
+    VehPowerGLM8:VehAgeGLM3       -7.053e-02  7.505e-02  -0.940 0.347342    
+    VehPowerGLM9:VehAgeGLM3       -1.363e-01  5.968e-02  -2.283 0.022412 *  
+    VehAgeGLM1:VehBrandB10        -4.036e-02  2.278e-01  -0.177 0.859392    
+    VehAgeGLM3:VehBrandB10         1.113e-01  9.549e-02   1.166 0.243727    
+    VehAgeGLM1:VehBrandB11        -3.262e-01  2.536e-01  -1.286 0.198373    
+    VehAgeGLM3:VehBrandB11         1.337e-01  9.884e-02   1.352 0.176315    
+    VehAgeGLM1:VehBrandB12        -1.660e-01  1.089e-01  -1.525 0.127268    
+    VehAgeGLM3:VehBrandB12         1.737e-01  9.282e-02   1.871 0.061291 .  
+    VehAgeGLM1:VehBrandB13         4.670e-01  2.566e-01   1.820 0.068728 .  
+    VehAgeGLM3:VehBrandB13        -1.820e-01  1.216e-01  -1.497 0.134453    
+    VehAgeGLM1:VehBrandB14         6.333e-01  4.444e-01   1.425 0.154102    
+    VehAgeGLM3:VehBrandB14        -2.178e-01  2.155e-01  -1.011 0.312145    
+    VehAgeGLM1:VehBrandB2         -1.133e-02  1.267e-01  -0.089 0.928749    
+    VehAgeGLM3:VehBrandB2         -5.138e-02  4.113e-02  -1.249 0.211520    
+    VehAgeGLM1:VehBrandB3         -7.756e-02  1.556e-01  -0.498 0.618132    
+    VehAgeGLM3:VehBrandB3         -9.286e-02  6.022e-02  -1.542 0.123047    
+    VehAgeGLM1:VehBrandB4          2.438e-01  1.970e-01   1.237 0.215996    
+    VehAgeGLM3:VehBrandB4         -1.610e-01  8.810e-02  -1.827 0.067633 .  
+    VehAgeGLM1:VehBrandB5         -5.698e-02  2.207e-01  -0.258 0.796269    
+    VehAgeGLM3:VehBrandB5         -1.042e-01  6.745e-02  -1.544 0.122527    
+    VehAgeGLM1:VehBrandB6         -7.599e-02  2.147e-01  -0.354 0.723395    
+    VehAgeGLM3:VehBrandB6         -1.344e-01  8.091e-02  -1.661 0.096810 .  
+    VehAgeGLM1:VehGasRegular      -1.905e-01  7.154e-02  -2.664 0.007733 ** 
+    VehAgeGLM3:VehGasRegular      -1.982e-02  3.376e-02  -0.587 0.557071    
+    BonusMalusGLM:log(DrivAge)    -8.901e-03  1.481e-03  -6.009 1.87e-09 ***
+    VehAgeGLM1:log(BonusMalusGLM) -5.987e-01  1.468e-01  -4.078 4.54e-05 ***
+    VehAgeGLM3:log(BonusMalusGLM)  3.104e-01  5.590e-02   5.552 2.82e-08 ***
+    DensityGLM:DrivAge             1.653e-04  2.562e-04   0.645 0.518868    
+    ---
+    Signif. codes:  0 â***â 0.001 â**â 0.01 â*â 0.05 â.â 0.1 â â 1
+    
+    (Dispersion parameter for poisson family taken to be 1)
+    
+        Null deviance: 137452  on 542961  degrees of freedom
+    Residual deviance: 130421  on 542874  degrees of freedom
+    AIC: 171209
+    
+    Number of Fisher Scoring iterations: 7
+    
+
+InÂ [96]:
+
+    
+    
+    learn$fitGLM5 <- fitted(d.glm5)
+    test$fitGLM5 <- predict(d.glm5, newdata=test, type="response")
+    
+    # Print Poisson Deviance
+    PDW2('Poisson Deviance GLM5', learn$fitGLM5,learn$ClaimNb,learn$Exposure, test$fitGLM5,test$ClaimNb,test$Exposure)
+    
+    # Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement
+    Benchmark.GLM2("GLM5", test$fitGLM5)
+    
+
+'Poisson Deviance GLM5, Learn/Test: 29.24% / 29.23%'
+
+'GLM2-Improvement-Index (PD test) of GLM5: 117.7%'
+
+This GLM5 is marginally better than the GLM4. We now have two GLMs (basically
+the same as in version 2) with a PD improvement index around 118%. This is a
+significant improvement compared to the simple GLMs we have seen before.
+
+However, it still lags far behind the gradient tree boosting models in Chapter
+3. A look back at section 2.4 shows that the Generalized Additive Model GAM3
+without interactions also performs comparably well, even slightly better:
+
+InÂ [97]:
+
+    
+    
+    # For comparison: Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement
+    Benchmark.GLM2("GAM3", test$fitGAM3)
+    
+
+'GLM2-Improvement-Index (PD test) of GAM3: 120.0%'
+
+### 5.4.3 "GAM6" Improved GAM with an InteractionÂ¶
+
+In extending GAM3, we only consider the apparent interaction between
+BonusMalus and driver age, which can be seen in the graphs in Section 2.4 and
+in the interaction analysis for GLMs above.
+
+InÂ [98]:
+
+    
+    
+    f.gam6 <- ClaimNb ~ s(VehAge) + s(DrivAge) + s(BonusMalusGLM,by=DrivAgeGLM) + VehPowerGLM + VehGas + VehBrand + AreaGLM + DensityGLM + Region + offset(log(Exposure))
+    
+    {t1 <- proc.time()
+        d.gam6 <- bam(f.gam6, data=learn, scale=-1, family=poisson)
+    (proc.time()-t1)}
+    
+    summary(d.gam6)
+    
+    
+    
+       user  system elapsed 
+    240.646 136.177 112.505 
+    
+    
+    Family: poisson 
+    Link function: log 
+    
+    Formula:
+    ClaimNb ~ s(VehAge) + s(DrivAge) + s(BonusMalusGLM, by = DrivAgeGLM) + 
+        VehPowerGLM + VehGas + VehBrand + AreaGLM + DensityGLM + 
+        Region + offset(log(Exposure))
+    
+    Parametric coefficients:
+                    Estimate Std. Error t value Pr(>|t|)    
+    (Intercept)   -3.0593570  0.0541636 -56.484  < 2e-16 ***
+    VehPowerGLM5   0.0590283  0.0321402   1.837  0.06627 .  
+    VehPowerGLM6   0.0874747  0.0316043   2.768  0.00564 ** 
+    VehPowerGLM7   0.0917411  0.0312260   2.938  0.00330 ** 
+    VehPowerGLM8   0.1211168  0.0442987   2.734  0.00626 ** 
+    VehPowerGLM9   0.2597773  0.0350528   7.411 1.26e-13 ***
+    VehGasRegular -0.1569455  0.0196717  -7.978 1.49e-15 ***
+    VehBrandB10   -0.0345462  0.0589151  -0.586  0.55763    
+    VehBrandB11    0.1781177  0.0609407   2.923  0.00347 ** 
+    VehBrandB12   -0.2819149  0.0334868  -8.419  < 2e-16 ***
+    VehBrandB13   -0.0020923  0.0666172  -0.031  0.97494    
+    VehBrandB14   -0.3024244  0.1363983  -2.217  0.02661 *  
+    VehBrandB2    -0.0115249  0.0252935  -0.456  0.64865    
+    VehBrandB3     0.0323325  0.0352006   0.919  0.35835    
+    VehBrandB4     0.0156990  0.0479088   0.328  0.74315    
+    VehBrandB5     0.0706662  0.0407295   1.735  0.08274 .  
+    VehBrandB6     0.0258836  0.0453743   0.570  0.56837    
+    AreaGLM        0.0220500  0.0280235   0.787  0.43138    
+    DensityGLM     0.0541854  0.0208260   2.602  0.00927 ** 
+    RegionR11     -0.0005031  0.0405239  -0.012  0.99010    
+    RegionR21     -0.0024848  0.1672359  -0.015  0.98815    
+    RegionR22      0.1370128  0.0858716   1.596  0.11059    
+    RegionR23     -0.0475436  0.1022506  -0.465  0.64195    
+    RegionR25     -0.0285689  0.0720567  -0.396  0.69175    
+    RegionR26      0.0418584  0.0797913   0.525  0.59986    
+    RegionR31      0.0323584  0.0526007   0.615  0.53844    
+    RegionR41     -0.0609338  0.0699496  -0.871  0.38369    
+    RegionR42      0.0322380  0.1525622   0.211  0.83265    
+    RegionR43     -0.1538685  0.2492674  -0.617  0.53705    
+    RegionR52      0.0265846  0.0418308   0.636  0.52508    
+    RegionR53      0.0110296  0.0388844   0.284  0.77668    
+    RegionR54      0.0592342  0.0553241   1.071  0.28432    
+    RegionR72      0.0017063  0.0507773   0.034  0.97319    
+    RegionR73     -0.2505479  0.0800827  -3.129  0.00176 ** 
+    RegionR74      0.2567920  0.1098355   2.338  0.01939 *  
+    RegionR82      0.1827939  0.0312201   5.855 4.77e-09 ***
+    RegionR83     -0.1299408  0.1312830  -0.990  0.32228    
+    RegionR91     -0.0042767  0.0499361  -0.086  0.93175    
+    RegionR93      0.1231348  0.0349693   3.521  0.00043 ***
+    RegionR94      0.1007151  0.1306212   0.771  0.44068    
+    ---
+    Signif. codes:  0 â***â 0.001 â**â 0.01 â*â 0.05 â.â 0.1 â â 1
+    
+    Approximate significance of smooth terms:
+                                   edf Ref.df      F p-value    
+    s(VehAge)                    3.845  4.723  28.28  <2e-16 ***
+    s(DrivAge)                   7.476  8.397  30.73  <2e-16 ***
+    s(BonusMalusGLM):DrivAgeGLM5 6.790  7.762  77.29  <2e-16 ***
+    s(BonusMalusGLM):DrivAgeGLM1 4.687  5.513  26.75  <2e-16 ***
+    s(BonusMalusGLM):DrivAgeGLM2 5.038  6.016  64.39  <2e-16 ***
+    s(BonusMalusGLM):DrivAgeGLM3 1.014  1.027 338.27  <2e-16 ***
+    s(BonusMalusGLM):DrivAgeGLM4 6.791  7.786  89.99  <2e-16 ***
+    s(BonusMalusGLM):DrivAgeGLM6 6.727  7.745 116.27  <2e-16 ***
+    s(BonusMalusGLM):DrivAgeGLM7 5.731  6.775  46.27  <2e-16 ***
+    ---
+    Signif. codes:  0 â***â 0.001 â**â 0.01 â*â 0.05 â.â 0.1 â â 1
+    
+    R-sq.(adj) =  0.0291   Deviance explained = 7.66%
+    fREML = 9.1888e+05  Scale est. = 1.7268    n = 542962
+
+InÂ [99]:
+
+    
+    
+    # Visualization of the fitted spline functions
+    plot(d.gam6, col = 'blue', shade=TRUE, ylim = c(-1.0,2.5), pages=5)
+    
+
+![No description has been provided for this
+image](__results___files/__results___169_0.png)
+
+![No description has been provided for this
+image](__results___files/__results___169_1.png)
+
+![No description has been provided for this
+image](__results___files/__results___169_2.png)
+
+![No description has been provided for this
+image](__results___files/__results___169_3.png)
+
+![No description has been provided for this
+image](__results___files/__results___169_4.png)
+
+As we can see, the adjusted BonusMalus function does not increase
+monotonically.
+
+InÂ [100]:
+
+    
+    
+    # Model performance: Improved GAM with an Interaction
+    
+    learn$fitGAM6 <- fitted(d.gam6)
+    test$fitGAM6 <- predict(d.gam6, newdata=test, type="response")
+    
+    # Print Poisson Deviance
+    PDW2('Poisson Deviance GAM6', learn$fitGAM6,learn$ClaimNb,learn$Exposure, test$fitGAM6,test$ClaimNb,test$Exposure)
+    
+    # Improvement in Poisson Deviance on test set compared to GLM2-INT-Improvement
+    Benchmark.GLM2("GAM6", test$fitGAM6)
+    
+
+'Poisson Deviance GAM6, Learn/Test: 29.12% / 29.13%'
+
+'GLM2-Improvement-Index (PD test) of GAM6: 124.3%'
+
+The GAM, extended by a single interaction, is performing best in this
+comparison while being fast enough and again shows the potential of other
+methods related to the GLM. It is a similar but regularized approach to
+modeling curves as with the polynomials for driver age and BonusMalus in GLM4
+and GLM5. If required for the application, the spline functions could be
+replaced by a series of class values or an approximate polynomial.
+
+# 6\. Cross Validation and Boxplots: ResultsÂ¶
+
+So far we have trained the models once at 80% of all policies and tested it on
+a hold-out data set consisting of 20% of all policies. The results could be a
+bit arbitrary. We don't know if our models generalize well with respect to
+other test data.
+
+In Chapter 1.6 we have already divided the data into five parts, which are
+called folds. Up to now we used fold no. 5 for testing. Now we repeat this for
+all five folds. This is called cross validation and considered the best way to
+avoid over-fitting.
+
+In the following, we restrict ourselves to the optimized classical models from
+Chapter 5 and the gradient boosting models from Chapter 3. The latter
+performed best, even when strong monotonicity constraints for plausible tariff
+structures are taken into account. This was not the case with the neural
+networks, which are also significantly more complex to implement.
+
+InÂ [101]:
+
+    
+    
+    # k folds as defined in Ch. 1.6
+    {t1 <- proc.time()
+    
+    PD.test.INT  <- vector() # initialize PD-test-folds-vector
+    PD.test.GLM2 <- vector() # 
+    PD.test.GLM4 <- vector() 
+    PD.test.GLM5 <- vector() 
+    PD.test.GAM6 <- vector()  
+    PD.test.ML_CB0  <- vector() 
+    PD.test.ML_CB1 <- vector() 
+    PD.test.ML_LGB0 <- vector() 
+    PD.test.ML_LGB1 <- vector() 
+    PD.test.ML_XGB0 <- vector() 
+    PD.test.ML_XGB1 <- vector() 
+    
+    for (i in 1:k) {
+        learn <- dat1[dat1$fold != i,]
+        test  <- dat1[dat1$fold == i,]
+        (n_l <- nrow(learn))
+        (n_t <- nrow(test))
+        df_feat <- dat[,c(features)]
+        df_feat$Area <- as.integer(df_feat$Area)
+        df_feat <- as.data.frame(model.matrix( ~ 0 +. ,data = df_feat)) 
+        X_learn <- df_feat[dat1$fold != i,]    # 80%
+        X_test  <- df_feat[dat1$fold == i,]    # 20%
+    
+        ### Model INT (intercept-only).  No model, just average claim frequency
+        (cf <- sum(learn$ClaimNb)/sum(learn$Exposure))
+        test$fit.cf <- cf*test$Exposure
+        # out-of-sample losses (in 10^(-2))
+        PD.test.INT[i] <- PDW(test$fit.cf, test$ClaimNb, test$Exposure)
+        
+        ### Model GLM2: Basic GLM without interactions
+        GLM2 <- glm(f.glm2, data=learn, offset=log(Exposure), family=poisson())
+        test$fitGLM2 <- predict(GLM2, newdata=test, type="response")
+        PD.test.GLM2[i] <- PDW(test$fitGLM2, test$ClaimNb, test$Exposure)
+    
+        ### Model GLM4: Featuring neural net residual analyses
+        GLM4 <- glm(f.glm4, data=learn, offset=log(Exposure), family=poisson())
+        test$fitGLM4 <- predict(GLM4, newdata=test, type="response")
+        PD.test.GLM4[i] <- PDW(test$fitGLM4, test$ClaimNb, test$Exposure)
+        
+        ### Model GLM5: Improved GLM with Interactions from XGBoost
+        GLM5 <- glm(f.glm5, data=learn, offset=log(Exposure), family=poisson())
+        test$fitGLM5 <- predict(GLM5, newdata=test, type="response")
+        PD.test.GLM5[i] <- PDW(test$fitGLM5, test$ClaimNb, test$Exposure)
+        
+        ### Model GAM6: Generalized Additive Model (3 splines and a single interaction)
+        GAM6 <- bam(f.gam6, data=learn, scale=-1, family=poisson)
+        test$fitGAM6 <- predict(GAM6, newdata=test, type="response")
+        PD.test.GAM6[i] <- PDW(test$fitGAM6, test$ClaimNb, test$Exposure)
+       
+        ### CatBoost-Models:
+        learn_pool <- catboost.load_pool(data = learn[features], label = learn$ClaimNb, 
+                         cat_features = cat_features, baseline = as.matrix(learn$Exposure))
+        test_pool <- catboost.load_pool(data = test[features], label = test$ClaimNb, 
+                         cat_features = cat_features, baseline = as.matrix(test$Exposure))
+        # CB0: Unconstraint 
+        CB0_params <- list(logging_level='Silent', loss_function='Poisson', random_seed=42,
+                          iterations = 500, learning_rate = 0.15, depth = 3)
+        CB0 <- catboost.train(learn_pool, params = CB0_params) 
+        test$fitCB0 <- exp(catboost.predict(CB0,test_pool))
+        PD.test.ML_CB0[i] <- PDW(test$fitCB0, test$ClaimNb, test$Exposure)
+        # CB1: Constraint 
+        CB1_params <- list(logging_level='Silent', loss_function='Poisson', 
+                          monotone_constraints = mtcc, random_seed=42,
+                          iterations = 500, learning_rate = 0.15, depth = 3)
+        CB1 <- catboost.train(learn_pool, params = CB1_params) 
+        test$fitCB1 <- exp(catboost.predict(CB1,test_pool))
+        PD.test.ML_CB1[i] <- PDW(test$fitCB1, test$ClaimNb, test$Exposure)
+    
+        ### LightGBM-Models:
+        llearn <- lgb.Dataset(data = data.matrix(X_learn), 
+                              label = learn$ClaimNb/learn$Exposure, weight=learn$Exposure)
+        # LGB0: Unconstraint 
+        LGB0 <- lgb.train(data=llearn, objective='poisson',
+                          num_leaves=31, learning_rate=0.1, n_estimators=100)
+        test$fitLGB0 <- predict(LGB0, data.matrix(X_test)) * test$Exposure
+        PD.test.ML_LGB0[i] <- PDW(test$fitLGB0, test$ClaimNb, test$Exposure)
+        # LGB1: Constraint 
+        LGB1 <- lgb.train(data=llearn, objective='poisson', monotone_constraints = mtc,
+                          num_leaves=31, learning_rate=0.1, n_estimators=100)
+        test$fitLGB1 <- predict(LGB1, data.matrix(X_test)) * test$Exposure
+        PD.test.ML_LGB1[i] <- PDW(test$fitLGB1, test$ClaimNb, test$Exposure)
+    
+        ### XGBoost-Models:  
+        dlearn <- xgb.DMatrix(data = data.matrix(X_learn),
+                              label = learn$ClaimNb/learn$Exposure, weight=learn$Exposure)
+        dtest <- xgb.DMatrix(data = data.matrix(X_test), 
+                             label = test$fold, weight=test$Exposure)
+        # XGB0: Unconstraint 
+        XGB0 <- xgb.train(data=dlearn, objective='count:poisson', 
+                          nrounds = 500, max_depth = 5, eta = 0.05, tree_method = "hist")
+        test$fitXGB0 <- predict(XGB0, newdata = dtest) * test$Exposure
+        PD.test.ML_XGB0[i] <- PDW(test$fitXGB0, test$ClaimNb, test$Exposure)  
+        # XGB1: Constraint
+        XGB1 <- xgb.train(data=dlearn, objective='count:poisson', monotone_constraints = mtc, 
+                          nrounds = 500, max_depth = 5, eta = 0.05, tree_method = "hist")
+        test$fitXGB1 <- predict(XGB1, newdata = dtest) * test$Exposure
+        PD.test.ML_XGB1[i] <- PDW(test$fitXGB1, test$ClaimNb, test$Exposure)
+    }
+    k
+    (proc.time()-t1)}
+    
+    
+    
+    Model shrinkage in combination with baseline column is not implemented yet. Reset model_shrink_rate to 0.
+    Model shrinkage in combination with baseline column is not implemented yet. Reset model_shrink_rate to 0.
+    Model shrinkage in combination with baseline column is not implemented yet. Reset model_shrink_rate to 0.
+    Model shrinkage in combination with baseline column is not implemented yet. Reset model_shrink_rate to 0.
+    Model shrinkage in combination with baseline column is not implemented yet. Reset model_shrink_rate to 0.
+    
+    
+    
+        user   system  elapsed 
+    8582.540 1200.821 2790.050 
+
+## 6.1 Repeat modeling k-timesÂ¶
+
+InÂ [102]:
+
+    
+    
+    # write vectors in a Data Frame
+    df <- data.frame(1:5,PD.test.INT,PD.test.GLM2,PD.test.GLM4,PD.test.GLM5,PD.test.GAM6,
+                     PD.test.ML_CB0,PD.test.ML_CB1,PD.test.ML_LGB0,PD.test.ML_LGB1,
+                     PD.test.ML_XGB0,PD.test.ML_XGB1)
+    names(df) <- c("fold","INT","GLM2","GLM4","GLM5","GAM6","CatBoost","CatBoost_mc",
+                   "LightGBM","LightGBM_mc","XGBoost","XGBoost_mc")
+    # calculate GLM2-Improvement-Index
+    df.idx <- df
+    df.idx$GLM4 <- round(((df$GLM4 - df$INT) / (df$GLM2 - df$INT)) * 100,2)
+    df.idx$GLM5 <- round(((df$GLM5 - df$INT) / (df$GLM2 - df$INT)) * 100,2)
+    df.idx$GAM6 <- round(((df$GAM6 - df$INT) / (df$GLM2 - df$INT)) * 100,2)
+    df.idx$CatBoost <- round(((df$CatBoost - df$INT) / (df$GLM2 - df$INT)) * 100,2)
+    df.idx$CatBoost_mc <- round(((df$CatBoost_mc - df$INT) / (df$GLM2 - df$INT)) * 100,2)
+    df.idx$LightGBM <- round(((df$LightGBM - df$INT) / (df$GLM2 - df$INT)) * 100,2)
+    df.idx$LightGBM_mc <- round(((df$LightGBM_mc - df$INT) / (df$GLM2 - df$INT)) * 100,2)
+    df.idx$XGBoost <- round(((df$XGBoost - df$INT) / (df$GLM2 - df$INT)) * 100,2)
+    df.idx$XGBoost_mc  <- round(((df$XGBoost_mc - df$INT) / (df$GLM2 - df$INT)) * 100,2)
+    df.idx
+    
+
+A data.frame: 5 Ã 12 fold| INT| GLM2| GLM4| GLM5| GAM6| CatBoost|
+CatBoost_mc| LightGBM| LightGBM_mc| XGBoost| XGBoost_mc  
+---|---|---|---|---|---|---|---|---|---|---|---  
+<int>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>| <dbl>|
+<dbl>  
+1| 31.12465| 29.44236| 113.76| 114.71| 121.24| 145.29| 128.06| 147.98| 132.63|
+147.13| 131.95  
+2| 31.26807| 29.63421| 115.26| 116.16| 123.91| 149.35| 124.18| 153.55| 132.67|
+154.52| 133.29  
+3| 31.44854| 29.83801| 119.75| 120.46| 128.31| 156.94| 130.66| 158.93| 137.83|
+154.95| 136.37  
+4| 30.90379| 29.29171| 116.51| 117.12| 122.62| 152.34| 130.86| 151.45| 134.86|
+149.42| 134.96  
+5| 31.09465| 29.51152| 117.54| 117.74| 124.28| 149.12| 129.79| 151.20| 134.55|
+149.00| 133.85  
+  
+## 6.2 Plot Poisson Deviance for each foldÂ¶
+
+InÂ [103]:
+
+    
+    
+    ggplot(df, aes(fold)) + 
+      geom_point(aes(y = INT,  colour = "INT"),  size=6) + 
+      geom_point(aes(y = GLM2, colour = "GLM2"), size=6) + 
+      geom_point(aes(y = GLM4, colour = "GLM4"), size=6) + 
+      geom_point(aes(y = GLM5, colour = "GLM5"), size=6) + 
+      geom_point(aes(y = GAM6, colour = "GAM6"), size=6) + 
+      geom_point(aes(y = CatBoost,    colour = "CatBoost"),    size=6) + 
+      geom_point(aes(y = CatBoost_mc, colour = "CatBoost_mc"), size=6) + 
+      geom_point(aes(y = LightGBM,    colour = "LightGBM"),    size=6) + 
+      geom_point(aes(y = LightGBM_mc, colour = "LightGBM_mc"), size=6) + 
+      geom_point(aes(y = XGBoost,     colour = "XGBoost"),     size=6) + 
+      geom_point(aes(y = XGBoost_mc,  colour = "XGBoost_mc"),  size=6) + 
+      ylab("Poisson Deviance") + theme(text = element_text(size=15))
+    
+
+![No description has been provided for this
+image](__results___files/__results___179_0.png)
+
+## 6.3 Plot GLM2-Improvement-Index: Final ResultsÂ¶
+
+Since a substantial part of the uncertainty is caused by differences between
+folds we calculate the relative improvement with respect to the models INT
+("no model") and our benchmark-model GLM2:
+
+InÂ [104]:
+
+    
+    
+    df.idx  %>% select(fold, GLM4, GLM5, GAM6, CatBoost, CatBoost_mc,
+                          LightGBM, LightGBM_mc, XGBoost, XGBoost_mc) %>% 
+      gather(model, PD, GLM4, GLM5, GAM6, CatBoost, CatBoost_mc,
+                     LightGBM, LightGBM_mc, XGBoost, XGBoost_mc) %>% 
+      ggplot(aes(x = fct_reorder(model, PD, mean), y=PD)) +
+        geom_boxplot(outlier.shape = NA) + 
+        geom_jitter(width = 0) +
+        stat_summary(fun = mean, colour="darkred", geom="point",shape=18, size=7) +
+        coord_flip() +
+        xlab("Model") + 
+        ylab("GLM2-Improvement-Index") + 
+        theme(text = element_text(size=20))
+    
+
+![No description has been provided for this
+image](__results___files/__results___181_0.png)
+
+The boxplots confirm and complement the results already seen above in Chapters
+3 and 5. The three gradient boosting models LightGBM, XGBoost and Catboost
+achieve by far the best model quality, with LightGBM having a small lead. The
+monotonicity constraint (_mc) regarding the most important feature BonusMalus
+reduces the model quality considerably, especially for CatBoost_mc. Among the
+generalized linear or additive models, GAM6 performs best by some margin,
+while GLM4 and GLM5 can only achieve a relatively modest improvement of about
+15% over the basic GLM2, although they are not monotonicity constrained and
+therefore fall far behind in direct comparison with the unconstrained gradient
+boosting models (that lead to an improvement of a good 50%).
+
+A direct comparison with the results from version 2 of this notebook shows a
+decline in model performance. This is caused by the cleansing of inconsistent
+claims data in this new version. The strong pattern that is easily
+recognizable to the models is now missing; the data picture has become more
+blurrier, so to speak.
+
+# 7\. SummaryÂ¶
+
+In summary, it can be stated that in the data set examined here, the gradient
+boosting models prove to be the superior forecasting models, even taking into
+account the tariff system. XGBoost continues to do very well, but has to pass
+the crown to the even better and, above all, much faster LightGBM. To ensure
+interpretability, SHAP, which builds on game theory, was used to demonstrate
+how the decisions of LightGBM can be explained globally and locally.
+
+While industry standard GLMs did perform worst (as well as regularized GLMs),
+generalized additive models, which can be viewed as smooth extensions of GLMs,
+worked remarkably well and should be considered for similar data with
+interesting nonlinear metric features.
+
+Neural networks with two-dimensional embeddings, which can be visualized
+nicely, have been shown to provide similar model performance to GAMs, but are
+much more complicated to implement.
+
+On our journey through the world of machine learning methods, we curiously
+started with deep learning and ended with powerful gradient boosting.
+
+  
+
+### ReferencesÂ¶
+
+Faraway, J. J. (2016), "Extending the Linear Model with R"
+(<https://julianfaraway.github.io/faraway/ELM/>)
+
+Hastie, T., Tibshirani, R. (1984), "Generalized Additive Models", SLAC
+PUB-3531: <https://www.slac.stanford.edu/pubs/slacpubs/3500/slac-pub-3531.pdf>
+
+James et al., "An Introduction to Statistical Learning", 2ed, 2021-2023.
+Available in two versions with R or Python examples, see
+<https://www.statlearning.com/>
+
+Mayer, M., Meier, D., WÃ¼thrich, M. V. (2023), "SHAP for Actuaries: Explain
+any Model": <https://github.com/actuarial-data-
+science/Tutorials/tree/master/14%20-%20SHAP>
+
+Schelldorfer, J., WÃ¼thrich, M. V. (2019) "Nesting Classical Actuarial Models
+into Neural Networks", SSRN-Preprint 3320525
+(<https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3320525>).
+
+WÃ¼thrich, M. V., Merz, M. (2023) "Statistical Foundations of Actuarial
+Learning and its Applications" (open-access book:
+<https://link.springer.com/book/10.1007/978-3-031-12409-9>)
+
+  
+  
+
+InÂ [105]:
+
+    
+    
+    sessionInfo()
+    
+    
+    
+    R version 4.0.5 (2021-03-31)
+    Platform: x86_64-pc-linux-gnu (64-bit)
+    Running under: Ubuntu 20.04.6 LTS
+    
+    Matrix products: default
+    BLAS:   /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3
+    LAPACK: /usr/lib/x86_64-linux-gnu/openblas-pthread/liblapack.so.3
+    
+    locale:
+     [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
+     [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
+     [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8   
+     [7] LC_PAPER=en_US.UTF-8       LC_NAME=C                 
+     [9] LC_ADDRESS=C               LC_TELEPHONE=C            
+    [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
+    
+    attached base packages:
+    [1] stats     graphics  grDevices utils     datasets  methods   base     
+    
+    other attached packages:
+     [1] flashlight_0.9.0 EIX_1.2.0        keras_2.13.0     kernelshap_0.4.1
+     [5] shapviz_0.9.3    lightgbm_2.3.1   R6_2.5.1         catboost_0.23.2 
+     [9] xgboost_1.7.6.1  ggeffects_1.3.2  mgcv_1.9-0       nlme_3.1-164    
+    [13] glmnet_4.1-8     Matrix_1.6-4     lubridate_1.9.3  forcats_1.0.0   
+    [17] stringr_1.5.1    dplyr_1.1.4      purrr_1.0.2      readr_2.1.4     
+    [21] tidyr_1.3.0      tibble_3.2.1     ggplot2_3.4.4    tidyverse_2.0.0 
+    [25] rpart.plot_3.1.1 repr_1.1.6.9000  rpart_4.1.23     bigrquery_1.4.2 
+    [29] httr_1.4.7      
+    
+    loaded via a namespace (and not attached):
+     [1] fs_1.6.3              MetricsWeighted_1.0.3 bit64_4.0.5          
+     [4] RColorBrewer_1.1-3    insight_0.19.7        tools_4.0.5          
+     [7] utf8_1.2.4            sjlabelled_1.2.0      DBI_1.1.3            
+    [10] colorspace_2.1-0      withr_2.5.2           tidyselect_1.2.0     
+    [13] bit_4.0.5             compiler_4.0.5        cli_3.6.1            
+    [16] Cairo_1.6-2           labeling_0.4.3        scales_1.3.0         
+    [19] shades_1.4.0          tfruns_1.5.1          systemfonts_1.0.5    
+    [22] pbdZMQ_0.3-10         digest_0.6.33         iBreakDown_2.1.2     
+    [25] base64enc_0.1-3       pkgconfig_2.0.3       htmltools_0.5.7      
+    [28] DALEX_2.4.3           dbplyr_2.4.0          fastmap_1.1.1        
+    [31] htmlwidgets_1.6.4     rlang_1.1.2           shape_1.4.6          
+    [34] farver_2.1.1          generics_0.1.3        jsonlite_1.8.8       
+    [37] tensorflow_2.14.0     magrittr_2.0.3        patchwork_1.1.3.9000 
+    [40] Rcpp_1.0.11           IRkernel_1.3.2.9000   munsell_0.5.0        
+    [43] fansi_1.0.5           ggfittext_0.10.1      reticulate_1.34.0    
+    [46] lifecycle_1.0.4       stringi_1.8.2         whisker_0.4          
+    [49] snakecase_0.11.1      MASS_7.3-60           plyr_1.8.9           
+    [52] grid_4.0.5            ggrepel_0.9.4         sjmisc_2.8.9         
+    [55] ppcor_1.1             crayon_1.5.2          lattice_0.22-5       
+    [58] IRdisplay_1.1.0.9000  haven_2.5.4           splines_4.0.5        
+    [61] hms_1.1.3             ggiraphExtra_0.3.0    zeallot_0.1.0        
+    [64] pillar_1.9.0          uuid_1.1-1            reshape2_1.4.4       
+    [67] codetools_0.2-18      glue_1.6.2            ggiraph_0.8.7        
+    [70] evaluate_0.23         mycor_0.1.1           data.table_1.14.8    
+    [73] vctrs_0.6.5           png_0.1-8             tzdb_0.4.0           
+    [76] foreach_1.5.2         gggenes_0.5.1         gtable_0.3.4         
+    [79] assertthat_0.2.1      datawizard_0.9.0      survival_3.5-7       
+    [82] viridisLite_0.4.2     gargle_1.5.2          iterators_1.0.14     
+    [85] timechange_0.2.0     
+

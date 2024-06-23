@@ -1,0 +1,965 @@
+#  Personal Medical Cost: Find predictive variables
+
+![](http://4.bp.blogspot.com/-Vg9WZCxRLcM/VWy0ZpYkXgI/AAAAAAAAAlo/meSgW-
+ptrYU/s1600/Blog%2BMedicine.jpg)
+
+This is my firt Kernel in Data Analytic couse, any recommendations or
+suggestions are welcome to improve the Notebook. Thank you for your visit and
+upvote (if it's useful).
+
+# I. Data infomation:¶
+
+Data are taken from: <https://www.kaggle.com/teertha/ushealthinsurancedataset>
+
+  * "age": age of primary beneficiary
+  * "sex": insurance contractor gender (female, male)
+  * "bmi": Body Mass Index, providing an understanding of body, weights that are relatively high or low relative to height.
+  * "children": Number of children covered by health insurance / Number of dependents
+  * "smoker": Smoking (yes, no)
+  * "region": the beneficiary's residential area in the US, northeast, southeast, southwest, northwest.
+  * "charges": Individual medical costs billed by health insurance
+
+# II. Project sumary:¶
+
+The main target of this project is to show ways to go deep into the data
+story-telling.
+
+In this project, we will try to understand what factors influenced the charge
+of patients. A summary story behind the patients in this dataset to show what
+factors that feature the true patient charge will be discussed.
+
+# III. Table of Contents:¶
+
+  1. Data preparation.
+
+a) Data importing & data description
+
+b) Data cleaning, analysis and hypothesis
+
+c) Parameters considered in this work
+
+d) Libraries importing
+
+e) Functions for general use
+
+  1. Distribution and correlation analysis of variables
+
+a) Parameters correlation (pair)
+
+b) Distribution of âchargesâ
+
+c) Distribution of âbmiâ
+
+d) Distribution of âageâ
+
+  1. Key parameters
+
+a) BMI and Weight category
+
+b) Age and Age category
+
+c) Charges vs other parameters
+
+d) BMI vs other parameters
+
+e) Special case study
+
+  1. Statistics
+
+a) Sex vs smoker
+
+b) Children vs number of patients
+
+c) Region vs number of patients
+
+d) Do charges of people who smoke differ significantly from the people who
+don't?
+
+e) Does charges of Obese differ significantly from that of under_weights?
+
+f) Does charges of males differ significantly from that of females?
+
+g) Does charges of Aldults differ significantly from that of Elders?
+
+h) Does BMI of males differ significantly from that of females?
+
+i) Does BMI of Youngs differ significantly from that of Elders?
+
+j) Does charges of northeast differ significantly from that of southeast?
+
+k) Does BMI of northeast differ significantly from that of southwest?
+
+l) Does charges of patient without children differ significantly from that of
+having 2 children?
+
+  1. Key factors correlation.
+
+a) Correlation of charges in function of age and smoker & sex
+
+b) Correlation of charges in function of age and smoker & weight
+
+c) Correlation of charges in function of bmi and smoker & sex
+
+d) Correlation of charges in function of bmi and children number
+
+  1. Conclusions and recommendations
+
+In [1]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/insurance/insurance.csv
+    
+
+# **1\. Data preparation**¶
+
+**a) Data importing & data description**
+
+In [2]:
+
+    
+    
+    df = pd.read_csv('../input/insurance/insurance.csv')
+    df.head(2)
+    
+
+Out[2]:
+
+| age | sex | bmi | children | smoker | region | charges  
+---|---|---|---|---|---|---|---  
+0 | 19 | female | 27.90 | 0 | yes | southwest | 16884.9240  
+1 | 18 | male | 33.77 | 1 | no | southeast | 1725.5523  
+  
+In [3]:
+
+    
+    
+    df.info()
+    
+    
+    
+    <class 'pandas.core.frame.DataFrame'>
+    RangeIndex: 1338 entries, 0 to 1337
+    Data columns (total 7 columns):
+     #   Column    Non-Null Count  Dtype  
+    ---  ------    --------------  -----  
+     0   age       1338 non-null   int64  
+     1   sex       1338 non-null   object 
+     2   bmi       1338 non-null   float64
+     3   children  1338 non-null   int64  
+     4   smoker    1338 non-null   object 
+     5   region    1338 non-null   object 
+     6   charges   1338 non-null   float64
+    dtypes: float64(2), int64(2), object(3)
+    memory usage: 73.3+ KB
+    
+
+We observe that:
+
+  * "age", "bmi", "charges" are numerical attributes. 
+  * "sex", "smoker", "region" are categorical attributes.
+
+**b) Data cleaning, analysis and hypothesis**
+
+In [4]:
+
+    
+    
+    df.isnull().sum()
+    
+
+Out[4]:
+
+    
+    
+    age         0
+    sex         0
+    bmi         0
+    children    0
+    smoker      0
+    region      0
+    charges     0
+    dtype: int64
+
+  * The dataset does not have "NaN value", no missing data.
+
+In [5]:
+
+    
+    
+    df.describe()
+    
+
+Out[5]:
+
+| age | bmi | children | charges  
+---|---|---|---|---  
+count | 1338.000000 | 1338.000000 | 1338.000000 | 1338.000000  
+mean | 39.207025 | 30.663397 | 1.094918 | 13270.422265  
+std | 14.049960 | 6.098187 | 1.205493 | 12110.011237  
+min | 18.000000 | 15.960000 | 0.000000 | 1121.873900  
+25% | 27.000000 | 26.296250 | 0.000000 | 4740.287150  
+50% | 39.000000 | 30.400000 | 1.000000 | 9382.033000  
+75% | 51.000000 | 34.693750 | 2.000000 | 16639.912515  
+max | 64.000000 | 53.130000 | 5.000000 | 63770.428010  
+  
+**c) Parameters considered in this work:**
+
+Base on the data infomation obtained in this work. We will study following
+parameters to understand what are the key parameters influenced to the
+patients charge:
+
+(i) age
+
+(ii) bmi
+
+(iii) smoking
+
+(iv) sex
+
+(v) children
+
+(vi) region.
+
+From these parameters, we could observe that, "age" and "bmi" data are
+distributed in a range of number. We could category these 2 parameters with
+some hypotheses. This will be further discussed in the next section.
+
+**d) Libraries importing**
+
+In [6]:
+
+    
+    
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import plotly.express as px
+    import plotly.graph_objects as go
+    import seaborn as sns
+    from wordcloud import wordcloud
+    import warnings
+    warnings.filterwarnings('ignore')
+    
+
+**e) Functions for general use**
+
+In this project, we use some repetition operations, for the convenience of
+follow-up, we decided to build some specific functions for the current
+project.
+
+**Function to check statistical hypothesis test**
+
+In [7]:
+
+    
+    
+    from scipy.stats import ttest_ind
+    
+    def Series_stats(var, category, prop1, prop2):
+    # Step 1: State the null and alternative hypothesis and select a level of significance is 5% or 0.05
+    # Step 2: Collect data and calculate the values of test statistic
+      s1 = df[(df[category]==prop1)][var]
+      s2 = df[(df[category]==prop2)][var]
+      t, p = ttest_ind(s1,s2,equal_var = False)
+    
+      print("Two-sample t-test: t={}, p={}".format(round(t,5),p))
+    # Step 3: Compare the probability associated with the test statistic with level of significance specified
+      if ((p < 0.05) and (np.abs(t) > 1.96)):
+        print("\n REJECT the Null Hypothesis and state that: \n at 5% significance level, the mean {} of {}-{} and {}-{} are not equal.".format(var, prop1, category, prop2, category))
+        print("\n YES, the {} of {}-{} differ significantly from {}-{} in the current dataset.".format(var, prop1, category, prop2, category))
+        print("\n The mean value of {} for {}-{} is {} and for {}-{} is {}".format(var, prop1, category, round(s1.mean(),2), prop2, category, round(s2.mean(),2)))
+      else:
+        print("\n FAIL to Reject the Null Hypothesis and state that: \n at 5% significance level, the mean {} of {} - {} and {} - {} are equal.".format(var, prop1, category, prop2, category))
+        print("\n NO, the {} of {}-{} NOT differ significantly from {}-{} in the current dataset".format(var, prop1, category, prop2, category))
+        print("\n The mean value of {} for {}-{} is {} and for {}-{} is {}".format(var, prop1, category, round(s1.mean(),2), prop2, category, round(s2.mean(),2)))
+    
+
+Function to plot Distribution charts of one parameter in function of several
+variable: "smoker", "sex". The Density plot gives an intuitive understanding
+of the underlying distribution of the attribute.
+
+In [8]:
+
+    
+    
+    def Plot_dis(text):
+      f= plt.figure(figsize=(21,5))
+      
+      ax=f.add_subplot(131)
+      sns.distplot(df[text],color='b',ax=ax)
+      ax.set_title('Distribution of {}'.format(text))
+    
+      ax=f.add_subplot(132)
+      sns.distplot(df[(df.smoker == 'yes')][text],color='g',ax=ax)
+      ax.set_title('Distribution of {} for smokers'.format(text))
+      
+      ax=f.add_subplot(133)
+      sns.distplot(df[(df.smoker == 'no')][text],color='c',ax=ax)
+      ax.set_title('Distribution of {} for non-smokers'.format(text))
+    
+      f1= plt.figure(figsize=(13,5))
+      
+      ax=f1.add_subplot(121)
+      sns.distplot(df[(df.sex == 'male')][text],color='g',ax=ax)
+      ax.set_title('Distribution of {} for male'.format(text))
+    
+      ax=f1.add_subplot(122)
+      sns.distplot(df[(df.sex == 'female')][text],color='g',ax=ax)
+      ax.set_title('Distribution of {} for female'.format(text))
+    
+
+Function to plot Box charts of one parameter in function of several variable
+("age", "smoker", "sex", "children", "region").
+
+The Boxplot shows the distribution of quantitative data in a way that
+facilitates comparisons between variables or across levels of parameters.
+
+In [9]:
+
+    
+    
+    def Plot_box(text):
+      fig, axes = plt.subplots(3, 2, figsize=(15, 15))
+      fig.suptitle('Box plot of {}'.format(text))
+      sns.boxplot(ax=axes[0, 0], data=df, y=text, x='Age_category',hue='smoker')
+      sns.boxplot(ax=axes[0, 1], data=df, y=text, x='Age_category',hue='sex')
+      sns.boxplot(ax=axes[1, 0], data=df, y=text, x='Weight_category',hue='smoker')
+      sns.boxplot(ax=axes[1, 1], data=df, y=text, x='Weight_category',hue='sex')
+      sns.boxplot(ax=axes[2, 0], data=df, y=text, x='children')
+      sns.boxplot(ax=axes[2, 1], data=df, y=text, x='region',hue='smoker')
+    
+
+**Function to plot scatter chart of one parameter**
+
+In [10]:
+
+    
+    
+    def Plot_scat(parameter1, parameter2,var1,var2):
+      
+      f= plt.figure(figsize=(15,5))
+      ax=f.add_subplot(121)
+      sns.scatterplot(x=parameter1,y=parameter2,hue=var1,data=df,ax=ax)
+      ax.set_title('Relationship between {} and {} in function of {}'.format(parameter1,parameter2,var1))
+      
+      ax=f.add_subplot(122)
+      sns.scatterplot(x=parameter1, y=parameter2,hue=var2,data=df,ax=ax)
+      ax.set_title('Relationship between {} and {} in function of {}'.format(parameter1,parameter2,var2))
+    
+
+**Function to create a new column data (applied for age and weight
+categories)**
+
+In [11]:
+
+    
+    
+    # Function used to create a new column data: applied for age and weight categories
+    def Add_column(new_column_name, var, key, value):
+      conditions = [(df[var] < key[0]),
+        (df[var] >= key[0]) & (df[var] < key[1]),
+        (df[var] >= key[1]) & (df[var] < key[2]),
+        (df[var] >= key[2])]
+      # create a new column and use np.select to assign values to it using our lists as arguments
+      df[new_column_name] = np.select(conditions, value)
+      df[new_column_name].value_counts().plot.pie(autopct="%.1f%%")
+    
+
+# **2\. Distribution and correlation analysis of variables**¶
+
+**a) Parameters correlation (pair)**
+
+In [12]:
+
+    
+    
+    correlation = df[['age','bmi','children','charges']].corr()
+    sns.heatmap(correlation,annot=True,cmap='Greens')
+    plt.title('Correlation between numerical parameters')
+    
+
+Out[12]:
+
+    
+    
+    Text(0.5, 1.0, 'Correlation between numerical parameters')
+
+![](__results___files/__results___27_1.png)
+
+  * The "charges" show a weak positive correlation with "age" or "bmi" or "children" parameters.
+  * The highest correlation is that of charges - age, that's logic and as expected.
+
+In [13]:
+
+    
+    
+    sns.pairplot(df,hue='smoker')
+    
+
+Out[13]:
+
+    
+    
+    <seaborn.axisgrid.PairGrid at 0x7f31b103b450>
+
+![](__results___files/__results___29_1.png)
+
+**b) Distribution of "charges":**
+
+First, let's look at the distribution of charges. This will help us to know
+how much patients spend on treatment on average.
+
+In [14]:
+
+    
+    
+    Plot_dis('charges')
+    
+
+![](__results___files/__results___31_0.png)
+
+![](__results___files/__results___31_1.png)
+
+  * Types of Distributions: _right skewed distribution_
+  * Most patients are being charged around **10,000**.
+  * The right-skewness of charges indicates that there are few people who are being charged higher than average.
+
+**c) Distribution of "bmi":**
+
+In [15]:
+
+    
+    
+    Plot_dis('bmi')
+    
+
+![](__results___files/__results___34_0.png)
+
+![](__results___files/__results___34_1.png)
+
+  * Types of Distributions: _normally distributed._
+  * BMI frequency: maximum number of patient around **bmi=30**.
+  * Distribution of bmi of sex or smoker is almost same.
+
+**d) Distribution of "age":**
+
+In [16]:
+
+    
+    
+    Plot_dis('age')
+    
+
+![](__results___files/__results___37_0.png)
+
+![](__results___files/__results___37_1.png)
+
+  * Type of distribution: _uniform distributed_
+  * Maximum number of patients is around **20 years old**. 
+  * Distribution of age of sex or smoker is almost same.
+  * Special case study: age around 20 +/- 2.
+
+# **3\. Key parameters**¶
+
+**a) BMI and Weight category:**
+
+The Body Mass Index (BMI) could be used to convert into other categorical
+variables as suggested by [ref](https://www.cancer.org/cancer/cancer-
+causes/diet-physical-activity/body-weight-and-cancer-risk/adult-bmi.html):
+
+  * Under Weight: BMI < 18.5
+  * Normal Weight: 18.5 =< BMI < 24.9
+  * Overweight: 25 =< BMI < 29.9
+  * Obese: BMI > 30.
+
+In [17]:
+
+    
+    
+    Bi = [18.5, 24.9, 29.9]
+    val = ['Under_Weight', 'Normal_Weight', 'Overweight','Obese']
+    Add_column('Weight_category','bmi', Bi, val)
+    
+
+![](__results___files/__results___41_0.png)
+
+  * Over 81% of patients are over-weight, and 53% of patients are obese. This ratio is too high than our expectation.
+
+**b) Age and Age category:**
+
+According to several puplications, Patients could be categorized by age range
+as following:
+
+  * Teen: age < 18 years; 
+  * Youngs: 18 <= age < 35; 
+  * Aldults: 35 <= age < 55, and 
+  * Elders: age >= 55.
+
+For more detail, readers are refered to this
+[reference](https://cenique1.zendesk.com/hc/en-us/articles/202487549-What-are-
+the-age-ranges-for-youth-young-adult-adult-and-senior-in-IntelliSense-) or
+this
+[reference](https://academic.oup.com/gerontologist/article/42/1/92/641498)
+(DOI: 10.1093/geront/42.1.92).
+
+In [18]:
+
+    
+    
+    age = [18,35,55]
+    val = ['Teen', 'Youngs', 'Aldults','Elders']
+    Add_column('Age_category','age', age, val)
+    
+
+![](__results___files/__results___44_0.png)
+
+**c) Charges vs other parameters**
+
+In [19]:
+
+    
+    
+    Plot_box('charges')
+    
+
+![](__results___files/__results___46_0.png)
+
+  * As expected, smokers pay a higher charges than non-smokers.
+  * Age does have an slight effect on raising the charges, and again it is when combined with smoking that the charges get dramatically higher.
+  * Charges is somehow fairly distributed between the families having 0-3 children, with some outliers of course. And it's very interesting that charges drops for families having more than 3 children. At least, there is question that larger families live healthier than those with less children?
+  * Among obese-female we are seeing some "tails", this could be assumed that, obese-female might have serious diseases than obese-male.
+  * The biggest effect on charges is the smoker category.
+
+**d) BMI vs other parameters**
+
+In [20]:
+
+    
+    
+    Plot_box('bmi')
+    
+
+![](__results___files/__results___49_0.png)
+
+  * Smoking doesn't seem to have an effect on the average bmi of gender or age of number of children or region.
+  * Weight_category does have an effect on raising the bmi.
+
+**e) Special case study: age 18 to 22**
+
+In [21]:
+
+    
+    
+    f = plt.figure(figsize=(15,5))
+    ax = f.add_subplot(121)
+    sns.boxplot(y='charges',x='smoker', data=df[(df.age>=18)& (df.age<=22)],ax=ax)
+    ax.set_title('Box plot of charges of patients age from 18 to 22')
+    ax.set_ylim([0,60000])
+    
+    ax = f.add_subplot(122)
+    sns.boxplot(y='charges',x='smoker', data=df[(df.age>=60)& (df.age<=65)],ax=ax)
+    ax.set_title('Box plot of charges of patients age from 60 to 65')
+    ax.set_ylim([0,60000])
+    
+
+Out[21]:
+
+    
+    
+    (0.0, 60000.0)
+
+![](__results___files/__results___52_1.png)
+
+  * As we can see, even at the age of 18-22, smoker-patients spend much more on treatment than non-smokers. The different ratio is such similar to that of the older group from 60-65 years old.
+  * Among non-smokers we are seeing some "tails", this could be assumed that is due to other serious diseases or accidents.
+
+# **4\. Statistics**¶
+
+**a) Sex vs smoker**
+
+In [22]:
+
+    
+    
+    sns.catplot(hue='sex',kind='count',x='smoker',data=df)
+    
+
+Out[22]:
+
+    
+    
+    <seaborn.axisgrid.FacetGrid at 0x7f31a7e12cd0>
+
+![](__results___files/__results___56_1.png)
+
+  * There are more male smokers than female smokers, but not significant.
+  * More non-smoker patients than smokers.
+
+**b) Children vs number of patients**
+
+In [23]:
+
+    
+    
+    sns.catplot(x='children',kind='count',data=df)
+    
+
+Out[23]:
+
+    
+    
+    <seaborn.axisgrid.FacetGrid at 0x7f31a78f3450>
+
+![](__results___files/__results___59_1.png)
+
+  * Most of patients do not have children.
+
+**c) Region vs number of patients**
+
+In [24]:
+
+    
+    
+    sns.catplot(x='region',kind='count',hue='Weight_category',data=df)
+    
+
+Out[24]:
+
+    
+    
+    <seaborn.axisgrid.FacetGrid at 0x7f31ac2857d0>
+
+![](__results___files/__results___62_1.png)
+
+  * Most of Obese patients are in the southeast region. 
+
+**d) Do charges of people who smoke differ significantly from the people who
+don't?**
+
+In [25]:
+
+    
+    
+    Series_stats('charges','smoker','yes','no')
+    
+    
+    
+    Two-sample t-test: t=32.75189, p=5.88946444671698e-103
+    
+     REJECT the Null Hypothesis and state that: 
+     at 5% significance level, the mean charges of yes-smoker and no-smoker are not equal.
+    
+     YES, the charges of yes-smoker differ significantly from no-smoker in the current dataset.
+    
+     The mean value of charges for yes-smoker is 32050.23 and for no-smoker is 8434.27
+    
+
+**e) Does charges of Obese differ significantly from that of under_weights?**
+
+In [26]:
+
+    
+    
+    Series_stats('charges','Weight_category','Obese','Under_Weight')
+    
+    
+    
+    Two-sample t-test: t=3.64693, p=0.0013542631838168704
+    
+     REJECT the Null Hypothesis and state that: 
+     at 5% significance level, the mean charges of Obese-Weight_category and Under_Weight-Weight_category are not equal.
+    
+     YES, the charges of Obese-Weight_category differ significantly from Under_Weight-Weight_category in the current dataset.
+    
+     The mean value of charges for Obese-Weight_category is 15460.5 and for Under_Weight-Weight_category is 8852.2
+    
+
+**f) Does charges of males differ significantly from that of females?**
+
+In [27]:
+
+    
+    
+    Series_stats('charges','sex', 'male', 'female')
+    
+    
+    
+    Two-sample t-test: t=2.10089, p=0.035841014956016645
+    
+     REJECT the Null Hypothesis and state that: 
+     at 5% significance level, the mean charges of male-sex and female-sex are not equal.
+    
+     YES, the charges of male-sex differ significantly from female-sex in the current dataset.
+    
+     The mean value of charges for male-sex is 13956.75 and for female-sex is 12569.58
+    
+
+**g) Does charges of Aldults differ significantly from that of Elders?**
+
+In [28]:
+
+    
+    
+    Series_stats('charges','Age_category', 'Youngs','Elders')
+    
+    
+    
+    Two-sample t-test: t=-10.01818, p=1.5222187109892808e-21
+    
+     REJECT the Null Hypothesis and state that: 
+     at 5% significance level, the mean charges of Youngs-Age_category and Elders-Age_category are not equal.
+    
+     YES, the charges of Youngs-Age_category differ significantly from Elders-Age_category in the current dataset.
+    
+     The mean value of charges for Youngs-Age_category is 9673.32 and for Elders-Age_category is 18513.28
+    
+
+**h) Does BMI of males differ significantly from that of females?**
+
+In [29]:
+
+    
+    
+    Series_stats('bmi','sex','male','female')
+    
+    
+    
+    Two-sample t-test: t=1.69703, p=0.08992430667834876
+    
+     FAIL to Reject the Null Hypothesis and state that: 
+     at 5% significance level, the mean bmi of male - sex and female - sex are equal.
+    
+     NO, the bmi of male-sex NOT differ significantly from female-sex in the current dataset
+    
+     The mean value of bmi for male-sex is 30.94 and for female-sex is 30.38
+    
+
+**i) Does BMI of Youngs differ significantly from that of Elders?**
+
+In [30]:
+
+    
+    
+    Series_stats('bmi','Age_category', 'Youngs','Elders')
+    
+    
+    
+    Two-sample t-test: t=-3.78896, p=0.0001695553738046629
+    
+     REJECT the Null Hypothesis and state that: 
+     at 5% significance level, the mean bmi of Youngs-Age_category and Elders-Age_category are not equal.
+    
+     YES, the bmi of Youngs-Age_category differ significantly from Elders-Age_category in the current dataset.
+    
+     The mean value of bmi for Youngs-Age_category is 30.05 and for Elders-Age_category is 31.76
+    
+
+**j) Does charges of northeast differ significantly from that of southeast?**
+
+In [31]:
+
+    
+    
+    Series_stats('charges','region','northeast','southeast')
+    
+    
+    
+    Two-sample t-test: t=-1.38016, p=0.16798984019177732
+    
+     FAIL to Reject the Null Hypothesis and state that: 
+     at 5% significance level, the mean charges of northeast - region and southeast - region are equal.
+    
+     NO, the charges of northeast-region NOT differ significantly from southeast-region in the current dataset
+    
+     The mean value of charges for northeast-region is 13406.38 and for southeast-region is 14735.41
+    
+
+**k) Does BMI of northeast differ significantly from that of southwest?**
+
+In [32]:
+
+    
+    
+    Series_stats('bmi','region','northwest','southeast')
+    
+    
+    
+    Two-sample t-test: t=-9.37683, p=9.989831002016284e-20
+    
+     REJECT the Null Hypothesis and state that: 
+     at 5% significance level, the mean bmi of northwest-region and southeast-region are not equal.
+    
+     YES, the bmi of northwest-region differ significantly from southeast-region in the current dataset.
+    
+     The mean value of bmi for northwest-region is 29.2 and for southeast-region is 33.36
+    
+
+**l) Does charges of patient without children differ significantly from that
+of having 2 children?**
+
+In [33]:
+
+    
+    
+    Series_stats('charges','children',0,2)
+    
+    
+    
+    Two-sample t-test: t=-2.78631, p=0.005572108190365014
+    
+     REJECT the Null Hypothesis and state that: 
+     at 5% significance level, the mean charges of 0-children and 2-children are not equal.
+    
+     YES, the charges of 0-children differ significantly from 2-children in the current dataset.
+    
+     The mean value of charges for 0-children is 12365.98 and for 2-children is 15073.56
+    
+
+# **5\. Key factors correlation**¶
+
+**a) Correlation of charges in function of age and smoker & sex**
+
+In [34]:
+
+    
+    
+    sns.jointplot(x='age',y='charges',data=df)
+    
+
+Out[34]:
+
+    
+    
+    <seaborn.axisgrid.JointGrid at 0x7f31ac374790>
+
+![](__results___files/__results___84_1.png)
+
+In [35]:
+
+    
+    
+    sns.lmplot(y='charges',x='age',hue='smoker',col='sex',data=df)
+    
+
+Out[35]:
+
+    
+    
+    <seaborn.axisgrid.FacetGrid at 0x7f31ac1bf410>
+
+![](__results___files/__results___85_1.png)
+
+  * For non-smoker patients, the charges increases with age. That makes sense. 
+  * Charges of smoker patients is nealy double that of non-smoker patients at the same age range.
+
+**b) Correlation of charges in function of age and smoker & weight**
+
+In [36]:
+
+    
+    
+    sns.lmplot(y='charges',x='age',col='Weight_category',hue='smoker', data=df)
+    
+
+Out[36]:
+
+    
+    
+    <seaborn.axisgrid.FacetGrid at 0x7f31ac19b7d0>
+
+![](__results___files/__results___88_1.png)
+
+  * A positive relationship between age and charges but a dramatically steeper hike for smokers in comparison to non-smokers. 
+  * We can conclude that smoking significantly raises the charges, particularly for Obese patients (nearly double).
+
+**c) Correlation of charges in function of bmi and smoker & sex**
+
+In [37]:
+
+    
+    
+    sns.jointplot(x="bmi", y="charges", data=df)
+    
+
+Out[37]:
+
+    
+    
+    <seaborn.axisgrid.JointGrid at 0x7f31ac19a590>
+
+![](__results___files/__results___91_1.png)
+
+In [38]:
+
+    
+    
+    sns.lmplot(y='charges',x='bmi',hue='smoker',col='sex',data=df)
+    
+
+Out[38]:
+
+    
+    
+    <seaborn.axisgrid.FacetGrid at 0x7f31ac1e0b50>
+
+![](__results___files/__results___92_1.png)
+
+  * There is a dramatical increase in charges depending on the bmi of the smoker-patient.
+  * For non-smoker patients, the correlation between bmi and charges is not clear.
+
+**d) Correlation of charges in function of bmi and children number**
+
+In [39]:
+
+    
+    
+    sns.lmplot(x='bmi',y='charges',col='children',data=df)
+    
+
+Out[39]:
+
+    
+    
+    <seaborn.axisgrid.FacetGrid at 0x7f31adc66e90>
+
+![](__results___files/__results___95_1.png)
+
+  * Perhaps a family with more children will be healthier and happier?
+
+# **6\. Conclusions and recommendations**¶
+
+  * For non-smoker patients, the correlation between bmi and charges is not clear
+  * Key effective parameters on charges: smoking >> weight > age > sex > region. 
+  * Southeast region have highest number of Obese patients
+  * Charges of male is slightly higher than that of female (combined smoking & weight).
+  * The are some outliers on non smokers and obese-female, this could be due to some serious disease or other specific reasons.
+  * Smoking parameter has an even greater impact on the charges of obese patients, this is a very big problem for young adults today.
+
+This project can be further expanded by collecting more data on the
+relationships between the number of children in the family, region category,
+some specific diseases, ... to the patient's charges. These new data will
+further assist in making the overall correlation between several variables and
+the charges, leading to the development of a model to precisely predict the
+charges for patients.
+

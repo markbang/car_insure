@@ -1,0 +1,1451 @@
+In [1]:
+
+    
+    
+    # This Python 3 environment comes with many helpful analytics libraries installed
+    # It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+    # For example, here's several helpful packages to load
+    
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    # Input data files are available in the read-only "../input/" directory
+    # For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+    
+    import os
+    for dirname, _, filenames in os.walk('/kaggle/input'):
+        for filename in filenames:
+            print(os.path.join(dirname, filename))
+    
+    # You can write up to 5GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+    # You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+    
+    
+    
+    /kaggle/input/health-insurance-cross-sell-prediction/test.csv
+    /kaggle/input/health-insurance-cross-sell-prediction/sample_submission.csv
+    /kaggle/input/health-insurance-cross-sell-prediction/train.csv
+    
+
+In [2]:
+
+    
+    
+    import seaborn as sns
+    import matplotlib.pyplot as plt 
+    from collections import Counter
+    from imblearn.over_sampling import SMOTE, ADASYN
+    from imblearn.under_sampling import RandomUnderSampler
+    from imblearn.over_sampling import RandomOverSampler
+    from sklearn import metrics
+    from sklearn.metrics import confusion_matrix
+    from sklearn.linear_model import LogisticRegression
+    from xgboost import XGBClassifier
+    import xgboost as xgb
+    from sklearn.preprocessing import LabelEncoder, StandardScaler, MinMaxScaler, RobustScaler
+    from sklearn.utils import resample
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import accuracy_score
+    from sklearn.preprocessing import LabelEncoder
+    
+
+loading datasets.....
+
+In [3]:
+
+    
+    
+    train = pd.read_csv('/kaggle/input/health-insurance-cross-sell-prediction/train.csv')
+    test = pd.read_csv('/kaggle/input/health-insurance-cross-sell-prediction/test.csv')
+    
+
+some preliminary feature engeneering
+
+In [4]:
+
+    
+    
+    ## gender to binary integer
+    train["Gender"][train["Gender"] == "Male"] = 1
+    train["Gender"][train["Gender"] == "Female"] = 0
+    train["Gender"] = train["Gender"].astype(int)
+    ## Vehicle Age from cat to integer
+    train["Vehicle_Age"][train["Vehicle_Age"] == "< 1 Year"] = 1
+    train["Vehicle_Age"][train["Vehicle_Age"] == "1-2 Year"] = 2
+    train["Vehicle_Age"][train["Vehicle_Age"] == "> 2 Years"] = 3
+    train["Vehicle_Age"] = train["Vehicle_Age"].astype(int)
+    ## Vehicle Damage to binary integer
+    train["Vehicle_Damage"][train["Vehicle_Damage"] == "Yes"] = 1
+    train["Vehicle_Damage"][train["Vehicle_Damage"] == "No"] = 0
+    train["Vehicle_Damage"] = train["Vehicle_Damage"].astype(int)
+    
+    train['Policy_Sales_Channel'] = train['Policy_Sales_Channel'].apply(lambda x: np.int(x))
+    train['Region_Code'] = train['Region_Code'].apply(lambda x: np.int(x))
+    
+    train['Drive_exp'] = train['Age'] - train['Age'].min() ## new feature - drive experience + some new features
+    train['Low_exp'] = train['Drive_exp'].map(lambda s:1 if s<9 else 0)
+    train['High_exp'] = train['Drive_exp'].map(lambda s:1 if s>20 else 0)
+    train['Mid_exp'] = train['Drive_exp'].map(lambda s:1 if s<=20 & s>=9 else 0)
+    train = train.drop('Age', axis=1)
+    ## some new features based on Annual_Premium, later we'll remove unnecessary
+    train['Annual_log'] = np.log(train.Annual_Premium + 0.01)
+    ss = StandardScaler() 
+    train['Annual_scaled'] = ss.fit_transform(train['Annual_Premium'].values.reshape(-1,1))
+    
+    mm = MinMaxScaler() 
+    train['Annual_minmax'] = mm.fit_transform(train['Annual_Premium'].values.reshape(-1,1))
+    ## new features based on frequency of 28th region and 152nd channel  in dataset
+    train['Region_Code_28'] = train['Region_Code'].map(lambda s:1 if s==28 else 0)
+    train['Policy_Sales_Channel_152'] = train['Policy_Sales_Channel'].map(lambda s:1 if s==152 else 0)
+    
+    
+    train['Annual_Premium_10'] = train['Annual_Premium'].map(lambda s:1 if s<=10000 else 0)
+    
+    # the same for test dataset:
+    test["Gender"][test["Gender"] == "Male"] = 1
+    test["Gender"][test["Gender"] == "Female"] = 0
+    test["Gender"] = test["Gender"].astype(int)
+    
+    test["Vehicle_Age"][test["Vehicle_Age"] == "< 1 Year"] = 1
+    test["Vehicle_Age"][test["Vehicle_Age"] == "1-2 Year"] = 2
+    test["Vehicle_Age"][test["Vehicle_Age"] == "> 2 Years"] = 3
+    test["Vehicle_Age"] = test["Vehicle_Age"].astype(int)
+    
+    test["Vehicle_Damage"][test["Vehicle_Damage"] == "Yes"] = 1
+    test["Vehicle_Damage"][test["Vehicle_Damage"] == "No"] = 0
+    test["Vehicle_Damage"] = test["Vehicle_Damage"].astype(int)
+    
+    test['Policy_Sales_Channel'] = test['Policy_Sales_Channel'].apply(lambda x: np.int(x))
+    test['Region_Code'] = test['Region_Code'].apply(lambda x: np.int(x))
+    
+    test['Drive_exp'] = test['Age'] - test['Age'].min() ## new feature - drive experience + some new features
+    test['Low_exp'] = test['Drive_exp'].map(lambda s:1 if s<9 else 0)
+    test['High_exp'] = test['Drive_exp'].map(lambda s:1 if s>20 else 0)
+    test['Mid_exp'] = test['Drive_exp'].map(lambda s:1 if s<=20 & s>=9 else 0)
+    test = test.drop('Age', axis=1)
+    
+    test['Annual_log'] = np.log(test.Annual_Premium + 0.01)
+    ss = StandardScaler() 
+    test['Annual_scaled'] = ss.fit_transform(test['Annual_Premium'].values.reshape(-1,1))
+    
+    mm = MinMaxScaler() 
+    test['Annual_minmax'] = mm.fit_transform(test['Annual_Premium'].values.reshape(-1,1))
+    
+    test['Region_Code_28'] = test['Region_Code'].map(lambda s:1 if s==28 else 0)
+    test['Policy_Sales_Channel_152'] = test['Policy_Sales_Channel'].map(lambda s:1 if s==152 else 0)
+    test['Annual_Premium_10'] = test['Annual_Premium'].map(lambda s:1 if s<=10000 else 0)
+    
+    
+    
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:2: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+      
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:3: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+      This is separate from the ipykernel package so we can avoid doing imports until
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:6: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+      
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:7: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+      import sys
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:8: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+      
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:11: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+      # This is added back by InteractiveShellApp.init_path()
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:12: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+      if sys.path[0] == '':
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:38: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:39: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:42: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:43: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:44: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:47: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+    /opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:48: SettingWithCopyWarning: 
+    A value is trying to be set on a copy of a slice from a DataFrame
+    
+    See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+    
+
+In [5]:
+
+    
+    
+    train = train[:20000] ## let's take one part from dataset 
+    train
+    
+
+Out[5]:
+
+| id | Gender | Driving_License | Region_Code | Previously_Insured | Vehicle_Age | Vehicle_Damage | Annual_Premium | Policy_Sales_Channel | Vintage | ... | Drive_exp | Low_exp | High_exp | Mid_exp | Annual_log | Annual_scaled | Annual_minmax | Region_Code_28 | Policy_Sales_Channel_152 | Annual_Premium_10  
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---  
+0 | 1 | 1 | 1 | 28 | 0 | 3 | 1 | 40454.0 | 26 | 217 | ... | 24 | 0 | 1 | 0 | 10.607921 | 0.574539 | 0.070366 | 1 | 0 | 0  
+1 | 2 | 1 | 1 | 3 | 0 | 2 | 0 | 33536.0 | 26 | 183 | ... | 56 | 0 | 1 | 0 | 10.420375 | 0.172636 | 0.057496 | 0 | 0 | 0  
+2 | 3 | 1 | 1 | 28 | 0 | 3 | 1 | 38294.0 | 26 | 27 | ... | 27 | 0 | 1 | 0 | 10.553049 | 0.449053 | 0.066347 | 1 | 0 | 0  
+3 | 4 | 1 | 1 | 11 | 1 | 1 | 0 | 28619.0 | 152 | 203 | ... | 1 | 1 | 0 | 0 | 10.261826 | -0.113018 | 0.048348 | 0 | 1 | 0  
+4 | 5 | 0 | 1 | 41 | 1 | 1 | 0 | 27496.0 | 152 | 39 | ... | 9 | 0 | 0 | 0 | 10.221796 | -0.178259 | 0.046259 | 0 | 1 | 0  
+... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ...  
+19995 | 19996 | 1 | 1 | 29 | 0 | 2 | 1 | 2630.0 | 157 | 115 | ... | 14 | 0 | 0 | 0 | 7.874743 | -1.622853 | 0.000000 | 0 | 0 | 1  
+19996 | 19997 | 0 | 1 | 41 | 0 | 1 | 1 | 38208.0 | 160 | 253 | ... | 3 | 1 | 0 | 0 | 10.550800 | 0.444057 | 0.066187 | 0 | 0 | 0  
+19997 | 19998 | 0 | 1 | 18 | 1 | 1 | 0 | 39994.0 | 152 | 221 | ... | 4 | 1 | 0 | 0 | 10.596485 | 0.547815 | 0.069510 | 0 | 1 | 0  
+19998 | 19999 | 1 | 1 | 48 | 0 | 2 | 1 | 2630.0 | 15 | 134 | ... | 34 | 0 | 1 | 0 | 7.874743 | -1.622853 | 0.000000 | 0 | 0 | 1  
+19999 | 20000 | 1 | 1 | 28 | 0 | 2 | 1 | 32921.0 | 124 | 28 | ... | 20 | 0 | 0 | 1 | 10.401866 | 0.136908 | 0.056352 | 1 | 0 | 0  
+  
+20000 rows Ã 21 columns
+
+features overview....
+
+In [6]:
+
+    
+    
+    def basic_details(df):
+        b = pd.DataFrame()
+        b['Missing value, %'] = round(df.isnull().sum()/df.shape[0]*100)
+        b['N unique value'] = df.nunique()
+        b['dtype'] = df.dtypes
+        return b
+    basic_details(train)
+    
+
+Out[6]:
+
+| Missing value, % | N unique value | dtype  
+---|---|---|---  
+id | 0.0 | 20000 | int64  
+Gender | 0.0 | 2 | int64  
+Driving_License | 0.0 | 2 | int64  
+Region_Code | 0.0 | 53 | int64  
+Previously_Insured | 0.0 | 2 | int64  
+Vehicle_Age | 0.0 | 3 | int64  
+Vehicle_Damage | 0.0 | 2 | int64  
+Annual_Premium | 0.0 | 13034 | float64  
+Policy_Sales_Channel | 0.0 | 109 | int64  
+Vintage | 0.0 | 290 | int64  
+Response | 0.0 | 2 | int64  
+Drive_exp | 0.0 | 65 | int64  
+Low_exp | 0.0 | 2 | int64  
+High_exp | 0.0 | 2 | int64  
+Mid_exp | 0.0 | 2 | int64  
+Annual_log | 0.0 | 13034 | float64  
+Annual_scaled | 0.0 | 13034 | float64  
+Annual_minmax | 0.0 | 13034 | float64  
+Region_Code_28 | 0.0 | 2 | int64  
+Policy_Sales_Channel_152 | 0.0 | 2 | int64  
+Annual_Premium_10 | 0.0 | 2 | int64  
+  
+In [7]:
+
+    
+    
+    train.describe().T
+    
+
+Out[7]:
+
+| count | mean | std | min | 25% | 50% | 75% | max  
+---|---|---|---|---|---|---|---|---  
+id | 20000.0 | 10000.500000 | 5773.647028 | 1.000000 | 5000.750000 | 10000.500000 | 15000.250000 | 20000.000000  
+Gender | 20000.0 | 0.541200 | 0.498312 | 0.000000 | 0.000000 | 1.000000 | 1.000000 | 1.000000  
+Driving_License | 20000.0 | 0.997800 | 0.046854 | 0.000000 | 1.000000 | 1.000000 | 1.000000 | 1.000000  
+Region_Code | 20000.0 | 26.473300 | 13.173214 | 0.000000 | 15.000000 | 28.000000 | 35.000000 | 52.000000  
+Previously_Insured | 20000.0 | 0.448900 | 0.497394 | 0.000000 | 0.000000 | 0.000000 | 1.000000 | 1.000000  
+Vehicle_Age | 20000.0 | 1.610100 | 0.567621 | 1.000000 | 1.000000 | 2.000000 | 2.000000 | 3.000000  
+Vehicle_Damage | 20000.0 | 0.513650 | 0.499826 | 0.000000 | 0.000000 | 1.000000 | 1.000000 | 1.000000  
+Annual_Premium | 20000.0 | 30657.221300 | 17021.014391 | 2630.000000 | 24469.750000 | 31818.500000 | 39546.000000 | 508073.000000  
+Policy_Sales_Channel | 20000.0 | 112.396600 | 54.007733 | 1.000000 | 30.000000 | 136.000000 | 152.000000 | 163.000000  
+Vintage | 20000.0 | 154.913450 | 83.333933 | 10.000000 | 83.000000 | 155.000000 | 226.000000 | 299.000000  
+Response | 20000.0 | 0.123800 | 0.329361 | 0.000000 | 0.000000 | 0.000000 | 0.000000 | 1.000000  
+Drive_exp | 20000.0 | 18.861550 | 15.590623 | 0.000000 | 5.000000 | 16.000000 | 29.000000 | 64.000000  
+Low_exp | 20000.0 | 0.388500 | 0.487421 | 0.000000 | 0.000000 | 0.000000 | 1.000000 | 1.000000  
+High_exp | 20000.0 | 0.432500 | 0.495435 | 0.000000 | 0.000000 | 0.000000 | 1.000000 | 1.000000  
+Mid_exp | 20000.0 | 0.032300 | 0.176800 | 0.000000 | 0.000000 | 0.000000 | 0.000000 | 1.000000  
+Annual_log | 20000.0 | 10.021564 | 1.000578 | 7.874743 | 10.105193 | 10.367803 | 10.585220 | 13.138380  
+Annual_scaled | 20000.0 | 0.005393 | 0.988839 | -1.622853 | -0.354069 | 0.072858 | 0.521788 | 27.740948  
+Annual_minmax | 20000.0 | 0.052140 | 0.031665 | 0.000000 | 0.040629 | 0.054301 | 0.068676 | 0.940298  
+Region_Code_28 | 20000.0 | 0.287050 | 0.452396 | 0.000000 | 0.000000 | 0.000000 | 1.000000 | 1.000000  
+Policy_Sales_Channel_152 | 20000.0 | 0.352350 | 0.477714 | 0.000000 | 0.000000 | 0.000000 | 1.000000 | 1.000000  
+Annual_Premium_10 | 20000.0 | 0.168100 | 0.373964 | 0.000000 | 0.000000 | 0.000000 | 0.000000 | 1.000000  
+  
+In [8]:
+
+    
+    
+    def basic_analysis(df1, df2):
+        '''the function compares the average values of  2 dataframes'''
+        b = pd.DataFrame()
+        b['Response df_mean'] = round(df1.mean(),2)
+        b['Not Response df_mean'] = round(df2.mean(),2)
+        c = (b['Response df_mean']/b['Not Response df_mean'])
+        if [c<=1]:
+            b['Variation, %'] = round((1-((b['Response df_mean']/b['Not Response df_mean'])))*100)
+        else:
+            b['Variation, %'] = round(((b['Response df_mean']/b['Not Response df_mean'])-1)*100)
+            
+        b['Influence'] = np.where(abs(b['Variation, %']) <= 9, "feature's effect on the target is not defined", 
+                                  "feature value affects the target")
+    
+        return b
+    
+
+let's split dataset into two datasets depending on Response and compare
+them....
+
+In [9]:
+
+    
+    
+    response = train.drop(train[train['Response'] != 1].index)
+    not_response = train.drop(train[train['Response'] != 0].index)
+    basic_analysis(response,not_response)
+    
+
+Out[9]:
+
+| Response df_mean | Not Response df_mean | Variation, % | Influence  
+---|---|---|---|---  
+id | 9999.45 | 10000.65 | 0.0 | feature's effect on the target is not defined  
+Gender | 0.60 | 0.53 | -13.0 | feature value affects the target  
+Driving_License | 1.00 | 1.00 | 0.0 | feature's effect on the target is not defined  
+Region_Code | 26.94 | 26.41 | -2.0 | feature's effect on the target is not defined  
+Previously_Insured | 0.01 | 0.51 | 98.0 | feature value affects the target  
+Vehicle_Age | 1.96 | 1.56 | -26.0 | feature value affects the target  
+Vehicle_Damage | 0.98 | 0.45 | -118.0 | feature value affects the target  
+Annual_Premium | 31913.86 | 30479.67 | -5.0 | feature's effect on the target is not defined  
+Policy_Sales_Channel | 91.01 | 115.42 | 21.0 | feature value affects the target  
+Vintage | 154.51 | 154.97 | 0.0 | feature's effect on the target is not defined  
+Response | 1.00 | 0.00 | -inf | feature value affects the target  
+Drive_exp | 23.45 | 18.21 | -29.0 | feature value affects the target  
+Low_exp | 0.12 | 0.43 | 72.0 | feature value affects the target  
+High_exp | 0.60 | 0.41 | -46.0 | feature value affects the target  
+Mid_exp | 0.05 | 0.03 | -67.0 | feature value affects the target  
+Annual_log | 10.04 | 10.02 | -0.0 | feature's effect on the target is not defined  
+Annual_scaled | 0.08 | -0.00 | inf | feature value affects the target  
+Annual_minmax | 0.05 | 0.05 | 0.0 | feature's effect on the target is not defined  
+Region_Code_28 | 0.45 | 0.26 | -73.0 | feature value affects the target  
+Policy_Sales_Channel_152 | 0.08 | 0.39 | 79.0 | feature value affects the target  
+Annual_Premium_10 | 0.18 | 0.17 | -6.0 | feature's effect on the target is not defined  
+  
+...and let's check for imbalanced target feature....
+
+In [10]:
+
+    
+    
+    sns.countplot(train.Response)
+    train['Response'].value_counts(normalize=True)
+    
+
+Out[10]:
+
+    
+    
+    0    0.8762
+    1    0.1238
+    Name: Response, dtype: float64
+
+![](__results___files/__results___14_1.png)
+
+distribution of cat features:
+
+In [11]:
+
+    
+    
+    ## distribution of cat features
+       
+    cat_features = train[[ 'Vehicle_Damage', 'Previously_Insured', 'Gender','Vehicle_Damage', 'Vehicle_Age', 'Driving_License']].columns
+    for i in cat_features:
+        sns.barplot(x="Response",y=i,data=train)
+        plt.title(i+" by "+"Response")
+        plt.show()
+    
+
+![](__results___files/__results___16_0.png)
+
+![](__results___files/__results___16_1.png)
+
+![](__results___files/__results___16_2.png)
+
+![](__results___files/__results___16_3.png)
+
+![](__results___files/__results___16_4.png)
+
+![](__results___files/__results___16_5.png)
+
+distribution and checking for outliers in numeric features:
+
+In [12]:
+
+    
+    
+    ## distribution and checking for outliers in numeric features
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    features = train[['Drive_exp', 'Policy_Sales_Channel', 'Vintage', 'Region_Code']].columns
+    
+    for i in features:
+        sns.boxplot(x="Response",y=i,data=train)
+        plt.title(i+" by "+"Response")
+        plt.show()
+    
+
+![](__results___files/__results___18_0.png)
+
+![](__results___files/__results___18_1.png)
+
+![](__results___files/__results___18_2.png)
+
+![](__results___files/__results___18_3.png)
+
+PPS matrix of correlation of non-linear relations between features:
+
+In [13]:
+
+    
+    
+    ## PPS matrix of correlation of non-linear relations between features
+    %pip install ppscore # installing ppscore, library used to check non-linear relationships between our variables
+    import ppscore as pps # importing ppscore
+    matrix_pps = pps.matrix(train.drop('id', axis=1))[['x', 'y', 'ppscore']].pivot(columns='x', index='y', values='ppscore')
+    matrix_pps = matrix_pps.apply(lambda x: round(x, 2))
+    f, ax = plt.subplots(figsize=(12, 9))
+    sns.heatmap(matrix_pps, vmin=0, vmax=1, cmap="icefire", linewidths=0.75, annot=True)
+    
+    
+    
+    Collecting ppscore
+    
+      Downloading ppscore-1.1.1.tar.gz (16 kB)
+    
+    Requirement already satisfied: pandas<2.0.0,>=1.0.0 in /opt/conda/lib/python3.7/site-packages (from ppscore) (1.1.2)
+    
+    Requirement already satisfied: scikit-learn<1.0.0,>=0.20.2 in /opt/conda/lib/python3.7/site-packages (from ppscore) (0.23.2)
+    
+    Requirement already satisfied: numpy>=1.15.4 in /opt/conda/lib/python3.7/site-packages (from pandas<2.0.0,>=1.0.0->ppscore) (1.18.5)
+    
+    Requirement already satisfied: python-dateutil>=2.7.3 in /opt/conda/lib/python3.7/site-packages (from pandas<2.0.0,>=1.0.0->ppscore) (2.8.1)
+    
+    Requirement already satisfied: pytz>=2017.2 in /opt/conda/lib/python3.7/site-packages (from pandas<2.0.0,>=1.0.0->ppscore) (2019.3)
+    
+    Requirement already satisfied: joblib>=0.11 in /opt/conda/lib/python3.7/site-packages (from scikit-learn<1.0.0,>=0.20.2->ppscore) (0.14.1)
+    
+    Requirement already satisfied: scipy>=0.19.1 in /opt/conda/lib/python3.7/site-packages (from scikit-learn<1.0.0,>=0.20.2->ppscore) (1.4.1)
+    
+    Requirement already satisfied: threadpoolctl>=2.0.0 in /opt/conda/lib/python3.7/site-packages (from scikit-learn<1.0.0,>=0.20.2->ppscore) (2.1.0)
+    
+    Requirement already satisfied: six>=1.5 in /opt/conda/lib/python3.7/site-packages (from python-dateutil>=2.7.3->pandas<2.0.0,>=1.0.0->ppscore) (1.14.0)
+    
+    Building wheels for collected packages: ppscore
+    
+      Building wheel for ppscore (setup.py) ... - \ done
+    
+      Created wheel for ppscore: filename=ppscore-1.1.1-py2.py3-none-any.whl size=12986 sha256=9845d5275d16e95d8a97c0552d43a77c3bf45f7fc1578a0d03a27b9855acc7c5
+    
+      Stored in directory: /root/.cache/pip/wheels/d0/1f/c4/e619fb20c9b10df8ddde15d583197edef8c2f27d7b1f29c633
+    
+    Successfully built ppscore
+    
+    Installing collected packages: ppscore
+    
+    Successfully installed ppscore-1.1.1
+    
+    WARNING: You are using pip version 20.2.3; however, version 20.2.4 is available.
+    
+    You should consider upgrading via the '/opt/conda/bin/python -m pip install --upgrade pip' command.
+    
+    Note: you may need to restart the kernel to use updated packages.
+    
+
+Out[13]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7ff28e0539d0>
+
+![](__results___files/__results___20_2.png)
+
+Spearman correlation matrix
+
+In [14]:
+
+    
+    
+    def spearman(frame, features):
+        spr = pd.DataFrame()
+        spr['feature'] = features
+        spr['spearman'] = [frame[f].corr(frame['Response'], 'spearman') for f in features]
+        spr = spr.sort_values('spearman')
+        plt.figure(figsize=(6, 0.25*len(features)))
+        f, ax = plt.subplots(figsize=(12, 9))
+        sns.barplot(data=spr, y='feature', x='spearman', orient='h')
+        
+    features = train.drop(['Response', 'id'], axis = 1).columns
+    spearman(train, features)
+    
+    
+    
+    <Figure size 432x342 with 0 Axes>
+
+![](__results___files/__results___22_1.png)
+
+Corr matrix:
+
+In [15]:
+
+    
+    
+    corrMatrix = train.corr()
+    f, ax = plt.subplots(figsize=(20, 10))
+    sns.heatmap(corrMatrix, annot = True)
+    plt.show()
+    
+
+![](__results___files/__results___24_0.png)
+
+Let's explore the Annual Premium by Response and see the distribuition of
+Amount transactions
+
+In [16]:
+
+    
+    
+    # Let's explore the Annual Premium by Response and see the distribuition of Amount transactions
+    fig , axs = plt.subplots(nrows = 1 , ncols = 4 , figsize = (16,4))
+    
+    sns.boxplot(x ="Response",y="Annual_Premium",data=train, ax = axs[0])
+    axs[0].set_title("Response vs Annual_Premium")
+    
+    sns.boxplot(x ="Response",y="Annual_log",data=train, ax = axs[1])
+    axs[1].set_title("Response vs Log Annual_Premium")
+    
+    sns.boxplot(x ="Response",y="Annual_scaled",data=train, ax = axs[2])
+    axs[2].set_title("Response vs Scaled Annual_Premium")
+    
+    sns.boxplot(x ="Response",y="Annual_minmax",data=train, ax = axs[3])
+    axs[3].set_title("Response vs Min-Max Annual_Premium")
+    
+    plt.show()
+    
+
+![](__results___files/__results___26_0.png)
+
+In [17]:
+
+    
+    
+    ## let's drop some features from dataset
+    train = train.drop(['Annual_Premium', 'Annual_minmax', 'Annual_log'], axis=1)
+    test = test.drop(['Annual_Premium', 'Annual_minmax', 'Annual_log'], axis=1)
+    train = train.drop('Driving_License', axis=1)
+    test = test.drop('Driving_License', axis=1)
+    
+
+...and reduce memory usage...
+
+In [18]:
+
+    
+    
+    def reduce_memory_usage(df):
+        """ The function will reduce memory of dataframe
+        Note: Apply this function after removing missing value"""
+        intial_memory = df.memory_usage().sum()/1024**2
+        print('Intial memory usage:',intial_memory,'MB')
+        for col in df.columns:
+            mn = df[col].min()
+            mx = df[col].max()
+            if df[col].dtype != object:            
+                if df[col].dtype == int:
+                    if mn >=0:
+                        if mx < np.iinfo(np.uint8).max:
+                            df[col] = df[col].astype(np.uint8)
+                        elif mx < np.iinfo(np.uint16).max:
+                            df[col] = df[col].astype(np.uint16)
+                        elif mx < np.iinfo(np.uint32).max:
+                            df[col] = df[col].astype(np.uint32)
+                        elif mx < np.iinfo(np.uint64).max:
+                            df[col] = df[col].astype(np.uint64)
+                    else:
+                        if mn > np.iinfo(np.int8).min and mx < np.iinfo(np.int8).max:
+                            df[col] = df[col].astype(np.int8)
+                        elif mn > np.iinfo(np.int16).min and mx < np.iinfo(np.int16).max:
+                            df[col] = df[col].astype(np.int16)
+                        elif mn > np.iinfo(np.int32).min and mx < np.iinfo(np.int32).max:
+                            df[col] = df[col].astype(np.int32)
+                        elif mn > np.iinfo(np.int64).min and mx < np.iinfo(np.int64).max:
+                            df[col] = df[col].astype(np.int64)
+                if df[col].dtype == float:
+                    df[col] =df[col].astype(np.float32)
+        
+        red_memory = df.memory_usage().sum()/1024**2
+        print('Memory usage after complition: ',red_memory,'MB')
+        
+    reduce_memory_usage(train)
+    
+    
+    
+    Intial memory usage: 2.5941162109375 MB
+    Memory usage after complition:  0.41973876953125 MB
+    
+
+modelling...
+
+In [19]:
+
+    
+    
+    X = train.drop(['Response', 'id'], axis=1)
+    y = train.Response
+    test_id = test.id.values
+    
+    sm = SMOTE(random_state=42)
+    X_sm, y_sm = sm.fit_sample(X, y)
+    
+    rus = RandomUnderSampler(random_state=42)
+    X_rus, y_rus = rus.fit_resample(X, y)
+    
+    ros = RandomOverSampler(random_state=42)
+    X_ros, y_ros= ros.fit_resample(X, y)
+    
+    adasyn = ADASYN(random_state=42)
+    X_ad, y_ad = adasyn.fit_resample(X, y)
+    
+    x_train, x_valid, y_train, y_valid = train_test_split(X, y, test_size=0.3, random_state=10)
+    x_train, y_train= rus.fit_resample(x_train, y_train)
+    
+    
+    
+    d_train = xgb.DMatrix(x_train, label=y_train)
+    d_valid = xgb.DMatrix(x_valid, label=y_valid)
+    
+    
+    params = {
+            'objective':'binary:hinge',
+            'n_estimators': 800,
+            'max_depth':2,
+            'learning_rate':0.01,
+            'eval_metric':'auc',
+            'min_child_weight':4,
+            'subsample':0.1,
+            'colsample_bytree':0.6,
+            'seed':29,
+            'reg_lambda':2.5,
+            'reg_alpha':7,
+            'gamma':0.01,
+            'scale_pos_weight':0,
+            'nthread':-1
+    }
+    
+    watchlist = [(d_train, 'train'), (d_valid, 'valid')]
+    nrounds=5000
+    model = xgb.train(params, d_train, nrounds, watchlist, early_stopping_rounds=800, 
+                               maximize=True, verbose_eval=10)
+    
+    
+    
+    [13:29:35] WARNING: ../src/learner.cc:516: 
+    Parameters: { n_estimators, scale_pos_weight } might not be used.
+    
+      This may not be accurate due to some parameters are only used in language bindings but
+      passed down to XGBoost core.  Or some parameters are not used but slip through this
+      verification. Please open an issue if you find above cases.
+    
+    
+    [0]	train-auc:0.50000	valid-auc:0.50000
+    Multiple eval metrics have been passed: 'valid-auc' will be used for early stopping.
+    
+    Will train until valid-auc hasn't improved in 800 rounds.
+    [10]	train-auc:0.50000	valid-auc:0.50000
+    [20]	train-auc:0.50000	valid-auc:0.50000
+    [30]	train-auc:0.50000	valid-auc:0.50000
+    [40]	train-auc:0.50000	valid-auc:0.50000
+    [50]	train-auc:0.50000	valid-auc:0.50000
+    [60]	train-auc:0.50000	valid-auc:0.50000
+    [70]	train-auc:0.66563	valid-auc:0.65880
+    [80]	train-auc:0.73504	valid-auc:0.73984
+    [90]	train-auc:0.73504	valid-auc:0.73984
+    [100]	train-auc:0.74238	valid-auc:0.74503
+    [110]	train-auc:0.74831	valid-auc:0.75027
+    [120]	train-auc:0.74887	valid-auc:0.75112
+    [130]	train-auc:0.74944	valid-auc:0.75079
+    [140]	train-auc:0.75395	valid-auc:0.75513
+    [150]	train-auc:0.75536	valid-auc:0.75791
+    [160]	train-auc:0.76411	valid-auc:0.76735
+    [170]	train-auc:0.77003	valid-auc:0.77457
+    [180]	train-auc:0.77060	valid-auc:0.77485
+    [190]	train-auc:0.77060	valid-auc:0.77485
+    [200]	train-auc:0.77060	valid-auc:0.77485
+    [210]	train-auc:0.77060	valid-auc:0.77485
+    [220]	train-auc:0.77060	valid-auc:0.77485
+    [230]	train-auc:0.77060	valid-auc:0.77485
+    [240]	train-auc:0.77060	valid-auc:0.77485
+    [250]	train-auc:0.77060	valid-auc:0.77485
+    [260]	train-auc:0.77060	valid-auc:0.77485
+    [270]	train-auc:0.77060	valid-auc:0.77485
+    [280]	train-auc:0.77060	valid-auc:0.77485
+    [290]	train-auc:0.77060	valid-auc:0.77485
+    [300]	train-auc:0.77060	valid-auc:0.77485
+    [310]	train-auc:0.77060	valid-auc:0.77485
+    [320]	train-auc:0.77060	valid-auc:0.77485
+    [330]	train-auc:0.77060	valid-auc:0.77485
+    [340]	train-auc:0.77060	valid-auc:0.77485
+    [350]	train-auc:0.77060	valid-auc:0.77485
+    [360]	train-auc:0.77060	valid-auc:0.77485
+    [370]	train-auc:0.77060	valid-auc:0.77485
+    [380]	train-auc:0.77060	valid-auc:0.77485
+    [390]	train-auc:0.77060	valid-auc:0.77485
+    [400]	train-auc:0.77060	valid-auc:0.77485
+    [410]	train-auc:0.77060	valid-auc:0.77485
+    [420]	train-auc:0.77060	valid-auc:0.77485
+    [430]	train-auc:0.77060	valid-auc:0.77485
+    [440]	train-auc:0.77060	valid-auc:0.77485
+    [450]	train-auc:0.77060	valid-auc:0.77485
+    [460]	train-auc:0.77060	valid-auc:0.77485
+    [470]	train-auc:0.77060	valid-auc:0.77485
+    [480]	train-auc:0.77060	valid-auc:0.77485
+    [490]	train-auc:0.77060	valid-auc:0.77485
+    [500]	train-auc:0.77060	valid-auc:0.77485
+    [510]	train-auc:0.77060	valid-auc:0.77485
+    [520]	train-auc:0.77060	valid-auc:0.77485
+    [530]	train-auc:0.77060	valid-auc:0.77485
+    [540]	train-auc:0.77060	valid-auc:0.77485
+    [550]	train-auc:0.77060	valid-auc:0.77485
+    [560]	train-auc:0.77060	valid-auc:0.77485
+    [570]	train-auc:0.77088	valid-auc:0.77485
+    [580]	train-auc:0.77088	valid-auc:0.77485
+    [590]	train-auc:0.77088	valid-auc:0.77485
+    [600]	train-auc:0.77088	valid-auc:0.77485
+    [610]	train-auc:0.77088	valid-auc:0.77485
+    [620]	train-auc:0.77088	valid-auc:0.77485
+    [630]	train-auc:0.77088	valid-auc:0.77485
+    [640]	train-auc:0.77116	valid-auc:0.77485
+    [650]	train-auc:0.77116	valid-auc:0.77485
+    [660]	train-auc:0.77116	valid-auc:0.77485
+    [670]	train-auc:0.77116	valid-auc:0.77485
+    [680]	train-auc:0.77116	valid-auc:0.77485
+    [690]	train-auc:0.77116	valid-auc:0.77485
+    [700]	train-auc:0.77116	valid-auc:0.77485
+    [710]	train-auc:0.77116	valid-auc:0.77485
+    [720]	train-auc:0.77116	valid-auc:0.77485
+    [730]	train-auc:0.77116	valid-auc:0.77485
+    [740]	train-auc:0.77116	valid-auc:0.77485
+    [750]	train-auc:0.77116	valid-auc:0.77485
+    [760]	train-auc:0.77145	valid-auc:0.77485
+    [770]	train-auc:0.77145	valid-auc:0.77485
+    [780]	train-auc:0.77145	valid-auc:0.77485
+    [790]	train-auc:0.77173	valid-auc:0.77485
+    [800]	train-auc:0.77116	valid-auc:0.77485
+    [810]	train-auc:0.77201	valid-auc:0.77514
+    [820]	train-auc:0.77173	valid-auc:0.77514
+    [830]	train-auc:0.77173	valid-auc:0.77523
+    [840]	train-auc:0.77201	valid-auc:0.77523
+    [850]	train-auc:0.77201	valid-auc:0.77542
+    [860]	train-auc:0.77342	valid-auc:0.77542
+    [870]	train-auc:0.77427	valid-auc:0.77608
+    [880]	train-auc:0.77624	valid-auc:0.77646
+    [890]	train-auc:0.77539	valid-auc:0.77646
+    [900]	train-auc:0.77596	valid-auc:0.77665
+    [910]	train-auc:0.77681	valid-auc:0.77684
+    [920]	train-auc:0.77822	valid-auc:0.77759
+    [930]	train-auc:0.77850	valid-auc:0.77825
+    [940]	train-auc:0.77934	valid-auc:0.77920
+    [950]	train-auc:0.77850	valid-auc:0.77872
+    [960]	train-auc:0.77906	valid-auc:0.77920
+    [970]	train-auc:0.77906	valid-auc:0.77854
+    [980]	train-auc:0.77906	valid-auc:0.77863
+    [990]	train-auc:0.78104	valid-auc:0.77976
+    [1000]	train-auc:0.78160	valid-auc:0.78005
+    [1010]	train-auc:0.78104	valid-auc:0.78024
+    [1020]	train-auc:0.78160	valid-auc:0.78052
+    [1030]	train-auc:0.78076	valid-auc:0.78109
+    [1040]	train-auc:0.78217	valid-auc:0.78132
+    [1050]	train-auc:0.78217	valid-auc:0.78099
+    [1060]	train-auc:0.78132	valid-auc:0.78075
+    [1070]	train-auc:0.78217	valid-auc:0.78141
+    [1080]	train-auc:0.78301	valid-auc:0.78174
+    [1090]	train-auc:0.78301	valid-auc:0.78145
+    [1100]	train-auc:0.78386	valid-auc:0.78212
+    [1110]	train-auc:0.78330	valid-auc:0.78212
+    [1120]	train-auc:0.78386	valid-auc:0.78268
+    [1130]	train-auc:0.78442	valid-auc:0.78263
+    [1140]	train-auc:0.78386	valid-auc:0.78306
+    [1150]	train-auc:0.78414	valid-auc:0.78292
+    [1160]	train-auc:0.78386	valid-auc:0.78301
+    [1170]	train-auc:0.78414	valid-auc:0.78348
+    [1180]	train-auc:0.78414	valid-auc:0.78320
+    [1190]	train-auc:0.78386	valid-auc:0.78216
+    [1200]	train-auc:0.78414	valid-auc:0.78197
+    [1210]	train-auc:0.78471	valid-auc:0.78197
+    [1220]	train-auc:0.78442	valid-auc:0.78187
+    [1230]	train-auc:0.78442	valid-auc:0.78249
+    [1240]	train-auc:0.78499	valid-auc:0.78211
+    [1250]	train-auc:0.78471	valid-auc:0.78206
+    [1260]	train-auc:0.78499	valid-auc:0.78282
+    [1270]	train-auc:0.78583	valid-auc:0.78319
+    [1280]	train-auc:0.78555	valid-auc:0.78296
+    [1290]	train-auc:0.78583	valid-auc:0.78314
+    [1300]	train-auc:0.78583	valid-auc:0.78324
+    [1310]	train-auc:0.78555	valid-auc:0.78362
+    [1320]	train-auc:0.78527	valid-auc:0.78381
+    [1330]	train-auc:0.78583	valid-auc:0.78418
+    [1340]	train-auc:0.78527	valid-auc:0.78376
+    [1350]	train-auc:0.78555	valid-auc:0.78395
+    [1360]	train-auc:0.78640	valid-auc:0.78404
+    [1370]	train-auc:0.78640	valid-auc:0.78404
+    [1380]	train-auc:0.78640	valid-auc:0.78423
+    [1390]	train-auc:0.78668	valid-auc:0.78489
+    [1400]	train-auc:0.78725	valid-auc:0.78527
+    [1410]	train-auc:0.78781	valid-auc:0.78555
+    [1420]	train-auc:0.78753	valid-auc:0.78574
+    [1430]	train-auc:0.78753	valid-auc:0.78555
+    [1440]	train-auc:0.78753	valid-auc:0.78503
+    [1450]	train-auc:0.78809	valid-auc:0.78493
+    [1460]	train-auc:0.78809	valid-auc:0.78503
+    [1470]	train-auc:0.78781	valid-auc:0.78550
+    [1480]	train-auc:0.78809	valid-auc:0.78550
+    [1490]	train-auc:0.78781	valid-auc:0.78541
+    [1500]	train-auc:0.78866	valid-auc:0.78569
+    [1510]	train-auc:0.78866	valid-auc:0.78588
+    [1520]	train-auc:0.78809	valid-auc:0.78512
+    [1530]	train-auc:0.78809	valid-auc:0.78560
+    [1540]	train-auc:0.78866	valid-auc:0.78531
+    [1550]	train-auc:0.78838	valid-auc:0.78522
+    [1560]	train-auc:0.78838	valid-auc:0.78512
+    [1570]	train-auc:0.78838	valid-auc:0.78522
+    [1580]	train-auc:0.78809	valid-auc:0.78522
+    [1590]	train-auc:0.78781	valid-auc:0.78560
+    [1600]	train-auc:0.78866	valid-auc:0.78560
+    [1610]	train-auc:0.78894	valid-auc:0.78616
+    [1620]	train-auc:0.78950	valid-auc:0.78578
+    [1630]	train-auc:0.78894	valid-auc:0.78626
+    [1640]	train-auc:0.78922	valid-auc:0.78626
+    [1650]	train-auc:0.78922	valid-auc:0.78616
+    [1660]	train-auc:0.78922	valid-auc:0.78635
+    [1670]	train-auc:0.78950	valid-auc:0.78573
+    [1680]	train-auc:0.78979	valid-auc:0.78564
+    [1690]	train-auc:0.78894	valid-auc:0.78531
+    [1700]	train-auc:0.78922	valid-auc:0.78568
+    [1710]	train-auc:0.78894	valid-auc:0.78554
+    [1720]	train-auc:0.78979	valid-auc:0.78564
+    [1730]	train-auc:0.78979	valid-auc:0.78625
+    [1740]	train-auc:0.78979	valid-auc:0.78582
+    [1750]	train-auc:0.78979	valid-auc:0.78502
+    [1760]	train-auc:0.79035	valid-auc:0.78582
+    [1770]	train-auc:0.79007	valid-auc:0.78620
+    [1780]	train-auc:0.79007	valid-auc:0.78540
+    [1790]	train-auc:0.79007	valid-auc:0.78648
+    [1800]	train-auc:0.78950	valid-auc:0.78578
+    [1810]	train-auc:0.79035	valid-auc:0.78578
+    [1820]	train-auc:0.79035	valid-auc:0.78606
+    [1830]	train-auc:0.79063	valid-auc:0.78634
+    [1840]	train-auc:0.79007	valid-auc:0.78615
+    [1850]	train-auc:0.78979	valid-auc:0.78625
+    [1860]	train-auc:0.79035	valid-auc:0.78625
+    [1870]	train-auc:0.78950	valid-auc:0.78615
+    [1880]	train-auc:0.79007	valid-auc:0.78625
+    [1890]	train-auc:0.79035	valid-auc:0.78563
+    [1900]	train-auc:0.79091	valid-auc:0.78592
+    [1910]	train-auc:0.79091	valid-auc:0.78639
+    [1920]	train-auc:0.79120	valid-auc:0.78596
+    [1930]	train-auc:0.79063	valid-auc:0.78525
+    [1940]	train-auc:0.79063	valid-auc:0.78534
+    [1950]	train-auc:0.79063	valid-auc:0.78615
+    [1960]	train-auc:0.78979	valid-auc:0.78615
+    [1970]	train-auc:0.79120	valid-auc:0.78511
+    [1980]	train-auc:0.79148	valid-auc:0.78477
+    [1990]	train-auc:0.79148	valid-auc:0.78487
+    [2000]	train-auc:0.79091	valid-auc:0.78529
+    [2010]	train-auc:0.79091	valid-auc:0.78520
+    [2020]	train-auc:0.79091	valid-auc:0.78458
+    [2030]	train-auc:0.79091	valid-auc:0.78440
+    [2040]	train-auc:0.79120	valid-auc:0.78421
+    [2050]	train-auc:0.79091	valid-auc:0.78449
+    [2060]	train-auc:0.79091	valid-auc:0.78553
+    [2070]	train-auc:0.79063	valid-auc:0.78520
+    [2080]	train-auc:0.79035	valid-auc:0.78529
+    [2090]	train-auc:0.79035	valid-auc:0.78511
+    [2100]	train-auc:0.79035	valid-auc:0.78492
+    [2110]	train-auc:0.79035	valid-auc:0.78492
+    [2120]	train-auc:0.79035	valid-auc:0.78539
+    [2130]	train-auc:0.79091	valid-auc:0.78477
+    [2140]	train-auc:0.79091	valid-auc:0.78524
+    [2150]	train-auc:0.79035	valid-auc:0.78487
+    [2160]	train-auc:0.79063	valid-auc:0.78515
+    [2170]	train-auc:0.79063	valid-auc:0.78458
+    [2180]	train-auc:0.79091	valid-auc:0.78515
+    [2190]	train-auc:0.79035	valid-auc:0.78496
+    [2200]	train-auc:0.79035	valid-auc:0.78506
+    [2210]	train-auc:0.79063	valid-auc:0.78506
+    [2220]	train-auc:0.79063	valid-auc:0.78506
+    [2230]	train-auc:0.79204	valid-auc:0.78534
+    [2240]	train-auc:0.79204	valid-auc:0.78534
+    [2250]	train-auc:0.79120	valid-auc:0.78496
+    [2260]	train-auc:0.79091	valid-auc:0.78534
+    [2270]	train-auc:0.79063	valid-auc:0.78543
+    [2280]	train-auc:0.79063	valid-auc:0.78524
+    [2290]	train-auc:0.79091	valid-auc:0.78506
+    [2300]	train-auc:0.79091	valid-auc:0.78553
+    [2310]	train-auc:0.79120	valid-auc:0.78562
+    [2320]	train-auc:0.79120	valid-auc:0.78562
+    [2330]	train-auc:0.79148	valid-auc:0.78553
+    [2340]	train-auc:0.79148	valid-auc:0.78553
+    [2350]	train-auc:0.79204	valid-auc:0.78581
+    [2360]	train-auc:0.79148	valid-auc:0.78572
+    [2370]	train-auc:0.79148	valid-auc:0.78572
+    [2380]	train-auc:0.79035	valid-auc:0.78572
+    [2390]	train-auc:0.79091	valid-auc:0.78581
+    [2400]	train-auc:0.79091	valid-auc:0.78591
+    [2410]	train-auc:0.79120	valid-auc:0.78591
+    [2420]	train-auc:0.79148	valid-auc:0.78619
+    [2430]	train-auc:0.79176	valid-auc:0.78572
+    [2440]	train-auc:0.79204	valid-auc:0.78591
+    [2450]	train-auc:0.79176	valid-auc:0.78581
+    [2460]	train-auc:0.79176	valid-auc:0.78591
+    [2470]	train-auc:0.79176	valid-auc:0.78600
+    [2480]	train-auc:0.79204	valid-auc:0.78619
+    [2490]	train-auc:0.79148	valid-auc:0.78591
+    [2500]	train-auc:0.79148	valid-auc:0.78591
+    [2510]	train-auc:0.79148	valid-auc:0.78600
+    [2520]	train-auc:0.79204	valid-auc:0.78609
+    [2530]	train-auc:0.79176	valid-auc:0.78609
+    [2540]	train-auc:0.79204	valid-auc:0.78666
+    [2550]	train-auc:0.79204	valid-auc:0.78647
+    [2560]	train-auc:0.79204	valid-auc:0.78657
+    [2570]	train-auc:0.79204	valid-auc:0.78695
+    [2580]	train-auc:0.79204	valid-auc:0.78676
+    [2590]	train-auc:0.79261	valid-auc:0.78704
+    [2600]	train-auc:0.79204	valid-auc:0.78676
+    [2610]	train-auc:0.79232	valid-auc:0.78685
+    [2620]	train-auc:0.79204	valid-auc:0.78695
+    [2630]	train-auc:0.79204	valid-auc:0.78723
+    [2640]	train-auc:0.79232	valid-auc:0.78695
+    [2650]	train-auc:0.79232	valid-auc:0.78676
+    [2660]	train-auc:0.79289	valid-auc:0.78695
+    [2670]	train-auc:0.79289	valid-auc:0.78695
+    [2680]	train-auc:0.79374	valid-auc:0.78742
+    [2690]	train-auc:0.79345	valid-auc:0.78732
+    [2700]	train-auc:0.79289	valid-auc:0.78732
+    [2710]	train-auc:0.79261	valid-auc:0.78761
+    [2720]	train-auc:0.79317	valid-auc:0.78713
+    [2730]	train-auc:0.79261	valid-auc:0.78713
+    [2740]	train-auc:0.79232	valid-auc:0.78742
+    [2750]	train-auc:0.79148	valid-auc:0.78751
+    [2760]	train-auc:0.79176	valid-auc:0.78751
+    [2770]	train-auc:0.79232	valid-auc:0.78779
+    [2780]	train-auc:0.79317	valid-auc:0.78779
+    [2790]	train-auc:0.79289	valid-auc:0.78761
+    [2800]	train-auc:0.79176	valid-auc:0.78761
+    [2810]	train-auc:0.79120	valid-auc:0.78798
+    [2820]	train-auc:0.79176	valid-auc:0.78798
+    [2830]	train-auc:0.79204	valid-auc:0.78798
+    [2840]	train-auc:0.79176	valid-auc:0.78789
+    [2850]	train-auc:0.79148	valid-auc:0.78798
+    [2860]	train-auc:0.79120	valid-auc:0.78808
+    [2870]	train-auc:0.79204	valid-auc:0.78808
+    [2880]	train-auc:0.79261	valid-auc:0.78808
+    [2890]	train-auc:0.79261	valid-auc:0.78827
+    [2900]	train-auc:0.79176	valid-auc:0.78779
+    [2910]	train-auc:0.79148	valid-auc:0.78779
+    [2920]	train-auc:0.79120	valid-auc:0.78798
+    [2930]	train-auc:0.79176	valid-auc:0.78855
+    [2940]	train-auc:0.79063	valid-auc:0.78817
+    [2950]	train-auc:0.79176	valid-auc:0.78836
+    [2960]	train-auc:0.79148	valid-auc:0.78855
+    [2970]	train-auc:0.79204	valid-auc:0.78808
+    [2980]	train-auc:0.79148	valid-auc:0.78798
+    [2990]	train-auc:0.79204	valid-auc:0.78817
+    [3000]	train-auc:0.79232	valid-auc:0.78836
+    [3010]	train-auc:0.79176	valid-auc:0.78846
+    [3020]	train-auc:0.79148	valid-auc:0.78855
+    [3030]	train-auc:0.79063	valid-auc:0.78836
+    [3040]	train-auc:0.79063	valid-auc:0.78855
+    [3050]	train-auc:0.79063	valid-auc:0.78846
+    [3060]	train-auc:0.79035	valid-auc:0.78864
+    [3070]	train-auc:0.79148	valid-auc:0.78864
+    [3080]	train-auc:0.79063	valid-auc:0.78874
+    [3090]	train-auc:0.79035	valid-auc:0.78883
+    [3100]	train-auc:0.79091	valid-auc:0.78902
+    [3110]	train-auc:0.79091	valid-auc:0.78883
+    [3120]	train-auc:0.79120	valid-auc:0.78902
+    [3130]	train-auc:0.79120	valid-auc:0.78874
+    [3140]	train-auc:0.79120	valid-auc:0.78902
+    [3150]	train-auc:0.79176	valid-auc:0.78883
+    [3160]	train-auc:0.79148	valid-auc:0.78874
+    [3170]	train-auc:0.79091	valid-auc:0.78893
+    [3180]	train-auc:0.79120	valid-auc:0.78912
+    [3190]	train-auc:0.79204	valid-auc:0.78912
+    [3200]	train-auc:0.79176	valid-auc:0.78893
+    [3210]	train-auc:0.79204	valid-auc:0.78883
+    [3220]	train-auc:0.79176	valid-auc:0.78893
+    [3230]	train-auc:0.79148	valid-auc:0.78864
+    [3240]	train-auc:0.79176	valid-auc:0.78883
+    [3250]	train-auc:0.79232	valid-auc:0.78893
+    [3260]	train-auc:0.79232	valid-auc:0.78902
+    [3270]	train-auc:0.79148	valid-auc:0.78864
+    [3280]	train-auc:0.79120	valid-auc:0.78864
+    [3290]	train-auc:0.79091	valid-auc:0.78893
+    [3300]	train-auc:0.79148	valid-auc:0.78931
+    [3310]	train-auc:0.79148	valid-auc:0.78940
+    [3320]	train-auc:0.79091	valid-auc:0.78912
+    [3330]	train-auc:0.79120	valid-auc:0.78931
+    [3340]	train-auc:0.79148	valid-auc:0.78931
+    [3350]	train-auc:0.79204	valid-auc:0.78931
+    [3360]	train-auc:0.79176	valid-auc:0.78949
+    [3370]	train-auc:0.79120	valid-auc:0.78959
+    [3380]	train-auc:0.79120	valid-auc:0.78968
+    [3390]	train-auc:0.79204	valid-auc:0.78987
+    [3400]	train-auc:0.79204	valid-auc:0.79006
+    [3410]	train-auc:0.79204	valid-auc:0.78997
+    [3420]	train-auc:0.79204	valid-auc:0.78997
+    [3430]	train-auc:0.79204	valid-auc:0.79034
+    [3440]	train-auc:0.79232	valid-auc:0.79025
+    [3450]	train-auc:0.79289	valid-auc:0.79053
+    [3460]	train-auc:0.79261	valid-auc:0.78997
+    [3470]	train-auc:0.79232	valid-auc:0.78987
+    [3480]	train-auc:0.79261	valid-auc:0.78959
+    [3490]	train-auc:0.79204	valid-auc:0.78959
+    [3500]	train-auc:0.79204	valid-auc:0.78987
+    [3510]	train-auc:0.79232	valid-auc:0.78987
+    [3520]	train-auc:0.79204	valid-auc:0.78987
+    [3530]	train-auc:0.79176	valid-auc:0.78978
+    [3540]	train-auc:0.79176	valid-auc:0.78997
+    [3550]	train-auc:0.79204	valid-auc:0.78997
+    [3560]	train-auc:0.79176	valid-auc:0.79016
+    [3570]	train-auc:0.79176	valid-auc:0.79016
+    [3580]	train-auc:0.79176	valid-auc:0.79016
+    [3590]	train-auc:0.79204	valid-auc:0.78987
+    [3600]	train-auc:0.79148	valid-auc:0.78978
+    [3610]	train-auc:0.79120	valid-auc:0.78949
+    [3620]	train-auc:0.79120	valid-auc:0.78978
+    [3630]	train-auc:0.79232	valid-auc:0.78978
+    [3640]	train-auc:0.79204	valid-auc:0.78997
+    [3650]	train-auc:0.79176	valid-auc:0.78959
+    [3660]	train-auc:0.79204	valid-auc:0.78978
+    [3670]	train-auc:0.79204	valid-auc:0.79034
+    [3680]	train-auc:0.79148	valid-auc:0.78997
+    [3690]	train-auc:0.79204	valid-auc:0.78987
+    [3700]	train-auc:0.79176	valid-auc:0.79006
+    [3710]	train-auc:0.79204	valid-auc:0.79016
+    [3720]	train-auc:0.79232	valid-auc:0.79072
+    [3730]	train-auc:0.79232	valid-auc:0.79072
+    [3740]	train-auc:0.79261	valid-auc:0.79082
+    [3750]	train-auc:0.79204	valid-auc:0.79072
+    [3760]	train-auc:0.79204	valid-auc:0.79053
+    [3770]	train-auc:0.79232	valid-auc:0.79053
+    [3780]	train-auc:0.79261	valid-auc:0.79063
+    [3790]	train-auc:0.79261	valid-auc:0.79063
+    [3800]	train-auc:0.79261	valid-auc:0.79082
+    [3810]	train-auc:0.79289	valid-auc:0.79110
+    [3820]	train-auc:0.79261	valid-auc:0.79063
+    [3830]	train-auc:0.79289	valid-auc:0.79020
+    [3840]	train-auc:0.79261	valid-auc:0.79020
+    [3850]	train-auc:0.79232	valid-auc:0.79001
+    [3860]	train-auc:0.79176	valid-auc:0.78992
+    [3870]	train-auc:0.79176	valid-auc:0.79001
+    [3880]	train-auc:0.79232	valid-auc:0.78992
+    [3890]	train-auc:0.79232	valid-auc:0.79025
+    [3900]	train-auc:0.79176	valid-auc:0.78963
+    [3910]	train-auc:0.79232	valid-auc:0.79063
+    [3920]	train-auc:0.79232	valid-auc:0.79091
+    [3930]	train-auc:0.79232	valid-auc:0.79053
+    [3940]	train-auc:0.79204	valid-auc:0.79034
+    [3950]	train-auc:0.79176	valid-auc:0.79025
+    [3960]	train-auc:0.79204	valid-auc:0.79016
+    [3970]	train-auc:0.79176	valid-auc:0.79044
+    [3980]	train-auc:0.79176	valid-auc:0.79044
+    [3990]	train-auc:0.79232	valid-auc:0.79072
+    [4000]	train-auc:0.79204	valid-auc:0.79082
+    [4010]	train-auc:0.79176	valid-auc:0.79053
+    [4020]	train-auc:0.79148	valid-auc:0.79072
+    [4030]	train-auc:0.79204	valid-auc:0.79082
+    [4040]	train-auc:0.79261	valid-auc:0.79072
+    [4050]	train-auc:0.79232	valid-auc:0.79063
+    [4060]	train-auc:0.79204	valid-auc:0.79044
+    [4070]	train-auc:0.79232	valid-auc:0.79044
+    [4080]	train-auc:0.79148	valid-auc:0.79053
+    [4090]	train-auc:0.79204	valid-auc:0.79053
+    [4100]	train-auc:0.79148	valid-auc:0.79016
+    [4110]	train-auc:0.79148	valid-auc:0.79025
+    [4120]	train-auc:0.79176	valid-auc:0.79053
+    [4130]	train-auc:0.79289	valid-auc:0.79072
+    [4140]	train-auc:0.79261	valid-auc:0.79044
+    [4150]	train-auc:0.79261	valid-auc:0.79053
+    [4160]	train-auc:0.79261	valid-auc:0.79053
+    [4170]	train-auc:0.79204	valid-auc:0.79053
+    [4180]	train-auc:0.79204	valid-auc:0.79063
+    [4190]	train-auc:0.79204	valid-auc:0.79072
+    [4200]	train-auc:0.79176	valid-auc:0.79072
+    [4210]	train-auc:0.79176	valid-auc:0.79053
+    [4220]	train-auc:0.79148	valid-auc:0.79072
+    [4230]	train-auc:0.79148	valid-auc:0.79082
+    [4240]	train-auc:0.79176	valid-auc:0.79082
+    [4250]	train-auc:0.79232	valid-auc:0.79091
+    [4260]	train-auc:0.79204	valid-auc:0.79072
+    [4270]	train-auc:0.79232	valid-auc:0.79100
+    [4280]	train-auc:0.79232	valid-auc:0.79157
+    [4290]	train-auc:0.79232	valid-auc:0.79091
+    [4300]	train-auc:0.79232	valid-auc:0.79082
+    [4310]	train-auc:0.79204	valid-auc:0.79072
+    [4320]	train-auc:0.79261	valid-auc:0.79091
+    [4330]	train-auc:0.79261	valid-auc:0.79067
+    [4340]	train-auc:0.79232	valid-auc:0.79077
+    [4350]	train-auc:0.79232	valid-auc:0.79082
+    [4360]	train-auc:0.79204	valid-auc:0.79082
+    [4370]	train-auc:0.79232	valid-auc:0.79091
+    [4380]	train-auc:0.79232	valid-auc:0.79067
+    [4390]	train-auc:0.79232	valid-auc:0.79105
+    [4400]	train-auc:0.79232	valid-auc:0.79105
+    [4410]	train-auc:0.79261	valid-auc:0.79086
+    [4420]	train-auc:0.79289	valid-auc:0.79095
+    [4430]	train-auc:0.79289	valid-auc:0.79124
+    [4440]	train-auc:0.79261	valid-auc:0.79124
+    [4450]	train-auc:0.79261	valid-auc:0.79114
+    [4460]	train-auc:0.79261	valid-auc:0.79124
+    [4470]	train-auc:0.79261	valid-auc:0.79124
+    [4480]	train-auc:0.79261	valid-auc:0.79152
+    [4490]	train-auc:0.79261	valid-auc:0.79143
+    [4500]	train-auc:0.79289	valid-auc:0.79143
+    [4510]	train-auc:0.79261	valid-auc:0.79171
+    [4520]	train-auc:0.79289	valid-auc:0.79143
+    [4530]	train-auc:0.79289	valid-auc:0.79171
+    [4540]	train-auc:0.79289	valid-auc:0.79171
+    [4550]	train-auc:0.79289	valid-auc:0.79124
+    [4560]	train-auc:0.79261	valid-auc:0.79124
+    [4570]	train-auc:0.79289	valid-auc:0.79124
+    [4580]	train-auc:0.79289	valid-auc:0.79105
+    [4590]	train-auc:0.79261	valid-auc:0.79133
+    [4600]	train-auc:0.79261	valid-auc:0.79214
+    [4610]	train-auc:0.79289	valid-auc:0.79143
+    [4620]	train-auc:0.79261	valid-auc:0.79214
+    [4630]	train-auc:0.79261	valid-auc:0.79204
+    [4640]	train-auc:0.79289	valid-auc:0.79233
+    [4650]	train-auc:0.79317	valid-auc:0.79162
+    [4660]	train-auc:0.79317	valid-auc:0.79233
+    [4670]	train-auc:0.79317	valid-auc:0.79171
+    [4680]	train-auc:0.79317	valid-auc:0.79171
+    [4690]	train-auc:0.79345	valid-auc:0.79133
+    [4700]	train-auc:0.79317	valid-auc:0.79195
+    [4710]	train-auc:0.79317	valid-auc:0.79223
+    [4720]	train-auc:0.79345	valid-auc:0.79162
+    [4730]	train-auc:0.79345	valid-auc:0.79162
+    [4740]	train-auc:0.79345	valid-auc:0.79171
+    [4750]	train-auc:0.79374	valid-auc:0.79180
+    [4760]	train-auc:0.79458	valid-auc:0.79180
+    [4770]	train-auc:0.79402	valid-auc:0.79171
+    [4780]	train-auc:0.79345	valid-auc:0.79152
+    [4790]	train-auc:0.79345	valid-auc:0.79152
+    [4800]	train-auc:0.79317	valid-auc:0.79171
+    [4810]	train-auc:0.79317	valid-auc:0.79180
+    [4820]	train-auc:0.79289	valid-auc:0.79152
+    [4830]	train-auc:0.79317	valid-auc:0.79143
+    [4840]	train-auc:0.79289	valid-auc:0.79199
+    [4850]	train-auc:0.79374	valid-auc:0.79199
+    [4860]	train-auc:0.79345	valid-auc:0.79199
+    [4870]	train-auc:0.79317	valid-auc:0.79199
+    [4880]	train-auc:0.79374	valid-auc:0.79171
+    [4890]	train-auc:0.79345	valid-auc:0.79162
+    [4900]	train-auc:0.79345	valid-auc:0.79190
+    [4910]	train-auc:0.79345	valid-auc:0.79180
+    [4920]	train-auc:0.79345	valid-auc:0.79162
+    [4930]	train-auc:0.79317	valid-auc:0.79162
+    [4940]	train-auc:0.79317	valid-auc:0.79162
+    [4950]	train-auc:0.79317	valid-auc:0.79199
+    [4960]	train-auc:0.79317	valid-auc:0.79190
+    [4970]	train-auc:0.79374	valid-auc:0.79199
+    [4980]	train-auc:0.79317	valid-auc:0.79190
+    [4990]	train-auc:0.79345	valid-auc:0.79199
+    [4999]	train-auc:0.79345	valid-auc:0.79209
+    
+
+Model results:
+
+In [20]:
+
+    
+    
+    y_pred = model.predict(d_valid)
+    print('Accuracy :{0:0.5f}'.format(metrics.accuracy_score(y_valid, y_pred))) 
+    print('AUC : {0:0.5f}'.format(metrics.roc_auc_score(y_valid, y_pred)))
+    print('Precision : {0:0.5f}'.format(metrics.precision_score(y_valid, y_pred)))
+    print('Recall : {0:0.5f}'.format(metrics.recall_score(y_valid, y_pred)))
+    print('F1 : {0:0.5f}'.format(metrics.f1_score(y_valid, y_pred)))
+    
+    
+    
+    Accuracy :0.66667
+    AUC : 0.79209
+    Precision : 0.25473
+    Recall : 0.95597
+    F1 : 0.40227
+    
+
+In [21]:
+
+    
+    
+    confusion_matrix(y_valid, y_pred)
+    
+
+Out[21]:
+
+    
+    
+    array([[3327, 1969],
+           [  31,  673]])
+
+In [22]:
+
+    
+    
+    xgb.plot_importance(model)
+    
+
+Out[22]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7ff28c26b790>
+
+![](__results___files/__results___35_1.png)
+
+In [23]:
+
+    
+    
+    from sklearn.metrics import roc_curve, auc
+    false_positive_rate, true_positive_rate, thresholds = roc_curve(y_valid, y_pred)
+    roc_auc = auc(false_positive_rate, true_positive_rate)
+    import matplotlib.pyplot as plt
+    plt.title('Receiver Operating Characteristic')
+    plt.plot(false_positive_rate, true_positive_rate, 'b', label='AUC = %0.2f'% roc_auc)
+    plt.legend(loc='lower right')
+    plt.plot([0,1],[0,1],'r--')
+    plt.xlim([-0.1,1.2])
+    plt.ylim([-0.1,1.2])
+    plt.ylabel('True Positive Rate')
+    plt.xlabel('False Positive Rate')
+    
+
+Out[23]:
+
+    
+    
+    Text(0.5, 0, 'False Positive Rate')
+
+![](__results___files/__results___36_1.png)
+
+some plots for some important features...
+
+In [24]:
+
+    
+    
+    var = train.drop(['id', 'Response'], axis=1).columns.values
+    
+    i = 0
+    t0 = train.loc[train['Response'] == 0]
+    t1 = train.loc[train['Response'] == 1]
+    
+    sns.set_style('whitegrid')
+    plt.figure()
+    fig, ax = plt.subplots(3,5,figsize=(22,28))
+    
+    for feature in var:
+        i += 1
+        plt.subplot(3,5,i)
+        sns.kdeplot(t0[feature], bw=0.5,label="Class = 0")
+        sns.kdeplot(t1[feature], bw=0.5,label="Class = 1")
+        plt.xlabel(feature, fontsize=12)
+        locs, labels = plt.xticks()
+        plt.tick_params(axis='both', which='major', labelsize=12)
+    plt.show();
+    
+    
+    
+    <Figure size 432x288 with 0 Axes>
+
+![](__results___files/__results___38_1.png)
+
+In [25]:
+
+    
+    
+    dmatrix_data = xgb.DMatrix(data=X_ros, label=y_ros)
+    
+    cv_params = {
+            'objective':'binary:hinge',
+            'max_depth':13,
+            'learning_rate':0.1,
+            'eval_metric':'auc',
+            'min_child_weight':1,
+            'subsample':1,
+            'colsample_bytree':0.6,
+            'seed':29,
+            'reg_lambda':2.79,
+            'reg_alpha':7,
+            'gamma':0.01,
+            'scale_pos_weight':0,
+            'nthread':-1
+    }
+    cross_val = xgb.cv(
+        params=cv_params,
+        dtrain=dmatrix_data, 
+        nfold=5,
+        num_boost_round=5000, 
+        early_stopping_rounds=1000, 
+        metrics='auc', 
+        as_pandas=True, 
+        seed=29)
+    print(cross_val.tail(1))
+    
+    
+    
+    [13:30:03] WARNING: ../src/learner.cc:516: 
+    Parameters: { scale_pos_weight } might not be used.
+    
+      This may not be accurate due to some parameters are only used in language bindings but
+      passed down to XGBoost core.  Or some parameters are not used but slip through this
+      verification. Please open an issue if you find above cases.
+    
+    
+    [13:30:03] WARNING: ../src/learner.cc:516: 
+    Parameters: { scale_pos_weight } might not be used.
+    
+      This may not be accurate due to some parameters are only used in language bindings but
+      passed down to XGBoost core.  Or some parameters are not used but slip through this
+      verification. Please open an issue if you find above cases.
+    
+    
+    [13:30:03] WARNING: ../src/learner.cc:516: 
+    Parameters: { scale_pos_weight } might not be used.
+    
+      This may not be accurate due to some parameters are only used in language bindings but
+      passed down to XGBoost core.  Or some parameters are not used but slip through this
+      verification. Please open an issue if you find above cases.
+    
+    
+    [13:30:03] WARNING: ../src/learner.cc:516: 
+    Parameters: { scale_pos_weight } might not be used.
+    
+      This may not be accurate due to some parameters are only used in language bindings but
+      passed down to XGBoost core.  Or some parameters are not used but slip through this
+      verification. Please open an issue if you find above cases.
+    
+    
+    [13:30:03] WARNING: ../src/learner.cc:516: 
+    Parameters: { scale_pos_weight } might not be used.
+    
+      This may not be accurate due to some parameters are only used in language bindings but
+      passed down to XGBoost core.  Or some parameters are not used but slip through this
+      verification. Please open an issue if you find above cases.
+    
+    
+         train-auc-mean  train-auc-std  test-auc-mean  test-auc-std
+    635        0.999322       0.000095       0.957531      0.000734
+    
+
+Pls upvote if you liked this kernel
+
+In [26]:
+
+    
+    
+    # from sklearn.model_selection import GridSearchCV
+    
+    # clf = xgb.XGBClassifier()
+    # parameters = {
+    #      "eta"    : [0.05, 0.10, 0.15, 0.20, 0.25, 0.30 ] ,
+    #      "max_depth"        : [ 3, 4, 5, 6, 8, 10, 12, 15],
+    #      "min_child_weight" : [ 1, 3, 5, 7 ],
+    #      "gamma"            : [ 0.0, 0.1, 0.2 , 0.3, 0.4 ],
+    #      "colsample_bytree" : [ 0.3, 0.4, 0.5 , 0.7 ]
+    #      }
+    
+    # grid = GridSearchCV(clf,
+    #                     parameters, n_jobs=4,
+    #                     scoring="neg_log_loss",
+    #                     cv=3)
+    
+    # grid.fit(x_train, y_train)
+    
+
+In [27]:
+
+    
+    
+    # ## model for prediction
+    # d_train = xgb.DMatrix(x_train, label=y_train)
+    # d_valid = xgb.DMatrix(x_valid, label=y_valid)
+    # X_test = test.drop('id', axis=1)
+    # d_test = xgb.DMatrix(X_test)
+    # params = {
+    #         'objective':'binary:logistic',
+    #         'n_estimators': 500,
+    #         'max_depth':12,
+    #         'learning_rate':0.1,
+    #         'eval_metric':'auc',
+    #         'min_child_weight':1,
+    #         'subsample':1,
+    #         'colsample_bytree':0.6,
+    #         'seed':29,
+    #         'reg_lambda':2.79,
+    #         'reg_alpha':7,
+    #         'gamma':0.01,
+    #         'scale_pos_weight':1,
+    #         'nthread':-1
+    # }
+    
+    # watchlist = [(d_train, 'train'), (d_valid, 'valid')]
+    # nrounds=10000
+    # model_1 = xgb.train(params, d_train, nrounds, watchlist, early_stopping_rounds=800, 
+    #                            maximize=True, verbose_eval=10)
+    
+
+In [28]:
+
+    
+    
+    # sub = pd.DataFrame()
+    # sub['ID'] = test['id']
+    # sub['Response'] = model_1.predict(d_test)
+    # sub.to_csv('submission.csv', index=False)
+    
+    # sub.head()
+    
+

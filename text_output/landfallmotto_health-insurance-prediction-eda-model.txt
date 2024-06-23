@@ -1,0 +1,955 @@
+# **Health Insurance Cross Sell Prediction**¶
+
+Vehicle insurance (also known as car insurance, motor insurance, or auto
+insurance) is insurance for cars, trucks, motorcycles, and other road
+vehicles. Its primary use is to provide financial protection against physical
+damage or bodily injury resulting from traffic collisions and against
+liability that could also arise from incidents in a vehicle. Vehicle insurance
+may additionally offer financial protection against theft of the vehicle, and
+against damage to the vehicle sustained from events other than traffic
+collisions, such as keying, weather or natural disasters, and damage sustained
+by colliding with stationary objects. The specific terms of vehicle insurance
+vary with legal regulations in each region.
+
+Reference: <https://en.wikipedia.org/wiki/Vehicle_insurance>
+
+Our goal is to build a model from Health insurance customer data to predict
+whether they interest in purchasing vehicle insurance policy.
+<https://www.kaggle.com/anmolkumar/health-insurance-cross-sell-prediction>
+
+In [1]:
+
+    
+    
+    import sys
+    import warnings
+    import numpy as np # linear algebra
+    import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+    
+    if not sys.warnoptions:
+        warnings.simplefilter("ignore")
+    
+    from scipy.stats import norm
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    
+    
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score, auc, roc_curve
+    from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+    from sklearn.model_selection import GridSearchCV, StratifiedKFold, cross_val_score, learning_curve, cross_validate, train_test_split, KFold, cross_val_score
+    from sklearn.svm import SVC
+    from sklearn.naive_bayes import GaussianNB
+    from sklearn.neural_network import MLPClassifier
+    from sklearn.preprocessing import OrdinalEncoder
+    from imblearn.over_sampling import SMOTE
+    from xgboost import XGBClassifier
+    import plotly.express as px
+    
+
+In [2]:
+
+    
+    
+    data=pd.read_csv('../input/health-insurance-cross-sell-prediction/train.csv')
+    data.head(2)
+    test_df=pd.read_csv('../input/health-insurance-cross-sell-prediction/test.csv')
+    
+
+In [3]:
+
+    
+    
+    data.drop(columns='id',inplace=True)
+    
+
+# **Helper Functions**¶
+
+In [4]:
+
+    
+    
+    def count_plot(df,feat,palette='rainbow'):
+        plt.style.use('seaborn')
+        sns.set_style('whitegrid')
+    
+        labels=df[feat].value_counts().index
+        values=df[feat].value_counts().values
+        
+        plt.figure(figsize=(15,5))
+    
+        ax = plt.subplot2grid((1,2),(0,0))
+        sns.barplot(x=labels, y=values,palette=palette, alpha=0.75)
+        for i, p in enumerate(ax.patches):
+            height = p.get_height()
+            ax.text(p.get_x()+p.get_width()/2., height + 0.1, values[i],ha="center")
+        plt.title('Response of Customer', fontsize=15, weight='bold')    
+        plt.show()
+    
+
+# **Target Variable**¶
+
+**Respone** is our target variable where 1 means customers interested in
+vehichle insurance or 0 when not interested. So this is a classification task.
+Also when we look at the target distribution it's clear that we have imbalance
+between labels. We can try to up or down sample data for increasing accuracy.
+
+Oversampling and undersampling in data analysis are techniques used to adjust
+the class distribution of a data set (i.e. the ratio between the different
+classes/categories represented). These terms are used both in statistical
+sampling, survey design methodology and in machine learning.
+
+Reference:
+<https://en.wikipedia.org/wiki/Oversampling_and_undersampling_in_data_analysis>
+
+In [5]:
+
+    
+    
+    sns.set_style("whitegrid")
+    
+
+In [6]:
+
+    
+    
+    count_plot(data,'Response')
+    
+
+![](__results___files/__results___8_0.png)
+
+# **Missing Values**¶
+
+In [7]:
+
+    
+    
+    missing = data.isnull().sum()
+    missing
+    
+
+Out[7]:
+
+    
+    
+    Gender                  0
+    Age                     0
+    Driving_License         0
+    Region_Code             0
+    Previously_Insured      0
+    Vehicle_Age             0
+    Vehicle_Damage          0
+    Annual_Premium          0
+    Policy_Sales_Channel    0
+    Vintage                 0
+    Response                0
+    dtype: int64
+
+# **Gender**¶
+
+Gender distribution in data looks balanced.
+
+In [8]:
+
+    
+    
+    count_plot(data,'Gender','Purples')
+    plt.show()
+    
+
+![](__results___files/__results___12_0.png)
+
+# **Age Groups**¶
+
+Let's see if Age has any effects on response target variable.
+
+In [9]:
+
+    
+    
+    sns.distplot(data[data.Response==0]['Age'], label='0')
+    sns.distplot(data[data.Response==1]['Age'], label='1')
+    plt.legend()
+    plt.show()
+    
+
+![](__results___files/__results___14_0.png)
+
+Some Age ranges have more interest in Vehicle insurance. So, it will be better
+to group ages regarding to above distributions
+
+In [10]:
+
+    
+    
+    bins = [20, 30, 40, 50, 60, 70, 80,90]
+    labels = ['20-29', '30-39', '40-49', '50-59', '60-69', '70-79','80+']
+    data['AgeClass']=pd.cut(data.Age, bins, labels = labels,include_lowest = True)
+    
+    test_df['AgeClass']=pd.cut(test_df.Age, bins, labels = labels,include_lowest = True)
+    
+    data[['Age','AgeClass']].head(5)
+    
+
+Out[10]:
+
+| Age | AgeClass  
+---|---|---  
+0 | 44 | 40-49  
+1 | 76 | 70-79  
+2 | 47 | 40-49  
+3 | 21 | 20-29  
+4 | 29 | 20-29  
+  
+# **Age vs Vehicle Damage**¶
+
+Older people having more damaged cars.
+
+In [11]:
+
+    
+    
+    with sns.axes_style(style='ticks'):
+        g = sns.factorplot("Vehicle_Damage", "Age", "Gender", data=data, kind="box")
+        g.set_axis_labels("Vehicle_Damage", "Age");
+    
+
+![](__results___files/__results___18_0.png)
+
+# **Features Cat vs Num**¶
+
+Let's decide which features are categorical and numeric. This will be later
+used for encoding purposes.
+
+In [12]:
+
+    
+    
+    data_cats=['Gender','Driving_License','Region_Code','Previously_Insured','Vehicle_Age','Vehicle_Damage','Policy_Sales_Channel','Vintage','AgeClass']
+    data_nums=['Age','Annual_Premium']
+    data_all=data_cats+data_nums
+    
+
+# **Outlier Detection**¶
+
+In statistics, an outlier is a data point that differs significantly from
+other observations. An outlier may be due to variability in the measurement or
+it may indicate experimental error; the latter are sometimes excluded from the
+data set. An outlier can cause serious problems in statistical analyses.
+Reference: <https://en.wikipedia.org/wiki/Outlier>
+
+The interquartile range (IQR) is often used to find outliers in data. Outliers
+here are defined as observations that fall below Q1 â 1.5 IQR or above Q3 +
+1.5 IQR. In a boxplot, the highest and lowest occurring value within this
+limit are indicated by whiskers of the box (frequently with an additional bar
+at the end of the whisker) and any outliers as individual points. Reference:
+<https://en.wikipedia.org/wiki/Interquartile_range#Outliers>
+
+![https://upload.wikimedia.org/wikipedia/commons/1/1a/Boxplot_vs_PDF.svg](https://upload.wikimedia.org/wikipedia/commons/1/1a/Boxplot_vs_PDF.svg)
+
+In [13]:
+
+    
+    
+    def detect_outliers(df,feat):
+        Q1 = data[feat].quantile(0.25)
+        Q3 = data[feat].quantile(0.75)
+        IQR = Q3 - Q1
+        #data[~ ((data['Annual_Premium'] < (Q1 - 1.5 * IQR)) |(data['Annual_Premium'] > (Q3 + 1.5 * IQR))) ]
+        return df[((df[feat] < (Q1 - 1.5 * IQR)) |(data[feat] > (Q3 + 1.5 * IQR))) ].shape[0]
+    
+    def clean_outliers(df,feat):
+        Q1 = data[feat].quantile(0.25)
+        Q3 = data[feat].quantile(0.75)
+        IQR = Q3 - Q1
+        return df[~ ((df[feat] < (Q1 - 1.5 * IQR)) |(data[feat] > (Q3 + 1.5 * IQR))) ]
+    
+
+In [14]:
+
+    
+    
+    for feat in data_nums:
+        res=detect_outliers(data,feat)
+        if (res>0):
+            print('%d Outlier detected in feature %s' % (res,feat))
+    
+    
+    
+    10320 Outlier detected in feature Annual_Premium
+    
+
+In [15]:
+
+    
+    
+    clean_data=clean_outliers(data,'Annual_Premium')
+    clean_data.shape
+    
+
+Out[15]:
+
+    
+    
+    (370789, 12)
+
+# **Train Test Split**¶
+
+We split data into 33% test and rest for training.
+
+In [16]:
+
+    
+    
+    from sklearn.model_selection import train_test_split
+    
+    X_train, X_test, y_train, y_test = train_test_split(clean_data[data_cats+data_nums], clean_data.Response, test_size=0.33, random_state=1)
+    
+
+# **Encode Categorical Values**¶
+
+**OrdinalEncoder/LabelEncoder:** When order is important for categorical
+variables, it's important to use sklearn OrdinalEncoder or LabelEncoder. eg.
+cold, warm, hot
+
+**One Hot Encoding:** When order is NOT important we can use sklearn
+OneHotEncoder or pandas get_dummies function. eg. Gender is an example
+Female,Male
+
+There is two rows in test data which has different Policy Sales Channel not
+exists in train data. It's 141 and 142. Just 2 of them so we replace them with
+140.
+
+In [17]:
+
+    
+    
+    def prepare_inputs(train):
+        oe = OrdinalEncoder()
+        oe.fit(train)
+        return oe
+    
+
+In [18]:
+
+    
+    
+    oe=prepare_inputs(data[data_cats])
+    
+    X_train_enc=oe.transform(X_train[data_cats])
+    X_test_enc=oe.transform(X_test[data_cats])
+    
+    # there is 2 unknown new Policy_Sales_Channel values in test 141 and 142
+    # we replace them with 140
+    
+    test_df.loc[test_df['Policy_Sales_Channel']==141.0, 'Policy_Sales_Channel']=140.0
+    test_df.loc[test_df['Policy_Sales_Channel']==142.0, 'Policy_Sales_Channel']=140.0
+    
+    test_df_enc=oe.transform(test_df[data_cats])
+    
+
+In [19]:
+
+    
+    
+    all_train_enc=np.concatenate((X_train_enc, X_train[data_nums].values), axis=1)
+    all_test_enc=np.concatenate((X_test_enc, X_test[data_nums].values), axis=1)
+    
+    all_test_df_enc=np.concatenate((test_df_enc, test_df[data_nums].values), axis=1)
+    
+
+# **Select Features**¶
+
+SelectKBest score functions:
+
+For Regression: f_regression, mutual_info_regression  
+For Classification: chi2, f_classif, mutual_info_classif
+
+Chi2 in general for categorical variables. We use mutual_info_classif which is
+suitable for mixed variables not just categorical or numerical ones ð  
+Here we see adding age groups as new feature doest not bring any improvements.
+Age and Ageclass have same feature importance ð Depending of the kscores we
+can drop some non useful features form dataset for example vintage here is the
+lowers k-score we may drop it if we want.
+
+In [20]:
+
+    
+    
+    from sklearn.feature_selection import SelectKBest
+    from sklearn.feature_selection import chi2, mutual_info_classif
+    
+    # chi2 for categorical variables
+    # mutual_info_classif for mixed variables
+       
+    fs = SelectKBest(score_func=mutual_info_classif, k='all')
+    fs.fit(all_train_enc, y_train)
+    X_train_fs = fs.transform(all_train_enc)
+    
+    
+    
+    for i in range(len(fs.scores_)):
+        print('%s: %f' % (data_all[i], fs.scores_[i]))
+    
+    plt.figure(figsize=(18,8))
+    sns.barplot(data_all, fs.scores_, orient='v')
+    plt.title('Categorical Feature Selection with mutual_info_classif')
+    plt.show()
+    
+    
+    
+    Gender: 0.014816
+    Driving_License: 0.047980
+    Region_Code: 0.014070
+    Previously_Insured: 0.091598
+    Vehicle_Age: 0.036731
+    Vehicle_Damage: 0.089040
+    Policy_Sales_Channel: 0.051027
+    Vintage: 0.000000
+    AgeClass: 0.032863
+    Age: 0.030349
+    Annual_Premium: 0.003923
+    
+
+![](__results___files/__results___33_1.png)
+
+# **OverSampling**¶
+
+In [21]:
+
+    
+    
+    from imblearn.over_sampling import RandomOverSampler 
+    from imblearn.over_sampling import ADASYN
+    
+    #ros = RandomOverSampler(random_state=42, sampling_strategy='minority')
+    #all_train_enc_over_sampled, y_train_over_sampled = ros.fit_resample(all_train_enc, y_train)
+    
+    ada = ADASYN(random_state=42)
+    all_train_enc_over_sampled, y_train_over_sampled = ada.fit_resample(all_train_enc, y_train)
+    
+    y_train=y_train_over_sampled
+    
+
+# **Visualize**¶
+
+In [22]:
+
+    
+    
+    import plotly.express as px
+    from sklearn.decomposition import PCA
+    n_components = 2
+    
+    pca = PCA(n_components=n_components)
+    components = pca.fit_transform(all_train_enc_over_sampled)
+    
+    total_var = pca.explained_variance_ratio_.sum() * 100
+    
+    
+    fig = px.scatter(components, x=0, y=1, color=y_train, title=f'Total Explained Variance: {total_var:.2f}%',)
+    fig.show()
+    
+
+# **Scale Values**¶
+
+In [23]:
+
+    
+    
+    from sklearn import preprocessing
+    
+    scaler = preprocessing.StandardScaler()
+    scaler.fit(all_train_enc)
+    X_train_transformed = scaler.transform(all_train_enc_over_sampled)
+    X_test_transformed = scaler.transform(all_test_enc)
+    all_test_df_transformed = scaler.transform(all_test_df_enc)
+    
+
+# **Models**¶
+
+In [24]:
+
+    
+    
+    from collections import Counter 
+    
+    #calculate class weight for XGBoost
+    counter = Counter(y_train)
+    weight_estimate = counter[0] / counter[1]
+    print('Estimate: %.3f' % weight_estimate)
+    # this is mainly for scale_pos_weight in xgboost since it's not support class_weight='balanced' like option
+    # weights is manual in xgboost
+    # eg. xgtest=XGBClassifier(random_state=55,  scale_pos_weight=weight_estimate)
+    
+    
+    
+    Estimate: 0.966
+    
+
+In [25]:
+
+    
+    
+    rf=RandomForestClassifier(random_state=55, n_jobs=-1)
+    lr=LogisticRegression(random_state=55, n_jobs=-1)
+    sv = SVC(probability=True,random_state=55,)
+    logreg = LogisticRegression(solver='newton-cg',random_state=55, n_jobs=-1) 
+    gb = GradientBoostingClassifier(random_state=55)
+    gnb = GaussianNB()
+    xgb = XGBClassifier(random_state=55, nthread=-1)
+    
+
+In [26]:
+
+    
+    
+    models=[rf, lr, logreg, gb, gnb, xgb]
+    cv = StratifiedKFold(5, shuffle=True, random_state=42)
+    
+
+# **Run Models**¶
+
+In [27]:
+
+    
+    
+    model_results = pd.DataFrame()
+    row_number = 0
+    results = []
+    names = []
+    
+    for ml in models:
+        model_name=ml.__class__.__name__
+        print('Training %s model ' % model_name)
+        cv_results = cross_validate(ml, X_train_transformed, y_train, cv=cv, scoring='roc_auc', return_train_score=True, n_jobs=-1 )
+        model_results.loc[row_number,'Model Name']=model_name
+        model_results.loc[row_number, 'Train roc_auc  Mean']=cv_results['train_score'].mean()
+        model_results.loc[row_number, 'Test roc_auc  Mean']=cv_results['test_score'].mean()
+        model_results.loc[row_number, 'Fit Time Mean']=cv_results['fit_time'].mean()
+        results.append(cv_results)
+        names.append(model_name)
+        
+        row_number+=1
+    
+    
+    
+    Training RandomForestClassifier model 
+    Training LogisticRegression model 
+    Training LogisticRegression model 
+    Training GradientBoostingClassifier model 
+    Training GaussianNB model 
+    Training XGBClassifier model 
+    
+
+In [28]:
+
+    
+    
+    cv_results_array = []
+    for tt in results:
+        cv_results_array.append(tt['test_score'])
+    
+    fig = plt.figure(figsize=(18, 6))
+    fig.suptitle('Algorithm Comparison')
+    ax = fig.add_subplot(111)
+    plt.boxplot(cv_results_array)
+    ax.set_xticklabels(names)
+    plt.show()
+    
+
+![](__results___files/__results___46_0.png)
+
+In [29]:
+
+    
+    
+    display(model_results.style.background_gradient(cmap='summer_r'))
+    
+
+| Model Name | Train roc_auc Mean | Test roc_auc Mean | Fit Time Mean  
+---|---|---|---|---  
+0 | RandomForestClassifier | 1.000000 | 0.978786 | 130.722252  
+1 | LogisticRegression | 0.819184 | 0.819101 | 1.450915  
+2 | LogisticRegression | 0.819184 | 0.819101 | 3.658544  
+3 | GradientBoostingClassifier | 0.969027 | 0.968937 | 143.601240  
+4 | GaussianNB | 0.844047 | 0.844026 | 0.240293  
+5 | XGBClassifier | 0.982417 | 0.980024 | 76.713828  
+  
+**RandomForest Classifier** looks overfit so XGBoost looks better
+
+Let's also see xgb eval metrics here
+
+In [30]:
+
+    
+    
+    eval_set = [(X_train_transformed, y_train), (X_test_transformed,y_test)]
+    xgtest=XGBClassifier(random_state=55, nthread=-1)
+    xgtest.fit(X_train_transformed, y_train, eval_metric=["auc", "logloss", "error"], eval_set=eval_set, verbose=False)
+    
+
+Out[30]:
+
+    
+    
+    XGBClassifier(base_score=0.5, booster='gbtree', colsample_bylevel=1,
+                  colsample_bynode=1, colsample_bytree=1, gamma=0, gpu_id=-1,
+                  importance_type='gain', interaction_constraints='',
+                  learning_rate=0.300000012, max_delta_step=0, max_depth=6,
+                  min_child_weight=1, missing=nan, monotone_constraints='()',
+                  n_estimators=100, n_jobs=-1, nthread=-1, num_parallel_tree=1,
+                  random_state=55, reg_alpha=0, reg_lambda=1, scale_pos_weight=1,
+                  subsample=1, tree_method='exact', validate_parameters=1,
+                  verbosity=None)
+
+In [31]:
+
+    
+    
+    y_scores=xgtest.predict(X_test_transformed)
+    roc_auc_score(y_test, y_scores)
+    
+
+Out[31]:
+
+    
+    
+    0.5228473752723634
+
+In [32]:
+
+    
+    
+    from matplotlib import pyplot
+    results = xgtest.evals_result()
+    epochs = len(results['validation_0']['error'])
+    x_axis = range(0, epochs)
+    # plot log loss
+    fig, ax = pyplot.subplots()
+    ax.plot(x_axis, results['validation_0']['logloss'], label='Train')
+    ax.plot(x_axis, results['validation_1']['logloss'], label='Test')
+    ax.legend()
+    pyplot.ylabel('Log Loss')
+    pyplot.title('XGBoost Log Loss')
+    pyplot.show()
+    # plot classification error
+    fig, ax = pyplot.subplots()
+    ax.plot(x_axis, results['validation_0']['error'], label='Train')
+    ax.plot(x_axis, results['validation_1']['error'], label='Test')
+    ax.legend()
+    pyplot.ylabel('Classification Error')
+    pyplot.title('XGBoost Classification Error')
+    # plot auc
+    fig, ax = pyplot.subplots()
+    ax.plot(x_axis, results['validation_0']['auc'], label='Train')
+    ax.plot(x_axis, results['validation_1']['auc'], label='Test')
+    ax.legend()
+    pyplot.ylabel('AUC')
+    pyplot.title('XGBoost AUC Score')
+    pyplot.show()
+    
+
+![](__results___files/__results___52_0.png)
+
+![](__results___files/__results___52_1.png)
+
+![](__results___files/__results___52_2.png)
+
+# **ROC Curve**¶
+
+A receiver operating characteristic curve, or ROC curve, is a graphical plot
+that illustrates the diagnostic ability of a binary classifier system as its
+discrimination threshold is varied. The method was developed for operators of
+military radar receivers, which is why it is so named.The ROC curve is created
+by plotting the true positive rate (TPR) against the false positive rate (FPR)
+at various threshold settings. The true-positive rate is also known as
+sensitivity, recall or probability of detection in machine learning. The
+false-positive rate is also known as probability of false alarm and can be
+calculated as (1 â specificity).
+
+![](https://upload.wikimedia.org/wikipedia/commons/3/36/ROC_space-2.png)
+
+Reference: <https://en.wikipedia.org/wiki/Receiver_operating_characteristic>
+
+In [33]:
+
+    
+    
+    gb_proba=xgtest.predict_proba(X_test_transformed)[:,1]
+    
+
+In [34]:
+
+    
+    
+    fpr, tpr, thresholds  = roc_curve(y_test, gb_proba)
+    
+    
+    plt.title('XGBoost ROC curve')
+    plt.xlabel('FPR (Precision)')
+    plt.ylabel('TPR (Recall)')
+    
+    plt.plot(fpr,tpr)
+    plt.plot((0,1), ls='dashed',color='black')
+    plt.show()
+    print ('Area under curve (AUC): ', format(round(auc(fpr,tpr),5)))
+    
+
+![](__results___files/__results___55_0.png)
+
+    
+    
+    Area under curve (AUC):  0.85525
+    
+
+# **Insights of Best Model**¶
+
+Analyze internals of best model. **XGBoost** in this case.
+
+## **Classification Report**¶
+
+The classification report visualizer displays the precision, recall, F1, and
+support scores for the model. In order to support easier interpretation and
+problem detection, the report integrates numerical scores with a color-coded
+heatmap. All heatmaps are in the range (0.0, 1.0) to facilitate easy
+comparison of classification models across different classification reports.
+
+<https://www.scikit-
+yb.org/en/latest/api/classifier/classification_report.html>
+
+In [35]:
+
+    
+    
+    from yellowbrick.classifier import ClassificationReport
+    
+    
+    def view_report(model,X,y):
+        visualizer = ClassificationReport(
+            model, classes=['0', '1'],
+            cmap="YlGn", size=(600, 360)
+        )
+        visualizer.fit(X,y)
+        visualizer.score(X,y)
+        visualizer.show()
+    
+
+In [36]:
+
+    
+    
+    model = xgtest
+    view_report(model,X_train_transformed, y_train)
+    
+
+![](__results___files/__results___59_0.png)
+
+## **Class Prediction Error**¶
+
+The Yellowbrick ClassPredictionError plot is a twist on other and sometimes
+more familiar classification model diagnostic tools like the Confusion Matrix
+and Classification Report. Like the Classification Report, this plot shows the
+support (number of training samples) for each class in the fitted
+classification model as a stacked bar chart. Each bar is segmented to show the
+proportion of predictions (including false negatives and false positives, like
+a Confusion Matrix) for each class.
+
+<https://www.scikit-
+yb.org/en/latest/api/classifier/class_prediction_error.html>
+
+In [37]:
+
+    
+    
+    from yellowbrick.classifier import ClassPredictionError
+    
+    def show_errors(model, X_train,y_train,X_test,y_test):
+        classes=['Not Responded','Responded']
+        visualizer = ClassPredictionError(model)
+    
+        visualizer.fit(X_train, y_train)
+        visualizer.score(X_test, y_test)
+        visualizer.show()
+    
+
+In [38]:
+
+    
+    
+    model = xgtest
+    show_errors(model, X_train_transformed, y_train,X_test_transformed,y_test)
+    
+
+![](__results___files/__results___62_0.png)
+
+## **Discrimination Threshold**¶
+
+A visualization of precision, recall, f1 score, and queue rate with respect to
+the discrimination threshold of a binary classifier. The discrimination
+threshold is the probability or score at which the positive class is chosen
+over the negative class. Generally, this is set to 50% but the threshold can
+be adjusted to increase or decrease the sensitivity to false positives or to
+other application factors.
+
+<https://www.scikit-yb.org/en/latest/api/classifier/threshold.html>
+
+In [39]:
+
+    
+    
+    from yellowbrick.classifier import DiscriminationThreshold
+    
+    model = xgtest
+    
+    visualizer = DiscriminationThreshold(model, n_trials=1,excludestr=['queue_rate'],random_state=55)
+    visualizer.fit(X_train_transformed, y_train)
+    visualizer.show()
+    
+
+![](__results___files/__results___64_0.png)
+
+Out[39]:
+
+    
+    
+    <matplotlib.axes._subplots.AxesSubplot at 0x7fcd192e5390>
+
+# **SHAP**¶
+
+In [40]:
+
+    
+    
+    import shap
+    
+    shap.initjs()
+    X_test_shap_sample = pd.DataFrame(X_test_transformed, columns=X_test.columns).sample(100, random_state=42)
+    
+    explainer = shap.TreeExplainer(xgtest)
+    shap_values = explainer.shap_values(X_test_shap_sample)
+    
+
+![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAAWCAYAAAA1vze2AAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAdxJREFUeNq0Vt1Rg0AQJjcpgBJiBWIFkgoMFYhPPAIVECogPuYpdJBYgXQQrMCUkA50V7+d2ZwXuXPGm9khHLu3f9+3l1nkWNvtNqfHLgpfQ1EUS3tz5nAQ0+NIsiAZSc6eDlI8M3J00B/mDuUKDk6kfOebAgW3pkdD0pFcODGW4gKKvOrAUm04MA4QDt1OEIXU9hDigfS5rC1eS5T90gltck1Xrizo257kgySZcNRzgCSxCvgiE9nckPJo2b/B2AcEkk2OwL8bD8gmOKR1GPbaCUqxEgTq0tLvgb6zfo7+DgYGkkWL2tqLDV4RSITfbHPPfJKIrWz4nJQTMPAWA7IbD6imcNaDeDfgk+4No+wZr40BL3g9eQJJCFqRQ54KiSt72lsLpE3o3MCBSxDuq4yOckU2hKXRuwBH3OyMR4g1UpyTYw6mlmBqNdUXRM1NfyF5EPI6JkcpIDBIX8jX6DR/6ckAZJ0wEAdLR8DEk6OfC1Pp8BKo6TQIwPJbvJ6toK5lmuvJoRtfK6Ym1iRYIarRo2UyYHvRN5qpakR3yoizWrouoyuXXQqI185LCw07op5ZyCRGL99h24InP0e9xdQukEKVmhzrqZuRIfwISB//cP3Wk3f8f/yR+BRgAHu00HjLcEQBAAAAAElFTkSuQmCC)
+
+In [41]:
+
+    
+    
+    # visualize the first prediction's explanation
+    shap.force_plot(explainer.expected_value, shap_values[0,:], X_test_shap_sample.iloc[0,:])
+    
+
+Out[41]:
+
+**Visualization omitted, Javascript library not loaded!**  
+Have you run `initjs()` in this notebook? If this notebook was from another
+user you must also trust this notebook (File -> Trust notebook). If you are
+viewing this notebook on github the Javascript has been stripped for security.
+If you are using JupyterLab this error is because a JupyterLab extension has
+not yet been written.
+
+In [42]:
+
+    
+    
+    # summarize the effects of all the features
+    shap.summary_plot(shap_values, X_test_shap_sample)
+    
+
+![](__results___files/__results___68_0.png)
+
+In [43]:
+
+    
+    
+    # mean absolute value of the SHAP values for each feature
+    shap.summary_plot(shap_values, X_test_shap_sample, plot_type="bar")
+    
+
+![](__results___files/__results___69_0.png)
+
+In [44]:
+
+    
+    
+    # visualize the test set predictions
+    shap.force_plot(explainer.expected_value, shap_values, X_test_shap_sample)
+    
+
+Out[44]:
+
+**Visualization omitted, Javascript library not loaded!**  
+Have you run `initjs()` in this notebook? If this notebook was from another
+user you must also trust this notebook (File -> Trust notebook). If you are
+viewing this notebook on github the Javascript has been stripped for security.
+If you are using JupyterLab this error is because a JupyterLab extension has
+not yet been written.
+
+In [45]:
+
+    
+    
+    shap_interaction_values = explainer.shap_interaction_values(X_test_shap_sample)
+    shap.summary_plot(shap_interaction_values, X_test_shap_sample)
+    
+
+![](__results___files/__results___71_0.png)
+
+# **Submission**¶
+
+In [46]:
+
+    
+    
+    tt=pd.read_csv('../input/health-insurance-cross-sell-prediction/sample_submission.csv')
+    id=tt.id
+    
+
+In [47]:
+
+    
+    
+    best_model=XGBClassifier(random_state=55)
+    best_model.fit(X_train_transformed, y_train)
+    
+
+Out[47]:
+
+    
+    
+    XGBClassifier(base_score=0.5, booster='gbtree', colsample_bylevel=1,
+                  colsample_bynode=1, colsample_bytree=1, gamma=0, gpu_id=-1,
+                  importance_type='gain', interaction_constraints='',
+                  learning_rate=0.300000012, max_delta_step=0, max_depth=6,
+                  min_child_weight=1, missing=nan, monotone_constraints='()',
+                  n_estimators=100, n_jobs=0, num_parallel_tree=1, random_state=55,
+                  reg_alpha=0, reg_lambda=1, scale_pos_weight=1, subsample=1,
+                  tree_method='exact', validate_parameters=1, verbosity=None)
+
+In [48]:
+
+    
+    
+    preds=best_model.predict_proba(all_test_df_transformed)[:,1]
+    
+
+In [49]:
+
+    
+    
+    submission = pd.DataFrame(data = {'id': id, 'Response': preds})
+    submission.to_csv('vehicle_insurance.csv', index = False)
+    submission.head()
+    
+
+Out[49]:
+
+| id | Response  
+---|---|---  
+0 | 381110 | 0.000917  
+1 | 381111 | 0.292785  
+2 | 381112 | 0.368626  
+3 | 381113 | 0.004337  
+4 | 381114 | 0.000589
+
